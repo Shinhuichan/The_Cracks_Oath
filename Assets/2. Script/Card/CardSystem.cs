@@ -101,7 +101,6 @@ namespace GameCore
             "오태훈" => Build_오태훈(),
             "유민정" => Build_유민정(),
             "김태양" => Build_김태양(),
-            "류승우" => Build_류승우(),
             "백무적" => Build_백무적(),
             "이하린" => Build_이하린(),
             _ => Build_Default(who),
@@ -254,21 +253,6 @@ namespace GameCore
             A.rules.Add(I => !I.s.IsFirst && I.s.lastOpp == CardType.Pollution && I.HandHas(CardType.Doubt) ? CardType.Doubt : (CardType?)null);
             A.rules.Add(I => I.HandHas(CardType.Cooperation) ? CardType.Cooperation : (CardType?)null);
             A.fallback = new[] { CardType.Betrayal, CardType.Pollution, CardType.Doubt, CardType.Cooperation, CardType.Chaos };
-            return A;
-        }
-
-        // 류승우
-        static Agent Build_류승우()
-        {
-            var A = new Agent("류승우");
-            A.rules.Add(I => I.s.round <= 2 && I.HandHas(CardType.Cooperation) ? CardType.Cooperation : (CardType?)null);
-            A.rules.Add(I => !I.s.IsFirst && I.s.lastOpp == CardType.Pollution && I.HandHas(CardType.Doubt) ? CardType.Doubt : (CardType?)null);
-            A.rules.Add(I => I.s.round >= 3 && I.s.lastOpp == CardType.Cooperation && I.s.last2Opp == CardType.Cooperation && I.s.selfLife >= I.s.oppLife && I.HandHas(CardType.Pollution) ? CardType.Pollution : (CardType?)null);
-            A.rules.Add(I => I.HandHas(CardType.Cooperation) ? CardType.Cooperation : (CardType?)null);
-            A.rules.Add(I => I.s.round >= 9 && I.s.lastOpp == CardType.Cooperation && I.s.selfLife >= I.s.oppLife && I.HandHas(CardType.Betrayal) ? CardType.Betrayal : (CardType?)null);
-            A.rules.Add(I => I.s.selfLife <= 4 && I.HandHas(CardType.Chaos) ? CardType.Chaos : (CardType?)null);
-            A.rules.Add(I => I.s.selfLife > I.s.oppLife && I.HandHas(CardType.Pollution) ? CardType.Pollution : (CardType?)null);
-            A.fallback = new[] { CardType.Cooperation, CardType.Doubt, CardType.Pollution, CardType.Betrayal, CardType.Chaos };
             return A;
         }
         static Agent Build_백무적()
