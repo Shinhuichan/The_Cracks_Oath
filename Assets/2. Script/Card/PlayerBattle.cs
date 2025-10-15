@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TMPro;
 using GameCore;
+using System;
 
 // === 참가자 목록 ===
 public enum AgentList
@@ -31,7 +32,7 @@ public class PlayerBattle : MonoBehaviour
         public string cardName;
         public Sprite sprite;
     }
-
+    
     // ---------- 설정 ----------
     [Header("설정")]
     public AgentList agentName = AgentList.김현수;
@@ -71,7 +72,13 @@ public class PlayerBattle : MonoBehaviour
     [Header("UI - 현재 순위(호환용)")]
     public TMP_Text rankText;            // 기존 단일 표기(플레이어와 동일 내용 표시)
 
+    [Header("Recon Peek UI")]
+    [SerializeField] private UnityEngine.UI.Image reconImageLeft;
+    [SerializeField] private UnityEngine.UI.Image reconImageRight;
+    [SerializeField] private float reconPeekAutoHideSec = 2.0f;
+
     // ---------- 내부 상태 ----------
+    private Dictionary<CardType, Sprite> spriteByType;
     private Dictionary<string, Sprite> nameToSprite;
     private CardSystem sys;
     private Agent agent;
@@ -101,6 +108,10 @@ public class PlayerBattle : MonoBehaviour
     private int miniCount = 0, miniTotal = 0;
     private string roundTextBackup = null;
 
+    // ▼ 추가
+    private bool miniAllowInput = false;              // 플레이어 직접 조작 허용
+    private Action<int,int> onMiniDone = null;        // (PLAYER, 상대) 미니 점수 콜백
+
     // 매치 기록 구조
     private struct MatchRec
     {
@@ -116,7 +127,7 @@ public class PlayerBattle : MonoBehaviour
         if (btn0) btn0.onClick.AddListener(() => OnPick(0));
         if (btn1) btn1.onClick.AddListener(() => OnPick(1));
         if (btn2) btn2.onClick.AddListener(() => OnPick(2));
-        BuildLookup();
+        BuildSpriteLookup();
 
         if (playerChosenImage) { playerChosenImage.preserveAspect = true; playerChosenImage.gameObject.SetActive(false); }
         if (opponentChosenImage){ opponentChosenImage.preserveAspect = true; opponentChosenImage.gameObject.SetActive(false); }
@@ -143,7 +154,7 @@ public class PlayerBattle : MonoBehaviour
 
     void OnValidate()
     {
-        BuildLookup();
+        BuildSpriteLookup();
         if (btn0) EnsureImage(btn0).preserveAspect = true;
         if (btn1) EnsureImage(btn1).preserveAspect = true;
         if (btn2) EnsureImage(btn2).preserveAspect = true;
@@ -177,9 +188,16 @@ public class PlayerBattle : MonoBehaviour
         if (playerIndex < 0 || playerIndex >= sys.playerIHands.Count) return;
 
         var pCard = sys.playerIHands[playerIndex];
+
+        // (Recon 미리보기용) 상대 손패 스냅샷과 상대 선택 카드 계산
+        var oppHandBefore = new List<CardType>(sys.playerIIHands);
         var unseenA = BuildUnseen(false);
         var aCard = agent.Choose(new DecisionInput(sys.playerIIHands, ac, unseenA));
         int aIndex = IndexOfType(sys.playerIIHands, aCard); if (aIndex < 0) aIndex = 0;
+
+        // 플레이어가 Recon을 사용했다면, 상대가 실제로 낸 카드(aCard)를 제외한 나머지 2장을 UI에 표시
+        if (pCard == CardType.Recon)
+            ShowReconPeek(oppHandBefore, aCard);
 
         int hpPBefore = sys.playerILife, hpABefore = sys.playerIILife;
         sys.ResolveRoundByIndex(playerIndex, aIndex);
@@ -201,7 +219,7 @@ public class PlayerBattle : MonoBehaviour
         if (playerHpAmountText)  playerHpAmountText.text  = FmtDelta(dP);
         if (agentHpAmountText)   agentHpAmountText.text   = FmtDelta(dA);
 
-        RevealChosenCards(GetSprite(pCard), GetSprite(aCard));
+        RevealChosenCards(GetSpriteFor(pCard), GetSpriteFor(aCard));
 
         round++; pc.round = round; ac.round = round;
 
@@ -222,39 +240,62 @@ public class PlayerBattle : MonoBehaviour
             if (btn1) btn1.interactable = false;
             if (btn2) btn2.interactable = false;
 
-            AwardPlayerMatchPoints();
-            UpdateBothRankUI();
-
-            bool playerDoneAll = AllOpponentsCleared();
-
-            if (!playerDoneAll)
+            // ▼ 미니 직접 경기인 경우: 리그 기록/시뮬 생략하고 콜백으로 점수 전달
+            if (inMini && miniAllowInput)
             {
-                string verdict =
-                    sys.playerILost && sys.playerIILost ? "무승부(동반 탈락)" :
-                    sys.playerILost ? $"{agent.name} 승" :
-                    sys.playerIILost ? "플레이어 승" :
-                    (sys.playerILife == sys.playerIILife ? "무승부(판정)" :
-                     sys.playerILife > sys.playerIILife ? "플레이어 승(판정)" : $"{agent.name} 승(판정)");
+                var (pPts, aPts) = ComputeCurrentMatchPts();
+                miniAllowInput = false;           // 입력 종료
+                onMiniDone?.Invoke(pPts, aPts);   // 미니 점수 반영
+                onMiniDone = null;
 
-                if (resultText)
-                    resultText.text = $"결과: {verdict}  |  총 라운드 {round - 1}";
+                // 미니 경기에서는 재시작/다음매치 버튼 숨김
+                if (retryButton) retryButton.gameObject.SetActive(true);
+                if (nextMatchButton) nextMatchButton.gameObject.SetActive(false);
             }
-
-            if (retryButton) { retryButton.gameObject.SetActive(true); retryButton.interactable = true; }
-            if (nextMatchButton) { nextMatchButton.gameObject.SetActive(true); nextMatchButton.interactable = true; }
-
-            if (playerDoneAll) suppressOtherMatchOutput = true;
-
-            if (simulateOthers) StartCoroutine(SimulateAIRoundCoroutine());
-
-            if (playerDoneAll && rr12Consumed.Count >= rr12Rounds.Count)
+            else
             {
-                if (nextMatchButton) { nextMatchButton.interactable = false; nextMatchButton.gameObject.SetActive(false); }
-                StartCoroutine(ShowFinalStandingsCoroutine());
+                // ▼ 일반 매치인 경우: 리그 기록/시뮬 진행
+                AwardPlayerMatchPoints();
+                UpdateBothRankUI();
+
+                bool playerDoneAll = AllOpponentsCleared();
+
+                if (!playerDoneAll)
+                {
+                    string verdict =
+                        sys.playerILost && sys.playerIILost ? "무승부(동반 탈락)" :
+                        sys.playerILost ? $"{agent.name} 승" :
+                        sys.playerIILost ? "플레이어 승" :
+                        (sys.playerILife == sys.playerIILife ? "무승부(판정)" :
+                         sys.playerILife > sys.playerIILife ? "플레이어 승(판정)" : $"{agent.name} 승(판정)");
+
+                    if (resultText)
+                        resultText.text = $"결과: {verdict}  |  총 라운드 {round - 1}";
+                }
+
+                if (retryButton) { retryButton.gameObject.SetActive(true); retryButton.interactable = true; }
+                if (nextMatchButton) { nextMatchButton.gameObject.SetActive(true); nextMatchButton.interactable = true; }
+
+                if (playerDoneAll) suppressOtherMatchOutput = true;
+
+                if (simulateOthers) StartCoroutine(SimulateAIRoundCoroutine());
+
+                if (playerDoneAll && rr12Consumed.Count >= rr12Rounds.Count)
+                {
+                    if (nextMatchButton) { nextMatchButton.interactable = false; nextMatchButton.gameObject.SetActive(false); }
+                    StartCoroutine(ShowFinalStandingsCoroutine());
+                }
             }
         }
     }
-
+    private (int pPts, int aPts) ComputeCurrentMatchPts()
+    {
+        int pPts, aPts;
+        if ((sys.playerILost && sys.playerIILost) || (sys.playerILife == sys.playerIILife)) { pPts = 1; aPts = 1; }
+        else if (sys.playerIILost || sys.playerILife > sys.playerIILife) { pPts = 2; aPts = 0; }
+        else { pPts = 0; aPts = 2; }
+        return (pPts, aPts);
+    }
     void AwardPlayerMatchPoints()
     {
         int pPts, aPts;
@@ -426,7 +467,7 @@ public class PlayerBattle : MonoBehaviour
     void SetButton(Button b, int idx)
     {
         if (!b) return;
-        bool ok = idx < sys.playerIHands.Count && !finished && !inMini;
+        bool ok = idx < sys.playerIHands.Count && !finished && (!inMini || miniAllowInput);
         b.interactable = ok;
 
         var img = EnsureImage(b);
@@ -434,12 +475,21 @@ public class PlayerBattle : MonoBehaviour
 
         Sprite s = fallbackSprite;
         if (idx < sys.playerIHands.Count)
-        {
-            string key = sys.playerIHands[idx].ToString();
-            if (nameToSprite != null && nameToSprite.TryGetValue(Norm(key), out var sp)) s = sp;
-        }
+            s = GetSpriteFor(sys.playerIHands[idx]);
         img.sprite = s;
         img.enabled = s != null;
+    }
+    void SetRetry(bool visible, bool interactable)
+    {
+        if (!retryButton) return;
+        retryButton.gameObject.SetActive(visible);
+        retryButton.interactable = visible && interactable;
+    }
+    void SetNextMatch(bool visible, bool interactable)
+    {
+        if (!nextMatchButton) return;
+        nextMatchButton.gameObject.SetActive(visible);
+        nextMatchButton.interactable = visible && interactable;
     }
 
     // ---------- 선택 카드 연출 ----------
@@ -515,7 +565,7 @@ public class PlayerBattle : MonoBehaviour
         playerOpponentOrder = new List<AgentList>(roster);
         for (int i = playerOpponentOrder.Count - 1; i > 0; i--)
         {
-            int j = Random.Range(0, i + 1);
+            int j = UnityEngine.Random.Range(0, i + 1);
             (playerOpponentOrder[i], playerOpponentOrder[j]) = (playerOpponentOrder[j], playerOpponentOrder[i]);
         }
     }
@@ -635,14 +685,74 @@ public class PlayerBattle : MonoBehaviour
         RefreshUI();
 
         for (int i = 0; i < names.Count; i++)
-            for (int j = i + 1; j < names.Count; j++)
+        for (int j = i + 1; j < names.Count; j++)
+        {
+            string A = names[i], B = names[j];
+
+            if (A != PLAYER && B != PLAYER)
             {
-                yield return SimulateMiniPair(names[i], names[j], (a,b)=>{ miniPts[names[i]] += a; miniPts[names[j]] += b; });
+                // AI vs AI (그대로)
+                yield return SimulateMiniPair(A, B, (a,b)=>{ miniPts[A]+=a; miniPts[B]+=b; });
+                continue;
             }
 
+            // ▶ PLAYER가 포함된 미니 매치: 직접 플레이
+            string oppName = (A == PLAYER) ? B : A;
+            if (!System.Enum.TryParse<AgentList>(oppName, out var oppEnum))
+            {
+                Debug.LogError($"[Mini] Unknown opponent '{oppName}'"); 
+                continue;
+            }
+
+            // 매치 세팅
+            miniAllowInput = true;
+            onMiniDone = (p,a) => { miniPts[PLAYER] += p; miniPts[oppName] += a; miniCount++; RefreshUI(); };
+            yield return StartMiniMatchAgainst(oppEnum);   // 완료까지 대기
+        }
+
         inMini = false;
+        miniAllowInput = false;
         miniCount = miniTotal = 0;
         RefreshUI();
+    }
+
+    // 플레이어가 직접 치르는 미니 매치 1경기 시작→완료 대기
+    IEnumerator StartMiniMatchAgainst(AgentList opp)
+    {
+        // 기존 RestartRoutine과 유사하되 버튼/텍스트 초기화만 수행
+        finished = false;
+        round = 1;
+
+        HideChosenCards();
+        if (playerCurrentHpText) playerCurrentHpText.text = string.Empty;
+        if (agentCurrentHpText)  agentCurrentHpText.text  = string.Empty;
+        if (playerHpAmountText)  playerHpAmountText.text  = string.Empty;
+        if (agentHpAmountText)   agentHpAmountText.text   = string.Empty;
+        if (resultText) resultText.text = string.Empty;
+
+        // 상대 세팅
+        agentName = opp;
+        yield return EnsureFreshSystem();
+        agent = AgentFactory.Create(agentName.ToString());
+
+        pc = new RoundCtx { round = 1, selfLife = sys.startLife, oppLife = sys.startLife,
+                            lastSelf = CardType.None, lastOpp = CardType.None,
+                            last2Opp = CardType.None, last3Opp = CardType.None };
+        ac = pc;
+
+        if (opponentNameText) opponentNameText.text = agent.name;
+
+        // 미니 입력 허용 상태에서 버튼 활성화
+        if (btn0) btn0.interactable = true;
+        if (btn1) btn1.interactable = true;
+        if (btn2) btn2.interactable = true;
+
+        RefreshUI();
+
+        // ▶ 플레이어가 경기를 끝낼 때까지 대기
+        yield return new WaitUntil(() => finished && !miniAllowInput);
+
+        // UI 정리(다음 미니 매치에서 다시 세팅됨)
     }
 
     // ---------- 최종 순위(코루틴) ----------
@@ -651,13 +761,16 @@ public class PlayerBattle : MonoBehaviour
         if (resultText) resultText.text = string.Empty;
         if (othersMatchLog) othersMatchLog.text = string.Empty;
 
-        var totals = BuildPointTable();
-
+        var totals = BuildPointTable();                                   // 전체 승점 표                                                                         :contentReference[oaicite:0]{index=0}
         var byScore = totals.GroupBy(kv => kv.Value)
                             .OrderByDescending(g => g.Key)
-                            .ToList();
+                            .ToList();                                     // 점수별 그룹화                                                                      :contentReference[oaicite:1]{index=1}
 
         LogLine("=== 최종 순위(승: 2/무: 1/패: 0) ===");
+
+        // 플레이어의 동점 그룹만 미니 라운드로빈 대상
+        if (!totals.TryGetValue(PLAYER, out var pPts)) pPts = -1;          // PLAYER = "플레이어"                                                                :contentReference[oaicite:2]{index=2}
+        var playerGroup = byScore.FirstOrDefault(g => g.Key == pPts);
 
         int rankCursor = 1;
         foreach (var grp in byScore)
@@ -665,6 +778,7 @@ public class PlayerBattle : MonoBehaviour
             var names = grp.Select(kv => kv.Key).ToList();
             int groupSize = names.Count;
 
+            // 단독 순위
             if (groupSize == 1)
             {
                 string n = names[0];
@@ -673,35 +787,46 @@ public class PlayerBattle : MonoBehaviour
                 continue;
             }
 
-            // 미니 라운드로빈(플레이어 포함)
-            var miniPts = names.ToDictionary(n => n, _ => 0);
-            yield return MiniRoundRobinCoroutine(names, miniPts);
-
-            // 미니 점수 내림차순으로 서브그룹화
-            var subGroups = names.GroupBy(n => miniPts[n])
-                                 .OrderByDescending(g => g.Key)
-                                 .ToList();
-
-            foreach (var sub in subGroups)
+            // 플레이어가 속한 동점 그룹만 미니 라운드로빈 수행
+            if (playerGroup != null && ReferenceEquals(grp, playerGroup))
             {
-                var subNames = sub.ToList();
-                if (subNames.Count == 1)
+                var miniPts = names.ToDictionary(n => n, _ => 0);
+                yield return MiniRoundRobinCoroutine(names, miniPts);      // 플레이어 포함 소그룹만 미니                                                      :contentReference[oaicite:3]{index=3}
+
+                // 미니 결과로 같은 점수 내 서브정렬
+                var subGroups = names.GroupBy(n => miniPts[n])
+                                    .OrderByDescending(g => g.Key)
+                                    .ToList();
+
+                foreach (var sub in subGroups)
                 {
-                    string n = subNames[0];
-                    LogLine($"{rankCursor}. {n} — {totals[n]}점 (미니:{miniPts[n]})");
-                    rankCursor += 1;
+                    var subNames = sub.ToList();
+                    if (subNames.Count == 1)
+                    {
+                        string n = subNames[0];
+                        LogLine($"{rankCursor}. {n} — {totals[n]}점 (미니:{miniPts[n]})");
+                        rankCursor += 1;
+                    }
+                    else
+                    {
+                        int worstRank = rankCursor + subNames.Count - 1;
+                        foreach (var n in subNames)
+                            LogLine($"{worstRank}. {n} — {totals[n]}점 (동점, 미니도 동률:{miniPts[n]} → 공동 최하)");
+                        rankCursor += subNames.Count;
+                    }
                 }
-                else
-                {
-                    int worstRank = rankCursor + subNames.Count - 1;
-                    foreach (var n in subNames)
-                        LogLine($"{worstRank}. {n} — {totals[n]}점 (동점, 미니도 동률:{miniPts[n]} → 공동 최하)");
-                    rankCursor += subNames.Count;
-                }
+            }
+            else
+            {
+                // 플레이어가 없는 동점 그룹은 미니 없이 공동 최하 처리
+                int worstRank = rankCursor + groupSize - 1;
+                foreach (var n in names)
+                    LogLine($"{worstRank}. {n} — {totals[n]}점 (동점, 플레이어 미포함 그룹)");
+                rankCursor += groupSize;
             }
         }
 
-        UpdateBothRankUI();
+        UpdateBothRankUI();                                                // 순위 UI 갱신                                                                      :contentReference[oaicite:4]{index=4}
     }
 
     // ---------- 순위 UI 갱신(플레이어+상대) ----------
@@ -777,6 +902,36 @@ public class PlayerBattle : MonoBehaviour
             if (!string.IsNullOrEmpty(k)) nameToSprite[k] = v.sprite;
         }
     }
+    void BuildSpriteLookup()
+    {
+        spriteByType = new Dictionary<CardType, Sprite>();
+        nameToSprite = new Dictionary<string, Sprite>();
+
+        foreach (var cv in cardVisuals)
+        {
+            // 1) enum으로 파싱 성공 시 가장 신뢰
+            if (Enum.TryParse<CardType>(cv.cardName, true, out var t))
+                spriteByType[t] = cv.sprite;
+
+            // 2) 문자열 키도 보조로 유지(과거 데이터 호환)
+            var k = NormalizeKey(cv.cardName);
+            if (!string.IsNullOrEmpty(k))
+                nameToSprite[k] = cv.sprite;
+        }
+    }
+    // 통합 조회 함수만 사용하도록 교체
+    Sprite GetSpriteFor(CardType type)
+    {
+        if (spriteByType != null && spriteByType.TryGetValue(type, out var sp) && sp) return sp;
+
+        var k = NormalizeKey(type.ToString());
+        if (nameToSprite != null && nameToSprite.TryGetValue(k, out sp) && sp) return sp;
+
+    #if UNITY_EDITOR
+        Debug.LogWarning($"[CardSprite] miss '{type}' → fallback. normKey='{k}'");
+    #endif
+        return fallbackSprite;
+    }
 
     static string Norm(string s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 
@@ -822,12 +977,12 @@ public class PlayerBattle : MonoBehaviour
         return -1;
     }
 
-    Sprite GetSprite(CardType t)
-    {
-        var key = t.ToString();
-        if (nameToSprite != null && nameToSprite.TryGetValue(Norm(key), out var sp) && sp) return sp;
-        return fallbackSprite;
-    }
+    // Sprite GetSprite(CardType t)
+    // {
+    //     var key = t.ToString();
+    //     if (nameToSprite != null && nameToSprite.TryGetValue(Norm(key), out var sp) && sp) return sp;
+    //     return fallbackSprite;
+    // }
 
     // 12명(짝수) 라운드로빈 스케줄 생성
     static List<(string A, string B)[]> BuildRoundRobinEven(List<string> players)
@@ -851,5 +1006,51 @@ public class PlayerBattle : MonoBehaviour
             arr.Insert(1, last);
         }
         return outRounds;
+    }
+    static string NormalizeKey(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return string.Empty;
+        // 제로-위드, NBSP 제거 + Trim + 대소문자 통일
+        var cleaned = s.Replace("\u200B","").Replace("\uFEFF","").Replace("\u200C","").Replace("\u200D","").Replace("\u00A0"," ");
+        return cleaned.Trim().ToLowerInvariant();
+    }
+
+    // ---- Recon 미리보기 ----
+    private void ClearReconPeek()
+    {
+        if (reconImageLeft)  { reconImageLeft.sprite  = null; reconImageLeft.enabled  = false; }
+        if (reconImageRight) { reconImageRight.sprite = null; reconImageRight.enabled = false; }
+    }
+
+    private System.Collections.IEnumerator HideReconAfter(float sec)
+    {
+        yield return new WaitForSeconds(sec);
+        ClearReconPeek();
+    }
+
+    /// <summary>
+    /// 플레이어가 Recon을 냈을 때, target의 "라운드 제출 전 손패"에서
+    /// 실제로 낸 카드 한 장을 제외한 남은 2장을 UI에 노출한다.
+    /// </summary>
+    private void ShowReconPeek(IReadOnlyList<CardType> targetHandBeforeSubmit, CardType targetSubmitted)
+    {
+        var remaining = new List<CardType>(targetHandBeforeSubmit);
+        int idx = remaining.FindIndex(c => c == targetSubmitted);
+        if (idx >= 0) remaining.RemoveAt(idx); // 제출 카드 1장만 제거
+
+        ClearReconPeek();
+
+        if (remaining.Count > 0 && reconImageLeft)
+        {
+            reconImageLeft.sprite  = GetSpriteFor(remaining[0]);
+            reconImageLeft.enabled = reconImageLeft.sprite != null;
+        }
+        if (remaining.Count > 1 && reconImageRight)
+        {
+            reconImageRight.sprite  = GetSpriteFor(remaining[1]);
+            reconImageRight.enabled = reconImageRight.sprite != null;
+        }
+
+        if (reconPeekAutoHideSec > 0f) StartCoroutine(HideReconAfter(reconPeekAutoHideSec));
     }
 }
