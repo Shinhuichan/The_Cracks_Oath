@@ -6,6 +6,7 @@ using System.Linq;
 using TMPro;
 using GameCore;
 using System;
+using CustomInspector;
 
 // === 참가자 목록 ===
 public enum AgentList
@@ -32,13 +33,12 @@ public class PlayerBattle : MonoBehaviour
         public string cardName;
         public Sprite sprite;
     }
-    
+
     // ---------- 설정 ----------
     [Header("설정")]
-    public AgentList agentName = AgentList.김현수;
-    public int maxRounds = 10;
+    [ReadOnly] public AgentList agentName = AgentList.김현수;
     [Tooltip("미니 라운드로빈에서 플레이어를 대리할 AI")]
-    public AgentList playerProxyForMini = AgentList.김현수;
+    [ReadOnly] public AgentList playerProxyForMini = AgentList.김현수;
 
     [Header("버튼(플레이어가 0/1/2 인덱스를 선택)")]
     public Button btn0, btn1, btn2;
@@ -76,6 +76,9 @@ public class PlayerBattle : MonoBehaviour
     [SerializeField] private UnityEngine.UI.Image reconImageLeft;
     [SerializeField] private UnityEngine.UI.Image reconImageRight;
     [SerializeField] private float reconPeekAutoHideSec = 2.0f;
+
+    [Header("UI - 자연재해 상태")]
+    public TMP_Text disasterText;
 
     // ---------- 내부 상태 ----------
     private Dictionary<CardType, Sprite> spriteByType;
@@ -178,6 +181,7 @@ public class PlayerBattle : MonoBehaviour
 
         if (opponentNameText) opponentNameText.text = agent.name;
         RefreshUI();
+        HookDisasterUI();
         UpdateBothRankUI();
     }
 
@@ -233,7 +237,7 @@ public class PlayerBattle : MonoBehaviour
     void CheckEnd()
     {
         if (finished) return;
-        if (round > maxRounds || sys.playerILost || sys.playerIILost)
+        if (round > sys.maxRounds || sys.playerILost || sys.playerIILost)
         {
             finished = true;
             if (btn0) btn0.interactable = false;
@@ -292,8 +296,8 @@ public class PlayerBattle : MonoBehaviour
     {
         int pPts, aPts;
         if ((sys.playerILost && sys.playerIILost) || (sys.playerILife == sys.playerIILife)) { pPts = 1; aPts = 1; }
-        else if (sys.playerIILost || sys.playerILife > sys.playerIILife) { pPts = 2; aPts = 0; }
-        else { pPts = 0; aPts = 2; }
+        else if (sys.playerIILost || sys.playerILife > sys.playerIILife) { pPts = 3; aPts = 0; }
+        else { pPts = 0; aPts = 3; }
         return (pPts, aPts);
     }
     void AwardPlayerMatchPoints()
@@ -302,9 +306,9 @@ public class PlayerBattle : MonoBehaviour
         if ((sys.playerILost && sys.playerIILost) || (sys.playerILife == sys.playerIILife))
         { pPts = 1; aPts = 1; }
         else if (sys.playerIILost || sys.playerILife > sys.playerIILife)
-        { pPts = 2; aPts = 0; }
+        { pPts = 3; aPts = 0; }
         else
-        { pPts = 0; aPts = 2; }
+        { pPts = 0; aPts = 3; }
 
         leagueMatches.Add(new MatchRec(PLAYER, agent.name, pPts, aPts));
         playedOnce.Add(agentName);
@@ -314,6 +318,19 @@ public class PlayerBattle : MonoBehaviour
     {
         int totalOpponents = roster.Count; // 11
         return playedOnce.Count >= totalOpponents;
+    }
+    void HookDisasterUI()
+    {
+        if (!sys) return;
+        // 초기 표시
+        if (disasterText) disasterText.text = sys.CurrentDisasterLabel;
+        // 중복 구독 방지 위해 먼저 해제 후 구독
+        sys.OnDisasterUIChanged -= OnDisasterUIChanged;
+        sys.OnDisasterUIChanged += OnDisasterUIChanged;
+    }
+    void OnDisasterUIChanged(string label)
+    {
+        if (disasterText) disasterText.text = label;
     }
 
     // ---------- 재시도(리그 전체 리셋) ----------
@@ -353,6 +370,7 @@ public class PlayerBattle : MonoBehaviour
         agentName = playerOpponentOrder[playerOppIdx];
 
         yield return EnsureFreshSystem();
+        HookDisasterUI();
 
         agent = AgentFactory.Create(agentName.ToString());
 
@@ -410,6 +428,7 @@ public class PlayerBattle : MonoBehaviour
         if (othersMatchLog) othersMatchLog.text = string.Empty;
 
         yield return EnsureFreshSystem();
+        HookDisasterUI();
 
         agent = AgentFactory.Create(agentName.ToString());
 
@@ -443,7 +462,7 @@ public class PlayerBattle : MonoBehaviour
         {
             if (roundText)
             {
-                roundText.text = $"Round {Mathf.Min(round, maxRounds)} / {maxRounds}";
+                roundText.text = $"Round {Mathf.Min(round, sys.maxRounds)} / {sys.maxRounds}";
             }
             roundTextBackup = null;
         }
@@ -455,6 +474,8 @@ public class PlayerBattle : MonoBehaviour
     {
         if (playerHpText)   playerHpText.text   = $"{sys.playerILife}";
         if (opponentHpText) opponentHpText.text = $"{sys.playerIILife}";
+        if (playerCurrentHpText) playerCurrentHpText.text = $"{sys.playerILife}";   // playerCurrentHpText
+        if (agentCurrentHpText)  agentCurrentHpText.text  = $"{sys.playerIILife}"; // agentCurrentHpText
     }
 
     void UpdateButtonsAndSprites()
@@ -584,7 +605,7 @@ public class PlayerBattle : MonoBehaviour
         var c2 = c1;
 
         int r = 1;
-        while (r <= maxRounds && !sim.playerILost && !sim.playerIILost)
+        while (r <= sys.maxRounds && !sim.playerILost && !sim.playerIILost)
         {
             var unseen1 = sim.BuildUnseen(true);
             var unseen2 = sim.BuildUnseen(false);
@@ -610,8 +631,8 @@ public class PlayerBattle : MonoBehaviour
 
         int pa, pb;
         if ((sim.playerILost && sim.playerIILost) || (sim.playerILife == sim.playerIILife)) { pa = 1; pb = 1; }
-        else if (sim.playerIILost || sim.playerILife > sim.playerIILife) { pa = 2; pb = 0; }
-        else { pa = 0; pb = 2; }
+        else if (sim.playerIILost || sim.playerILife > sim.playerIILife) { pa = 3; pb = 0; }
+        else { pa = 0; pb = 3; }
         leagueMatches.Add(new MatchRec(A1.ToString(), A2.ToString(), pa, pb));
 
         if (!suppressOtherMatchOutput)
@@ -645,7 +666,7 @@ public class PlayerBattle : MonoBehaviour
         var c2 = c1;
 
         int r = 1;
-        while (r <= maxRounds && !sim.playerILost && !sim.playerIILost)
+        while (r <= sys.maxRounds && !sim.playerILost && !sim.playerIILost)
         {
             var t1 = ag1.Choose(new DecisionInput(sim.playerIHands,  c1, sim.BuildUnseen(true)));
             var t2 = ag2.Choose(new DecisionInput(sim.playerIIHands, c2, sim.BuildUnseen(false)));
@@ -666,8 +687,8 @@ public class PlayerBattle : MonoBehaviour
 
         int pa, pb;
         if ((sim.playerILost && sim.playerIILost) || (sim.playerILife == sim.playerIILife)) { pa = 1; pb = 1; }
-        else if (sim.playerIILost || sim.playerILife > sim.playerIILife) { pa = 2; pb = 0; }
-        else { pa = 0; pb = 2; }
+        else if (sim.playerIILost || sim.playerILife > sim.playerIILife) { pa = 3; pb = 0; }
+        else { pa = 0; pb = 3; }
 
         onDone?.Invoke(pa, pb);
         Destroy(go);
@@ -706,7 +727,7 @@ public class PlayerBattle : MonoBehaviour
 
             // 매치 세팅
             miniAllowInput = true;
-            onMiniDone = (p,a) => { miniPts[PLAYER] += p; miniPts[oppName] += a; miniCount++; RefreshUI(); };
+                onMiniDone = (p, a) => { miniPts[PLAYER] += p; miniPts[oppName] += a; miniCount++; RefreshUI(); UpdateBothRankUI(); };
             yield return StartMiniMatchAgainst(oppEnum);   // 완료까지 대기
         }
 
@@ -733,6 +754,8 @@ public class PlayerBattle : MonoBehaviour
         // 상대 세팅
         agentName = opp;
         yield return EnsureFreshSystem();
+        HookDisasterUI();
+
         agent = AgentFactory.Create(agentName.ToString());
 
         pc = new RoundCtx { round = 1, selfLife = sys.startLife, oppLife = sys.startLife,
@@ -756,78 +779,64 @@ public class PlayerBattle : MonoBehaviour
     }
 
     // ---------- 최종 순위(코루틴) ----------
-    IEnumerator ShowFinalStandingsCoroutine()
+IEnumerator ShowFinalStandingsCoroutine()
+{
+    if (resultText) resultText.text = string.Empty;
+    if (othersMatchLog) othersMatchLog.text = string.Empty;
+
+    var totals   = BuildPointTable();                  // 전체 승점
+    var byScore  = totals.GroupBy(kv => kv.Value)
+                         .OrderByDescending(g => g.Key)
+                         .ToList();
+
+    LogLine("=== 최종 순위(승: 2/무: 1/패: 0) ===");
+
+    int rankCursor = 1;
+    foreach (var grp in byScore)
     {
-        if (resultText) resultText.text = string.Empty;
-        if (othersMatchLog) othersMatchLog.text = string.Empty;
+        var names = grp.Select(kv => kv.Key).ToList();
+        int groupSize = names.Count;
 
-        var totals = BuildPointTable();                                   // 전체 승점 표                                                                         :contentReference[oaicite:0]{index=0}
-        var byScore = totals.GroupBy(kv => kv.Value)
-                            .OrderByDescending(g => g.Key)
-                            .ToList();                                     // 점수별 그룹화                                                                      :contentReference[oaicite:1]{index=1}
-
-        LogLine("=== 최종 순위(승: 2/무: 1/패: 0) ===");
-
-        // 플레이어의 동점 그룹만 미니 라운드로빈 대상
-        if (!totals.TryGetValue(PLAYER, out var pPts)) pPts = -1;          // PLAYER = "플레이어"                                                                :contentReference[oaicite:2]{index=2}
-        var playerGroup = byScore.FirstOrDefault(g => g.Key == pPts);
-
-        int rankCursor = 1;
-        foreach (var grp in byScore)
+        // 단독 순위는 그대로 확정
+        if (groupSize == 1)
         {
-            var names = grp.Select(kv => kv.Key).ToList();
-            int groupSize = names.Count;
+            string n = names[0];
+            LogLine($"{rankCursor}. {n} — {totals[n]}점");
+            rankCursor += 1;
+            continue;
+        }
 
-            // 단독 순위
-            if (groupSize == 1)
+        // 동점 그룹은 모두 미니 라운드로빈 실행
+        var miniPts = names.ToDictionary(n => n, _ => 0);
+        UpdateBothRankUI();
+        yield return MiniRoundRobinCoroutine(names, miniPts);   // 플레이어가 없으면 전부 AI 자동
+
+        // 미니 결과로 재정렬(내림차순)
+        var subGroups = names.GroupBy(n => miniPts[n])
+                             .OrderByDescending(g => g.Key)
+                             .ToList();
+
+        foreach (var sub in subGroups)
+        {
+            var subNames = sub.ToList();
+            if (subNames.Count == 1)
             {
-                string n = names[0];
-                LogLine($"{rankCursor}. {n} — {totals[n]}점");
+                string n = subNames[0];
+                LogLine($"{rankCursor}. {n} — {totals[n]}점 (미니:{miniPts[n]})");
                 rankCursor += 1;
-                continue;
-            }
-
-            // 플레이어가 속한 동점 그룹만 미니 라운드로빈 수행
-            if (playerGroup != null && ReferenceEquals(grp, playerGroup))
-            {
-                var miniPts = names.ToDictionary(n => n, _ => 0);
-                yield return MiniRoundRobinCoroutine(names, miniPts);      // 플레이어 포함 소그룹만 미니                                                      :contentReference[oaicite:3]{index=3}
-
-                // 미니 결과로 같은 점수 내 서브정렬
-                var subGroups = names.GroupBy(n => miniPts[n])
-                                    .OrderByDescending(g => g.Key)
-                                    .ToList();
-
-                foreach (var sub in subGroups)
-                {
-                    var subNames = sub.ToList();
-                    if (subNames.Count == 1)
-                    {
-                        string n = subNames[0];
-                        LogLine($"{rankCursor}. {n} — {totals[n]}점 (미니:{miniPts[n]})");
-                        rankCursor += 1;
-                    }
-                    else
-                    {
-                        int worstRank = rankCursor + subNames.Count - 1;
-                        foreach (var n in subNames)
-                            LogLine($"{worstRank}. {n} — {totals[n]}점 (동점, 미니도 동률:{miniPts[n]} → 공동 최하)");
-                        rankCursor += subNames.Count;
-                    }
-                }
             }
             else
             {
-                // 플레이어가 없는 동점 그룹은 미니 없이 공동 최하 처리
-                int worstRank = rankCursor + groupSize - 1;
-                foreach (var n in names)
-                    LogLine($"{worstRank}. {n} — {totals[n]}점 (동점, 플레이어 미포함 그룹)");
-                rankCursor += groupSize;
+                // 미니도 동률이면 공동 최하 처리
+                int worstRank = rankCursor + subNames.Count - 1;
+                foreach (var n in subNames)
+                    LogLine($"{worstRank}. {n} — {totals[n]}점 (동점, 미니도 동률:{miniPts[n]} → 공동 최하)");
+                rankCursor += subNames.Count;
             }
         }
-
-        UpdateBothRankUI();                                                // 순위 UI 갱신                                                                      :contentReference[oaicite:4]{index=4}
     }
+    UpdateBothRankUI();
+}
 
     // ---------- 순위 UI 갱신(플레이어+상대) ----------
     void UpdateBothRankUI()
@@ -946,8 +955,15 @@ public class PlayerBattle : MonoBehaviour
 
     IEnumerator EnsureFreshSystem()
     {
-        if (sys != null) Destroy(sys);
-        sys = gameObject.AddComponent<CardSystem>();
+        if (sys == null)
+            sys = GetComponent<CardSystem>();
+        if (sys == null)
+            sys = gameObject.AddComponent<CardSystem>(); // 씬에 없을 때만 생성
+
+        // 인스펙터에서 선택한 모드 유지
+        sys.ApplyModeIfAvailable();
+        sys.ResetForNewMatch();
+
         yield return null;
         yield return new WaitUntil(() => sys.publicDeck != null && sys.publicDeck.Count > 0);
         sys.ClearLoseFlags();
