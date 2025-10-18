@@ -8,21 +8,7 @@ using GameCore;
 using System;
 using CustomInspector;
 
-// === 참가자 목록 ===
-public enum AgentList
-{
-    김현수 = 1,
-    이수진,
-    최용호,
-    한지혜,
-    박민재,
-    정다은,
-    오태훈,
-    유민정,
-    김태양,
-    이하린,
-    백무적
-}
+
 
 [RequireComponent(typeof(CardSystem))]
 public class PlayerBattle : MonoBehaviour
@@ -47,7 +33,13 @@ public class PlayerBattle : MonoBehaviour
     public TMP_Text roundText, opponentNameText, playerHpText, opponentHpText;
 
     [Header("UI - 전 라운드 결과")]
-    public TMP_Text resultText, playerCurrentHpText, agentCurrentHpText, playerHpAmountText, agentHpAmountText;
+    public TMP_Text resultText, playerCurrentHpText, agentCurrentHpText;
+
+    [Header("UI - 피해 세부")]
+    public TMP_Text playerCardDeltaText;
+    public TMP_Text playerDisasterDeltaText;
+    public TMP_Text agentCardDeltaText;
+    public TMP_Text agentDisasterDeltaText;
 
     [Header("카드 비주얼 매핑")]
     public CardVisual[] cardVisuals;
@@ -76,6 +68,9 @@ public class PlayerBattle : MonoBehaviour
     [SerializeField] private UnityEngine.UI.Image reconImageLeft;
     [SerializeField] private UnityEngine.UI.Image reconImageRight;
     [SerializeField] private float reconPeekAutoHideSec = 2.0f;
+
+    [Header("선택형 드로우 UI")]
+    public UnityEngine.UI.Image choiceLeftImage, choiceRightImage;
 
     [Header("UI - 자연재해 상태")]
     public TMP_Text disasterText;
@@ -113,7 +108,7 @@ public class PlayerBattle : MonoBehaviour
 
     // ▼ 추가
     private bool miniAllowInput = false;              // 플레이어 직접 조작 허용
-    private Action<int,int> onMiniDone = null;        // (PLAYER, 상대) 미니 점수 콜백
+    private Action<int, int> onMiniDone = null;        // (PLAYER, 상대) 미니 점수 콜백
 
     // 매치 기록 구조
     private struct MatchRec
@@ -153,6 +148,10 @@ public class PlayerBattle : MonoBehaviour
         rr12Rounds = BuildRoundRobinEven(names12);
 
         BuildPlayerOpponentOrder();
+
+        sys.OnOfferChoiceForPlayer += HandleOfferChoiceForPlayer; // 두 장 미리보기 표시
+        sys.OnChoiceClosed         += HideChoiceUI;               // 선택 UI 닫기
+        sys.OnPlayerHandChanged    += RenderHand3;                // 손패 3장 재그리기
     }
 
     void OnValidate()
@@ -166,14 +165,20 @@ public class PlayerBattle : MonoBehaviour
     IEnumerator Start()
     {
         yield return EnsureFreshSystem();
+        sys.OnOfferChoiceForPlayer -= HandleOfferChoiceForPlayer;
+        sys.OnOfferChoiceForPlayer += HandleOfferChoiceForPlayer;
+        HideChoiceUI(); // 초기에는 숨김
 
         if (playerOpponentOrder == null || playerOpponentOrder.Count != roster.Count)
             BuildPlayerOpponentOrder();
         playerOppIdx = 0;
         agentName = playerOpponentOrder[playerOppIdx];
-
         agent = AgentFactory.Create(agentName.ToString());
 
+        sys.opponentStyle = (agent.name == "김현수")
+            ? CardSystem.AgentStyle.김현수
+            : CardSystem.AgentStyle.Generic;
+            
         pc = new RoundCtx { round = 1, selfLife = sys.startLife, oppLife = sys.startLife,
                             lastSelf = CardType.None, lastOpp = CardType.None,
                             last2Opp = CardType.None, last3Opp = CardType.None };
@@ -188,42 +193,54 @@ public class PlayerBattle : MonoBehaviour
     // ---------- 라운드 입력 ----------
     void OnPick(int playerIndex)
     {
+        // 선택형 드로우 중이면 입력 무시
+        bool choiceOpen =
+            (choiceLeftImage && choiceLeftImage.gameObject.activeInHierarchy) ||
+            (choiceRightImage && choiceRightImage.gameObject.activeInHierarchy);
+            
+        if (choiceOpen) return;
         if (finished) return;
         if (playerIndex < 0 || playerIndex >= sys.playerIHands.Count) return;
 
         var pCard = sys.playerIHands[playerIndex];
 
-        // (Recon 미리보기용) 상대 손패 스냅샷과 상대 선택 카드 계산
+        // 상대 선택 추정은 그대로
         var oppHandBefore = new List<CardType>(sys.playerIIHands);
         var unseenA = BuildUnseen(false);
         var aCard = agent.Choose(new DecisionInput(sys.playerIIHands, ac, unseenA));
         int aIndex = IndexOfType(sys.playerIIHands, aCard); if (aIndex < 0) aIndex = 0;
 
-        // 플레이어가 Recon을 사용했다면, 상대가 실제로 낸 카드(aCard)를 제외한 나머지 2장을 UI에 표시
-        if (pCard == CardType.Recon)
-            ShowReconPeek(oppHandBefore, aCard);
+        if (pCard == CardType.Recon) ShowReconPeek(oppHandBefore, aCard);
 
         int hpPBefore = sys.playerILife, hpABefore = sys.playerIILife;
+
+        // 라운드 해결
         sys.ResolveRoundByIndex(playerIndex, aIndex);
 
+        // ▼ 강풍 등으로 교체된 “최종 제출 카드”로 스프라이트 표시
+        var finalP = sys.lastSubmittedP1;
+        var finalA = sys.lastSubmittedP2;
+        RevealChosenCards(GetSpriteFor(finalP), GetSpriteFor(finalA));
+
+        // 상태 갱신 로직은 기존 그대로
         pc.last3Opp = pc.last2Opp; ac.last3Opp = ac.last2Opp;
         pc.last2Opp = pc.lastOpp;  ac.last2Opp = ac.lastOpp;
-        pc.lastOpp  = aCard;       ac.lastOpp  = pCard;
+        pc.lastOpp  = aCard;       ac.lastOpp  = pCard; // 패턴 추적은 ‘선택’ 기준 유지
         pc.lastSelf = pCard;       ac.lastSelf = aCard;
 
         pc.selfLife = sys.playerILife;  pc.oppLife = sys.playerIILife;
         ac.selfLife = sys.playerIILife; ac.oppLife = sys.playerILife;
 
+        // … 기존 총합 표시는 유지
         int hpPAfter = sys.playerILife, hpAAfter = sys.playerIILife;
         int dP = hpPAfter - hpPBefore;
         int dA = hpAAfter - hpABefore;
 
-        if (playerCurrentHpText) playerCurrentHpText.text = $"{hpPAfter}";
-        if (agentCurrentHpText)  agentCurrentHpText.text  = $"{hpAAfter}";
-        if (playerHpAmountText)  playerHpAmountText.text  = FmtDelta(dP);
-        if (agentHpAmountText)   agentHpAmountText.text   = FmtDelta(dA);
-
-        RevealChosenCards(GetSpriteFor(pCard), GetSpriteFor(aCard));
+        // ▼ 분리된 카드/자연재해 피해 출력
+        if (playerCardDeltaText)     playerCardDeltaText.text     = FmtDelta(sys.lastCardDeltaP1);
+        if (playerDisasterDeltaText) playerDisasterDeltaText.text = FmtDelta(sys.lastDisasterDeltaP1);
+        if (agentCardDeltaText)      agentCardDeltaText.text      = FmtDelta(sys.lastCardDeltaP2);
+        if (agentDisasterDeltaText)  agentDisasterDeltaText.text  = FmtDelta(sys.lastDisasterDeltaP2);
 
         round++; pc.round = round; ac.round = round;
 
@@ -356,8 +373,11 @@ public class PlayerBattle : MonoBehaviour
         HideChosenCards();
         if (playerCurrentHpText) playerCurrentHpText.text = string.Empty;
         if (agentCurrentHpText)  agentCurrentHpText.text  = string.Empty;
-        if (playerHpAmountText)  playerHpAmountText.text  = string.Empty;
-        if (agentHpAmountText)   agentHpAmountText.text   = string.Empty;
+        if (playerCardDeltaText) playerCardDeltaText.text = string.Empty;
+        if (playerDisasterDeltaText) playerDisasterDeltaText.text = string.Empty;
+        if (agentCardDeltaText) agentCardDeltaText.text = string.Empty;
+        if (agentDisasterDeltaText) agentDisasterDeltaText.text = string.Empty;
+
         if (resultText) resultText.text = string.Empty;
         if (othersMatchLog) othersMatchLog.text = string.Empty;
         if (playerRankText) playerRankText.text = "-";
@@ -422,8 +442,11 @@ public class PlayerBattle : MonoBehaviour
 
         if (playerCurrentHpText) playerCurrentHpText.text = string.Empty;
         if (agentCurrentHpText)  agentCurrentHpText.text  = string.Empty;
-        if (playerHpAmountText)  playerHpAmountText.text  = string.Empty;
-        if (agentHpAmountText)   agentHpAmountText.text   = string.Empty;
+        if (playerCardDeltaText) playerCardDeltaText.text = string.Empty;
+        if (playerDisasterDeltaText) playerDisasterDeltaText.text = string.Empty;
+        if (agentCardDeltaText) agentCardDeltaText.text = string.Empty;
+        if (agentDisasterDeltaText) agentDisasterDeltaText.text = string.Empty;
+        
         if (resultText) resultText.text = string.Empty;
         if (othersMatchLog) othersMatchLog.text = string.Empty;
 
@@ -747,8 +770,10 @@ public class PlayerBattle : MonoBehaviour
         HideChosenCards();
         if (playerCurrentHpText) playerCurrentHpText.text = string.Empty;
         if (agentCurrentHpText)  agentCurrentHpText.text  = string.Empty;
-        if (playerHpAmountText)  playerHpAmountText.text  = string.Empty;
-        if (agentHpAmountText)   agentHpAmountText.text   = string.Empty;
+        if (playerCardDeltaText) playerCardDeltaText.text = string.Empty;
+        if (playerDisasterDeltaText) playerDisasterDeltaText.text = string.Empty;
+        if (agentCardDeltaText) agentCardDeltaText.text = string.Empty;
+        if (agentDisasterDeltaText) agentDisasterDeltaText.text = string.Empty;
         if (resultText) resultText.text = string.Empty;
 
         // 상대 세팅
@@ -894,6 +919,55 @@ IEnumerator ShowFinalStandingsCoroutine()
     }
 
     // ---------- 공용 유틸 ----------
+    // 핸들러 및 유틸
+    void LockHandDuringChoice(bool on)
+    {
+        if (btn0) btn0.interactable = !on;
+        if (btn1) btn1.interactable = !on;
+        if (btn2) btn2.interactable = !on;
+    }
+    void RenderHand3(System.Collections.Generic.List<GameCore.CardType> _)
+    {
+        // 선택 완료 후 패널 닫힘을 보장하고 버튼/스프라이트 3장 갱신
+        HideChoiceUI();
+        UpdateButtonsAndSprites();
+    }
+    void HandleOfferChoiceForPlayer(GameCore.CardType a, GameCore.CardType b)
+    {
+        LockHandDuringChoice(true);
+        var choiceLeftButton  = choiceLeftImage.gameObject.GetComponent<UnityEngine.UI.Button>();
+        var choiceRightButton = choiceRightImage.gameObject.GetComponent<UnityEngine.UI.Button>();
+
+        if (choiceLeftImage)  { choiceLeftImage.sprite  = GetSpriteFor(a); choiceLeftImage.enabled  = true; choiceLeftImage.gameObject.SetActive(true); }
+        if (choiceRightImage) { choiceRightImage.sprite = GetSpriteFor(b); choiceRightImage.enabled = true; choiceRightImage.gameObject.SetActive(true); }
+
+        if (choiceLeftButton)
+        {
+            choiceLeftButton.onClick.RemoveAllListeners();
+            choiceLeftButton.onClick.AddListener(() => { HideChoiceUI(); sys.SelectChoiceForPlayer(0); });
+            choiceLeftButton.gameObject.SetActive(true); choiceLeftButton.interactable = true;
+        }
+        if (choiceRightButton)
+        {
+            choiceRightButton.onClick.RemoveAllListeners();
+            choiceRightButton.onClick.AddListener(() => { HideChoiceUI(); sys.SelectChoiceForPlayer(1); });
+            choiceRightButton.gameObject.SetActive(true); choiceRightButton.interactable = true;
+        }
+    }
+    // 선택 패널 닫힐 때 손패 버튼 복구
+    void HideChoiceUI()
+    {
+        var choiceLeftButton  = choiceLeftImage.gameObject.GetComponent<UnityEngine.UI.Button>();
+        var choiceRightButton = choiceRightImage.gameObject.GetComponent<UnityEngine.UI.Button>();
+
+        if (choiceLeftImage)  choiceLeftImage.gameObject.SetActive(false);
+        if (choiceRightImage) choiceRightImage.gameObject.SetActive(false);
+        if (choiceLeftButton) choiceLeftButton.gameObject.SetActive(false);
+        if (choiceRightButton) choiceRightButton.gameObject.SetActive(false);
+
+        LockHandDuringChoice(false);  // <<< 추가
+        UpdateButtonsAndSprites();    // 손패 3장 다시 그림
+    }
     void LogLine(string s)
     {
         if (othersMatchLog) othersMatchLog.text += (othersMatchLog.text.Length > 0 ? "\n" : "") + s;
@@ -955,18 +1029,10 @@ IEnumerator ShowFinalStandingsCoroutine()
 
     IEnumerator EnsureFreshSystem()
     {
-        if (sys == null)
-            sys = GetComponent<CardSystem>();
-        if (sys == null)
-            sys = gameObject.AddComponent<CardSystem>(); // 씬에 없을 때만 생성
-
-        // 인스펙터에서 선택한 모드 유지
-        sys.ApplyModeIfAvailable();
-        sys.ResetForNewMatch();
-
+        sys = GetComponent<CardSystem>();
+        if (!sys) sys = gameObject.AddComponent<CardSystem>();
         yield return null;
-        yield return new WaitUntil(() => sys.publicDeck != null && sys.publicDeck.Count > 0);
-        sys.ClearLoseFlags();
+        sys.ResetForNewMatch();  // ← 덱/손패/라운드 초기화
     }
 
     IReadOnlyDictionary<CardType, int> BuildUnseen(bool forP1)
