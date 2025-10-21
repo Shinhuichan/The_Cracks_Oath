@@ -35,6 +35,7 @@ namespace GameCore
             => lastOpp != CardType.Doubt
             && last2Opp != CardType.Doubt
             && last3Opp != CardType.Doubt;
+        public List<CardType> oppHistory;
     }
     // ===== 에이전트 =====
     public sealed class Agent
@@ -64,6 +65,13 @@ namespace GameCore
     }
 
     // ===== 규칙 입력 =====
+    public static class DecisionInputExtensions
+{
+    public static List<CardType> HistoryOpponent(this DecisionInput I)
+    {
+        return I.s.oppHistory ?? new List<CardType>();
+    }
+}
     public readonly struct DecisionInput
     {
         public readonly List<CardType> hand;
@@ -154,15 +162,22 @@ namespace GameCore
         bool waitingChoice = false;
         GameCore.CardType pendingA, pendingB;
 
+        // 한파 제어 플래그
+        bool coldWaveJustStartedP1, coldWaveJustStartedP2;   // 한파가 ‘시작한’ 그 라운드에서만 드로우 스킵
+        bool coldWaveRecoverThisRoundP1, coldWaveRecoverThisRoundP2; // 한파가 ‘끝난’ 라운드에서 2장 복구
+        GameCore.CardSystem.NaturalDisaster lastDisaster;
+
         // 자연재해
-        public enum NaturalDisaster { Peace, Meteorite, Heatwave, Lightning, Gale, ColdWave }
+        public enum NaturalDisaster { Peace, Meteorite, Heatwave, Lightning, Storm, ColdWave, Eclipse, Sandstorm }
 
         [Header("Natural Disaster")]
         [SerializeField] int disasterSpan = 5; // 5라운드마다 교체
         [SerializeField] List<NaturalDisaster> disasterPool =
-            new() { NaturalDisaster.Peace, NaturalDisaster.Meteorite, NaturalDisaster.Heatwave,
-                    NaturalDisaster.Lightning, NaturalDisaster.Gale, NaturalDisaster.ColdWave };
-
+            new() {
+                NaturalDisaster.Peace, NaturalDisaster.Meteorite, NaturalDisaster.Heatwave,
+                NaturalDisaster.Lightning, NaturalDisaster.Storm, NaturalDisaster.ColdWave,
+                NaturalDisaster.Eclipse, NaturalDisaster.Sandstorm
+            };
         List<NaturalDisaster> disasterOrder;
         int disasterIndex = 0;
         public NaturalDisaster currentDisaster { get; private set; } = NaturalDisaster.Peace;
@@ -171,8 +186,8 @@ namespace GameCore
         public CardType lastSubmittedP1 { get; private set; } = CardType.None;
         public CardType lastSubmittedP2 { get; private set; } = CardType.None;
 
-        // Gale 전용: 제출 카드 치환 여부, ColdWave 전용: 라운드 종료 드로우 상한
-        bool galeCheckedThisRound = false;
+        // Storm 전용: 제출 카드 치환 여부, ColdWave 전용: 라운드 종료 드로우 상한
+        bool StormCheckedThisRound = false;
         bool extraLightningAppliedThisRound = false;
 
         public int lastCardDeltaP1, lastCardDeltaP2;         // 카드/혼합 효과로 변한 HP
@@ -190,28 +205,16 @@ namespace GameCore
         ApplyModeIfAvailable();
     }
 #endif
+        bool bootstrapped = false;
         void Start()
         {
-            // ▼ 직렬화 잔여값 정리
-            playerIHands.Clear();
-            playerIIHands.Clear();
-            discardCards.Clear();
-            bool bootstrapped;
+            if (bootstrapped) return;
+            bootstrapped = true;
 
-            void Start()
-            {
-                if (bootstrapped) return;
-                bootstrapped = true;
-                ResetForNewMatch();   // ← 덱 구성과 시작 드로우는 여기서만
-            }
-            // Add(publicDeck, CardType.Cooperation, cooperationCount);
-            // Add(publicDeck, CardType.Doubt,       doubtCount);
-            // Add(publicDeck, CardType.Betrayal,    betrayalCount);
-            // Add(publicDeck, CardType.Chaos,       chaosCount);
-            // Add(publicDeck, CardType.Pollution,   pollutionCount);
-            // if (interruptCount > 0) Add(publicDeck, CardType.Interrupt, interruptCount);
-            // if (reconCount > 0)     Add(publicDeck, CardType.Recon,     reconCount);
-            // publicDeck.Shuffle();
+            ApplyModeIfAvailable();     // 모드 반영
+            ResetForNewMatch();         // 덱 구성 + 시작 드로우 + 재해 초기화
+            BuildEffects_WithRecon();   // 효과 테이블
+            RaiseDisasterUI();
 
             // 정확히 3장만
             Draw(publicDeck, playerIHands, startingHand);
@@ -230,6 +233,9 @@ namespace GameCore
             currentDisaster = disasterOrder[0];
             OnDisasterStart(currentDisaster); // 태풍 즉시 반영 등
             RaiseDisasterUI();
+            // 한파 종료 시, 대기 중이던 복구 2장을 즉시 지급
+            GrantColdWaveCarryIfNeeded();
+            ApplyPhaseStartBonusIfNeeded();
         }
 
         public string CurrentDisasterLabel
@@ -242,8 +248,20 @@ namespace GameCore
         public void ResolveRoundAuto(Agent p1, Agent p2, RoundCtx ctxP1, RoundCtx ctxP2)
         {
             if (playerILost || playerIILost) return;
-            currentP1 = p1;                   // ▼ 추가
-            currentP2 = p2;                   // ▼ 추가
+
+            // 자동 매치일 땐 선택드로우 전부 비활성 보장
+            enableChoiceDrawForPlayer = false;
+            enableChoiceDrawForAgent  = true;
+
+            currentP1 = p1;
+            currentP2 = p2;
+
+            // 손패가 부족하면 먼저 채움(비주얼 UI 없이)
+            DrawToLimitByDisaster(true);
+            DrawToLimitByDisaster(false);
+
+            if (playerIHands.Count == 0 || playerIIHands.Count == 0) return;
+
             var unseenForP1 = BuildUnseen(true);
             var unseenForP2 = BuildUnseen(false);
 
@@ -257,10 +275,14 @@ namespace GameCore
 
         public void ResolveRoundByIndex(int p1Index, int p2Index)
         {
+            phaseBonusAppliedThisRound = false;
             if (playerILost || playerIILost) return;
 
-            galeCheckedThisRound = false;
+            StormCheckedThisRound = false;
             extraLightningAppliedThisRound = false;
+
+            int hpP_StartOfRound = playerILife;
+            int hpA_StartOfRound = playerIILife;
 
             // ▼ 분리된 피해 누적치 초기화
             lastCardDeltaP1 = lastCardDeltaP2 = 0;
@@ -272,11 +294,11 @@ namespace GameCore
             if (a == CardType.None || b == CardType.None) return;
 
             // --- 강풍: 40% 확률로 제출 카드 교체(양측 동일 확률)
-            if (currentDisaster == NaturalDisaster.Gale)
+            if (currentDisaster == NaturalDisaster.Storm)
             {
                 if (UnityEngine.Random.value < 0.25f) { playerIHands.Add(a); a = DrawOneForSubmit(); }
                 if (UnityEngine.Random.value < 0.25f) { playerIIHands.Add(b); b = DrawOneForSubmit(); }
-                galeCheckedThisRound = true;
+                StormCheckedThisRound = true;
             }
 
             // ▼ 최종 제출 카드 기록(스프라이트 표시용)
@@ -288,28 +310,28 @@ namespace GameCore
             int hpP_beforeCards = playerILife;
             int hpA_beforeCards = playerIILife;
 
-            // (B) 일반 카드 효과 → Chaos → Recon
+            // (B) 일반 카드 효과 → Chaos
             int dSelf = ef.selfUseRound ? (ef.self >= 0 ? +roundCounter : -roundCounter) : ef.self;
-            int dOpp  = ef.oppUseRound  ? (ef.opp  >= 0 ? +roundCounter : -roundCounter)  : ef.opp;
+            int dOpp = ef.oppUseRound ? (ef.opp >= 0 ? +roundCounter : -roundCounter) : ef.opp;
+            
+            // 월식: 일반 카드 수치 2배(Recon 제외, 수치만 배수. 리셋/정찰 같은 플래그는 그대로)
+            if (currentDisaster == NaturalDisaster.Eclipse)
+            {
+                dSelf *= 2;
+                dOpp  *= 2;
+            }
+
             playerILife  += dSelf;
             playerIILife += dOpp;
-
-            if (playerILife <= 0)  playerILost  = true;
-            if (playerIILife <= 0) playerIILost = true;
-
-            if (ef.repSelf) ReplaceHand(playerIHands);
-            if (ef.repOpp) ReplaceHand(playerIIHands);
             
-            if (ef.reconSelf) { lastSeenByP1 = new List<CardType>(playerIIHands); }
-            if (ef.reconOpp)  { lastSeenByP2 = new List<CardType>(playerIHands);  }
-
-            // ▼ 카드로 인한 순수 변화량 기록
+            // ★ 카드 피해 누적 기록 추가
             lastCardDeltaP1 += (playerILife  - hpP_beforeCards);
             lastCardDeltaP2 += (playerIILife - hpA_beforeCards);
 
-            if (playerILost || playerIILost) return;
+            if (ef.repSelf) ReplaceHand(playerIHands);   // Chaos(손패 리셋) 처리
+            if (ef.repOpp)  ReplaceHand(playerIIHands);
 
-            // (C) 라운드 종료 단계: 자연재해 → 라운드 피로 → 드로우 → 라운드 증가/자연재해 교체
+            // (C) 라운드 종료: 재해 → 라운드 피로 → 드로우
             ApplyDisasterEndEffects(a, b);
             if (playerILost || playerIILost) return;
 
@@ -326,6 +348,7 @@ namespace GameCore
             playerIILost |= playerIILife <= 0;
             if (playerILost || playerIILost) return;
 
+            // ▶ 그 다음 패 채움(한파면 DrawToLimitByDisaster 내부가 2장 상한 유지)
             if (!IsLastRound)
             {
                 DrawToLimitByDisaster(true);   // 플레이어
@@ -333,12 +356,31 @@ namespace GameCore
             }
             else
             {
-                // 선택 패널이 열려 있었다면 강제 종료
                 if (waitingChoice) { waitingChoice = false; OnChoiceClosed?.Invoke(); }
             }
 
+            // ▶ Recon 공개를 먼저
+            if (ef.reconSelf)
+                lastSeenByP1 = new List<CardType>(playerIIHands.Take(3));
+            if (ef.reconOpp)
+                lastSeenByP2 = new List<CardType>(playerIHands.Take(3));
+
+            // Peace: 라운드 총 변화량을 ±5로 캡(캡에 의한 보정은 재해 피해로 기록)
+            if (currentDisaster == NaturalDisaster.Peace)
+            {
+                const int CAP = 5;
+                void Cap(ref int hp, int start, ref int disasterDelta)
+                {
+                    int delta = hp - start;
+                    if (delta > CAP) { int adj = delta - CAP; hp -= adj; disasterDelta -= adj; }
+                    else if (delta < -CAP) { int adj = -CAP - delta; hp += adj; disasterDelta += adj; }
+                }
+                Cap(ref playerILife,  hpP_StartOfRound, ref lastDisasterDeltaP1);
+                Cap(ref playerIILife, hpA_StartOfRound, ref lastDisasterDeltaP2);
+            }
+
             roundCounter++;
-            // 5라운드마다 교체. 이미 쓴 재해는 재등장하지 않음. 모두 소진되면 평화 유지.
+            var prev = currentDisaster;
             if ((roundCounter - 1) % disasterSpan == 0)
             {
                 disasterIndex++;
@@ -347,9 +389,20 @@ namespace GameCore
                 else
                     currentDisaster = NaturalDisaster.Peace;
 
+                // ▼ 추가: 전환 플래그
+                if (currentDisaster == NaturalDisaster.ColdWave)
+                {
+                    coldWaveJustStartedP1 = coldWaveJustStartedP2 = true;
+                }
+                if (prev == NaturalDisaster.ColdWave && currentDisaster != NaturalDisaster.ColdWave)
+                {
+                    coldWaveRecoverThisRoundP1 = coldWaveRecoverThisRoundP2 = true;
+                }
+
                 OnDisasterStart(currentDisaster);
-                RaiseDisasterUI();   // ← 추가
+                RaiseDisasterUI();
             }
+            ApplyPhaseStartBonusIfNeeded();
         }
 
         public Dictionary<CardType, int> BuildUnseen(bool isP1)
@@ -373,6 +426,8 @@ namespace GameCore
         }
         public void ResetForNewMatch()
         {
+            carryAfterColdWaveP1 = carryAfterColdWaveP2 = false;
+
             ClearLoseFlags();
             publicDeck.Clear();
             playerIHands.Clear();
@@ -422,24 +477,31 @@ namespace GameCore
         }
         string ToKorean(NaturalDisaster d) => d switch
         {
-            NaturalDisaster.Peace => "맑음",
-            NaturalDisaster.Meteorite => "<color=grey>운석 충돌</color>",
-            NaturalDisaster.Heatwave => "<color=red>폭염</color>",
-            NaturalDisaster.Lightning => "<color=yellow>낙뢰</color>",
-            NaturalDisaster.Gale => "<color=black>강풍</color>",
-            NaturalDisaster.ColdWave => "<color=blue>한파</color>",
+            NaturalDisaster.Peace      => "평화",
+            NaturalDisaster.Meteorite  => "<color=grey>운석 충돌</color>",
+            NaturalDisaster.Heatwave   => "<color=red>폭염</color>",
+            NaturalDisaster.Lightning  => "<color=yellow>낙뢰</color>",
+            NaturalDisaster.Storm      => "<color=black>폭풍</color>",
+            NaturalDisaster.ColdWave   => "<color=blue>한파</color>",
+            NaturalDisaster.Eclipse    => "<color=#888>월식</color>",
+            NaturalDisaster.Sandstorm  => "<color=#caa566>황사</color>",
             _ => d.ToString()
         };
+
         string DisasterRule(NaturalDisaster d) => d switch
         {
-            NaturalDisaster.Peace     => "\n없음",
-            NaturalDisaster.Meteorite   => "\n각 참가자의 양초 * 2/3",
-            NaturalDisaster.Heatwave  => "\nRound마다 추가 양초 - 1",
-            NaturalDisaster.Lightning => "\nRound마다 25% 확률로 \n양초 - 3",
-            NaturalDisaster.Gale      => "\nRound마다 25% 확률로 \n제출된 카드 교체",
-            NaturalDisaster.ColdWave  => "\n최대 패 수급 2장으로 제한",
+            // Peace 변경: “라운드 총 변화량 |ΔHP| ≤ 5”
+            NaturalDisaster.Peace => "\n<size=24>한 라운드 내 양초 변화량을\n5로 제한</size>",
+            NaturalDisaster.Meteorite => "\n<size=24>각 참가자의 양초 * 2/3</size>",
+            NaturalDisaster.Heatwave => "\n<size=24>Round마다 추가 양초 - 1</size>",
+            NaturalDisaster.Lightning => "\n<size=24>Round마다 25% 확률로\n각 참가자의 양초 - 3</size>",
+            NaturalDisaster.Storm => "\n<size=24>Round마다 25% 확률로\n제출 카드 교체</size>",
+            NaturalDisaster.ColdWave => "\n<size=24>최대 패 수급 2장으로 제한</size>",
+            NaturalDisaster.Eclipse => "\n<size=24>일반 카드의 효과를 2배로 증폭</size>",
+            NaturalDisaster.Sandstorm => "\n<size=24>Pollution이 공개되면,\n각 참가자의 양초 - 1</size>",
             _ => ""
         };
+        
         CardType DrawOneForSubmit()
         {
             // publicDeck에서 1장 뽑아 제출용으로만 사용
@@ -494,14 +556,27 @@ namespace GameCore
                     }
                     break;
 
-                case NaturalDisaster.Gale:
+                case NaturalDisaster.Storm:
                     // 제출 단계에서 이미 처리
                     break;
 
                 case NaturalDisaster.ColdWave:
                     // 드로우 단계에서 처리(2장 상한)
                     break;
-
+                case NaturalDisaster.Sandstorm:
+                    {
+                        bool polluted = (a == CardType.Pollution) || (b == CardType.Pollution);
+                        if (polluted)
+                        {
+                            playerILife  = Mathf.Max(0, playerILife  - 1);
+                            playerIILife = Mathf.Max(0, playerIILife - 1);
+                            lastDisasterDeltaP1 -= 1;
+                            lastDisasterDeltaP2 -= 1;
+                            playerILost  |= playerILife  <= 0;
+                            playerIILost |= playerIILife <= 0;
+                        }
+                        break;
+                    }
                 case NaturalDisaster.Peace:
                 case NaturalDisaster.Heatwave:
                 case NaturalDisaster.Meteorite:
@@ -541,10 +616,11 @@ namespace GameCore
             // 매치 종료/대기 중이면 무시
             if (IsMatchEnded || waitingChoice) return;
 
-            // 플레이어의 선택 드로우가 꺼져 있으면 일반 드로우
-            if (!enableChoiceDrawForPlayer)
+            // H2H처럼 UI 구독자가 없거나 기능을 끈 경우 → 자동 드로우(Chaos 제외 1장)
+            bool noUI = OnOfferChoiceForPlayer == null;
+            if (!enableChoiceDrawForPlayer || noUI)
             {
-                var c = DrawOne(publicDeck);
+                var c = DrawNonChaosFromPublic();              // 기존 DrawOne 대신 Chaos 제외
                 if (c != CardType.None) playerIHands.Add(c);
                 OnPlayerHandChanged?.Invoke(new List<CardType>(playerIHands));
                 return;
@@ -558,31 +634,77 @@ namespace GameCore
             // UI에 두 장 통지(구독자가 없으면 null-safe)
             OnOfferChoiceForPlayer?.Invoke(pendingA, pendingB);
         }
-        // 기존 DrawToLimitByDisaster(List<CardType> hand) 수정
+        bool carryAfterColdWaveP1 = false, carryAfterColdWaveP2 = false;
         private void DrawToLimitByDisaster(bool isP1)
         {
             if (IsMatchEnded) return;
             var hand = isP1 ? playerIHands : playerIIHands;
 
-            while (hand.Count < 3)
+            int limit = (currentDisaster == NaturalDisaster.ColdWave) ? 2 : 3;
+
+            // 1) 한파 '시작' 라운드: 이번 라운드만 드로우 스킵
+            if (currentDisaster == NaturalDisaster.ColdWave)
+            {
+                bool justStarted = isP1 ? coldWaveJustStartedP1 : coldWaveJustStartedP2;
+                if (justStarted)
+                {
+                    if (isP1) coldWaveJustStartedP1 = false; else coldWaveJustStartedP2 = false;
+                    if (waitingChoice) { waitingChoice = false; OnChoiceClosed?.Invoke(); }
+                    return; // 손패 2장 유지
+                }
+            }
+
+            // 2) 한파 '종료' 라운드 복구: 선택 없이 즉시 3장까지
+            bool recover = isP1 ? coldWaveRecoverThisRoundP1 : coldWaveRecoverThisRoundP2;
+            if (recover && currentDisaster != NaturalDisaster.ColdWave)
+            {
+                while (hand.Count < 3)
+                {
+                    var c = DrawOne(publicDeck);
+                    if (c == CardType.None) break;
+                    hand.Add(c);
+                }
+                if (isP1) { coldWaveRecoverThisRoundP1 = false; OnPlayerHandChanged?.Invoke(new List<CardType>(playerIHands)); }
+                else      { coldWaveRecoverThisRoundP2 = false; }
+                return;
+            }
+
+            // 3) 평시/한파 진행 라운드: 상한까지 정상 드로우
+            while (hand.Count < limit)
             {
                 if (isP1 && enableChoiceDrawForPlayer)
                 {
-                    StartChoiceDrawForPlayer(); // UI 열고 대기 → 콜백에서 이어서 채움
-                    return;
+                    StartChoiceDrawForPlayer(); // 2장 중 1장 선택 UI
+                    return; // 선택 콜백에서 이어서 채움
                 }
                 else if (!isP1 && enableChoiceDrawForAgent)
                 {
-                    StartChoiceDrawForAgent();  // 즉시 결정
-                    // 손패가 3장 될 때까지 while 계속
+                    StartChoiceDrawForAgent();  // 에이전트 선택 로직
                 }
                 else
                 {
-                    // 일반 드로우
                     var c = DrawOne(publicDeck);
                     if (c == CardType.None) return;
                     hand.Add(c);
                 }
+            }
+        }
+        void GrantColdWaveCarryIfNeeded()
+        {
+            if (currentDisaster == NaturalDisaster.ColdWave) return;
+
+            if (carryAfterColdWaveP1)
+            {
+                playerIHands.Add(DrawOne(publicDeck));
+                playerIHands.Add(DrawOne(publicDeck));
+                carryAfterColdWaveP1 = false;
+                OnPlayerHandChanged?.Invoke(new List<CardType>(playerIHands));
+            }
+            if (carryAfterColdWaveP2)
+            {
+                playerIIHands.Add(DrawOne(publicDeck));
+                playerIIHands.Add(DrawOne(publicDeck));
+                carryAfterColdWaveP2 = false;
             }
         }
 
@@ -675,17 +797,20 @@ namespace GameCore
 
             return UnityEngine.Random.value < 0.5f ? 0 : 1;
         }
-        // private CardInfo DrawNonChaosForChoice()
-        // {
-        //     CardInfo ci;
-        //     int guard = 20;
-        //     do
-        //     {
-        //         ci = DrawOneFromPublic(); // 기존 단일 드로우 함수
-        //         guard--;
-        //     } while (ci.type == CardType.Chaos && guard > 0); // Chaos 제외
-        //     return ci;
-        // }
+        // 페이즈 시작 보너스(동점이면 없음)
+        bool phaseBonusAppliedThisRound = false;
+        void ApplyPhaseStartBonusIfNeeded()
+        {
+            // 라운드 1,6,11,16… = (roundCounter-1) % disasterSpan == 0
+            if ((roundCounter - 1) % disasterSpan != 0) return;
+            if (phaseBonusAppliedThisRound) return;
+
+            if (playerILife > playerIILife) playerILife += 1;
+            else if (playerIILife > playerILife) playerIILife += 1;
+            // 동점이면 아무도 보너스 없음
+
+            phaseBonusAppliedThisRound = true;
+        }
         // Chaos 제외 1장 드로우(선택지용)
         CardType DrawNonChaosFromPublic()
         {

@@ -66,6 +66,7 @@ public class PlayerBattle : MonoBehaviour
 
     [Header("Recon Peek UI")]
     [SerializeField] private UnityEngine.UI.Image reconImageLeft;
+    [SerializeField] private UnityEngine.UI.Image reconImageCenter; // ★ NEW
     [SerializeField] private UnityEngine.UI.Image reconImageRight;
     [SerializeField] private float reconPeekAutoHideSec = 2.0f;
 
@@ -141,11 +142,13 @@ public class PlayerBattle : MonoBehaviour
             nextMatchButton.onClick.AddListener(OnNextMatch);
         }
 
-        roster = new List<AgentList>((AgentList[])System.Enum.GetValues(typeof(AgentList)));
+        if (roster == null || roster.Count == 0)
+            roster = new List<AgentList>((AgentList[])Enum.GetValues(typeof(AgentList)));
 
         var names12 = new List<string> { PLAYER };
         names12.AddRange(roster.Select(x => x.ToString()));
-        rr12Rounds = BuildRoundRobinEven(names12);
+        if (rr12Rounds == null || rr12Rounds.Count == 0 || rr12Rounds.Any(r => r == null))
+            rr12Rounds = BuildRoundRobinEven(names12);
 
         BuildPlayerOpponentOrder();
 
@@ -189,6 +192,8 @@ public class PlayerBattle : MonoBehaviour
         HookDisasterUI();
         UpdateBothRankUI();
     }
+    // Recon 표시 지연 저장
+    private List<CardType> pendingReconPeek = null;
 
     // ---------- 라운드 입력 ----------
     void OnPick(int playerIndex)
@@ -210,16 +215,30 @@ public class PlayerBattle : MonoBehaviour
         var aCard = agent.Choose(new DecisionInput(sys.playerIIHands, ac, unseenA));
         int aIndex = IndexOfType(sys.playerIIHands, aCard); if (aIndex < 0) aIndex = 0;
 
-        if (pCard == CardType.Recon) ShowReconPeek(oppHandBefore, aCard);
-
         int hpPBefore = sys.playerILife, hpABefore = sys.playerIILife;
+
+        pendingReconPeek = null; // 라운드 시작마다 초기화
 
         // 라운드 해결
         sys.ResolveRoundByIndex(playerIndex, aIndex);
 
-        // ▼ 강풍 등으로 교체된 “최종 제출 카드”로 스프라이트 표시
-        var finalP = sys.lastSubmittedP1;
-        var finalA = sys.lastSubmittedP2;
+        // 최종 제출 카드
+        CardType finalP = sys.lastSubmittedP1;
+        CardType finalA = sys.lastSubmittedP2;
+
+        // 선택 드로우 UI 열림 여부 재평가
+        bool choiceOpenNow =
+            (choiceLeftImage && choiceLeftImage.gameObject.activeInHierarchy) ||
+            (choiceRightImage && choiceRightImage.gameObject.activeInHierarchy);
+
+        // ▼ 플레이어가 Recon을 쓴 경우만 처리. 상대 Recon은 표시하지 않음.
+        if (finalP == CardType.Recon)
+        {
+            // 선택 드로우가 열려 있으면 '지연', 아니면 즉시 1회 노출
+            if (choiceOpenNow) pendingReconPeek = new List<CardType>(sys.lastSeenByP1);
+            else               ShowReconPeek(sys.lastSeenByP1);
+        }
+
         RevealChosenCards(GetSpriteFor(finalP), GetSpriteFor(finalA));
 
         // 상태 갱신 로직은 기존 그대로
@@ -327,7 +346,8 @@ public class PlayerBattle : MonoBehaviour
         else
         { pPts = 0; aPts = 3; }
 
-        leagueMatches.Add(new MatchRec(PLAYER, agent.name, pPts, aPts));
+        // 기존: agent.name  → 변경: agentName.ToString()
+        leagueMatches.Add(new MatchRec(PLAYER, agentName.ToString(), pPts, aPts));
         playedOnce.Add(agentName);
     }
 
@@ -565,27 +585,30 @@ public class PlayerBattle : MonoBehaviour
 
         string oppName = agent.name;
         int idx = FindRoundIndexWithPair(PLAYER, oppName);
-        if (idx < 0) yield break;
+        if (idx < 0)
+        {
+            // 편성표 재구성 후 재시도
+            var names12 = new List<string> { PLAYER };
+            names12.AddRange(roster.Select(x => x.ToString()));
+            rr12Rounds = BuildRoundRobinEven(names12);
+            rr12Consumed.Clear();
+            idx = FindRoundIndexWithPair(PLAYER, oppName);
+            if (idx < 0) yield break;
+        }
 
         foreach (var (A, B) in rr12Rounds[idx])
         {
             if (A == PLAYER || B == PLAYER) continue;
-
-            if (System.Enum.TryParse<AgentList>(A, out var a1) &&
-                System.Enum.TryParse<AgentList>(B, out var a2))
+            if (Enum.TryParse<AgentList>(A, out var a1) &&
+                Enum.TryParse<AgentList>(B, out var a2))
             {
-                yield return SimulateAIVsAI(a1, a2);
+                yield return SimulateAIVsAI(a1, a2); // 이미 구현됨
             }
         }
 
         rr12Consumed.Add(idx);
         UpdateBothRankUI();
-
-        if (AllOpponentsCleared() && rr12Consumed.Count >= rr12Rounds.Count)
-        {
-            if (nextMatchButton) { nextMatchButton.interactable = false; nextMatchButton.gameObject.SetActive(false); }
-            StartCoroutine(ShowFinalStandingsCoroutine());
-        }
+        // 최종 순위 호출 경로는 기존 그대로 유지
     }
 
     int FindRoundIndexWithPair(string n1, string n2)
@@ -618,8 +641,10 @@ public class PlayerBattle : MonoBehaviour
     {
         var go = new GameObject($"Sim_{A1}_vs_{A2}");
         var sim = go.AddComponent<CardSystem>();
+
+        // 덱/라이프/재해 초기화 후 한 프레임 대기
+        sim.ResetForNewMatch();
         yield return null;
-        yield return new WaitUntil(() => sim.publicDeck != null && sim.publicDeck.Count > 0);
 
         var ag1 = AgentFactory.Create(A1.ToString());
         var ag2 = AgentFactory.Create(A2.ToString());
@@ -628,14 +653,10 @@ public class PlayerBattle : MonoBehaviour
         var c2 = c1;
 
         int r = 1;
-        while (r <= sys.maxRounds && !sim.playerILost && !sim.playerIILost)
+        while (r <= sim.maxRounds && !sim.playerILost && !sim.playerIILost)
         {
-            var unseen1 = sim.BuildUnseen(true);
-            var unseen2 = sim.BuildUnseen(false);
-
-            var t1 = ag1.Choose(new DecisionInput(sim.playerIHands,  c1, unseen1));
-            var t2 = ag2.Choose(new DecisionInput(sim.playerIIHands, c2, unseen2));
-
+            var t1 = ag1.Choose(new DecisionInput(sim.playerIHands,  c1, sim.BuildUnseen(true)));
+            var t2 = ag2.Choose(new DecisionInput(sim.playerIIHands, c2, sim.BuildUnseen(false)));
             int i1 = IndexOfType(sim.playerIHands,  t1); if (i1 < 0) i1 = 0;
             int i2 = IndexOfType(sim.playerIIHands, t2); if (i2 < 0) i2 = 0;
 
@@ -650,12 +671,16 @@ public class PlayerBattle : MonoBehaviour
             c2.selfLife = sim.playerIILife; c2.oppLife = sim.playerILife;
 
             r++; c1.round = r; c2.round = r;
+
+            // 필요시 프레임 양보
+            yield return null;
         }
 
         int pa, pb;
         if ((sim.playerILost && sim.playerIILost) || (sim.playerILife == sim.playerIILife)) { pa = 1; pb = 1; }
         else if (sim.playerIILost || sim.playerILife > sim.playerIILife) { pa = 3; pb = 0; }
         else { pa = 0; pb = 3; }
+
         leagueMatches.Add(new MatchRec(A1.ToString(), A2.ToString(), pa, pb));
 
         if (!suppressOtherMatchOutput)
@@ -665,11 +690,12 @@ public class PlayerBattle : MonoBehaviour
                 sim.playerILost ? $"{A2} 승" :
                 sim.playerIILost ? $"{A1} 승" :
                 (sim.playerILife == sim.playerIILife ? "무승부(판정)" :
-                 sim.playerILife > sim.playerIILife ? $"{A1} 승(판정)" : $"{A2} 승(판정)");
+                sim.playerILife > sim.playerIILife ? $"{A1} 승(판정)" : $"{A2} 승(판정)");
             LogLine($"[{A1} vs {A2}] → {result} | HP {sim.playerILife}:{sim.playerIILife}");
         }
 
-        Destroy(go);
+        UnityEngine.Object.Destroy(go);
+        yield break; // 조기 종료 경로 대비 명시
     }
 
     // === 미니매치(최종 동률 그룹 전용, 플레이어 포함) ===
@@ -872,16 +898,10 @@ IEnumerator ShowFinalStandingsCoroutine()
         if (playerRankText) playerRankText.text = prank > 0 ? $"{prank}위 / {ppts}점" : "-";
         if (rankText)       rankText.text       = prank > 0 ? $"{prank}위 / {ppts}점" : "-";
 
-        string opp = agent != null ? agent.name : null;
-        if (!string.IsNullOrEmpty(opp))
-        {
-            int orank = GetWorstSharedRank(totals, opp, out int opts);
-            if (opponentRankText) opponentRankText.text = orank > 0 ? $"{orank}위 / {opts}점" : "-";
-        }
-        else
-        {
-            if (opponentRankText) opponentRankText.text = "-";
-        }
+        // 기존: agent?.name  → 변경: agentName.ToString()
+        string oppKey = agentName.ToString();
+        int orank = GetWorstSharedRank(totals, oppKey, out int opts);
+        if (opponentRankText) opponentRankText.text = orank > 0 ? $"{orank}위 / {opts}점" : "-";
     }
 
     // 동점자는 그룹 최하 순위를 반환
@@ -920,6 +940,19 @@ IEnumerator ShowFinalStandingsCoroutine()
 
     // ---------- 공용 유틸 ----------
     // 핸들러 및 유틸
+    void HandleChoicePickLeft()
+    {
+        // 기존 선택 처리
+        sys.SelectChoiceForPlayer(0);
+        HideChoiceUI();
+        if (pendingReconPeek != null) { ShowReconPeek(pendingReconPeek); pendingReconPeek = null; }
+    }
+    void HandleChoicePickRight()
+    {
+        sys.SelectChoiceForPlayer(1);
+        HideChoiceUI();
+        if (pendingReconPeek != null) { ShowReconPeek(pendingReconPeek); pendingReconPeek = null; }
+    }
     void LockHandDuringChoice(bool on)
     {
         if (btn0) btn0.interactable = !on;
@@ -965,8 +998,15 @@ IEnumerator ShowFinalStandingsCoroutine()
         if (choiceLeftButton) choiceLeftButton.gameObject.SetActive(false);
         if (choiceRightButton) choiceRightButton.gameObject.SetActive(false);
 
-        LockHandDuringChoice(false);  // <<< 추가
-        UpdateButtonsAndSprites();    // 손패 3장 다시 그림
+        LockHandDuringChoice(false);
+        UpdateButtonsAndSprites();
+
+        // Recon 지연 표시 처리
+        if (pendingReconPeek != null)
+        {
+            ShowReconPeek(pendingReconPeek);
+            pendingReconPeek = null;
+        }
     }
     void LogLine(string s)
     {
@@ -1067,27 +1107,37 @@ IEnumerator ShowFinalStandingsCoroutine()
     // }
 
     // 12명(짝수) 라운드로빈 스케줄 생성
-    static List<(string A, string B)[]> BuildRoundRobinEven(List<string> players)
+    List<(string A, string B)[]> BuildRoundRobinEven(List<string> names)
     {
-        var arr = new List<string>(players);
-        int n = arr.Count;
-        int rounds = n - 1;
-        int half = n / 2;
+        // 짝수 인원 전제(12명: 플레이어+AI11)
+        int n = names.Count;
+        var arr = new List<string>(names);
+        var rounds = new List<(string A, string B)[]>();
 
-        var outRounds = new List<(string, string)[]>(rounds);
-
-        for (int r = 0; r < rounds; r++)
+        // 고정 1 + 회전 n-1 라운드(베르거 테이블)
+        for (int r = 0; r < n - 1; r++)
         {
-            var pairs = new List<(string, string)>(half);
-            for (int i = 0; i < half; i++)
-                pairs.Add((arr[i], arr[n - 1 - i]));
-            outRounds.Add(pairs.ToArray());
+            var pairs = new List<(string A, string B)>();
+            for (int i = 0; i < n / 2; i++)
+            {
+                string A = arr[i];
+                string B = arr[n - 1 - i];
+                // 편향 줄이기 위해 라운드마다 홈/어웨이 스왑
+                if (r % 2 == 1) (A, B) = (B, A);
+                pairs.Add((A, B));
+            }
+            rounds.Add(pairs.ToArray());
 
-            var last = arr[n - 1];
-            arr.RemoveAt(n - 1);
-            arr.Insert(1, last);
+            // 회전: 첫 요소 고정, 나머지 오른쪽 회전
+            var head = arr[0];
+            var tail = arr.Skip(1).ToList();
+            var last = tail[^1];
+            tail.RemoveAt(tail.Count - 1);
+            tail.Insert(0, last);
+            arr = new List<string> { head };
+            arr.AddRange(tail);
         }
-        return outRounds;
+        return rounds;
     }
     static string NormalizeKey(string s)
     {
@@ -1104,35 +1154,30 @@ IEnumerator ShowFinalStandingsCoroutine()
         if (reconImageRight) { reconImageRight.sprite = null; reconImageRight.enabled = false; }
     }
 
-    private System.Collections.IEnumerator HideReconAfter(float sec)
+    IEnumerator HideReconAfter(float sec)
     {
         yield return new WaitForSeconds(sec);
-        ClearReconPeek();
+        if (reconImageLeft)   reconImageLeft.gameObject.SetActive(false);
+        if (reconImageCenter) reconImageCenter.gameObject.SetActive(false);
+        if (reconImageRight)  reconImageRight.gameObject.SetActive(false);
     }
 
     /// <summary>
     /// 플레이어가 Recon을 냈을 때, target의 "라운드 제출 전 손패"에서
     /// 실제로 낸 카드 한 장을 제외한 남은 2장을 UI에 노출한다.
     /// </summary>
-    private void ShowReconPeek(IReadOnlyList<CardType> targetHandBeforeSubmit, CardType targetSubmitted)
+    void ShowReconPeek(List<CardType> peek)
     {
-        var remaining = new List<CardType>(targetHandBeforeSubmit);
-        int idx = remaining.FindIndex(c => c == targetSubmitted);
-        if (idx >= 0) remaining.RemoveAt(idx); // 제출 카드 1장만 제거
+        var arr = (peek ?? new List<CardType>()).Take(3).ToArray();
+        var s0 = arr.Length > 0 ? GetSpriteFor(arr[0]) : null;
+        var s1 = arr.Length > 1 ? GetSpriteFor(arr[1]) : null;
+        var s2 = arr.Length > 2 ? GetSpriteFor(arr[2]) : null;
 
-        ClearReconPeek();
+        if (reconImageLeft)   { reconImageLeft.sprite = s0;   reconImageLeft.enabled = s0 != null;   reconImageLeft.gameObject.SetActive(s0 != null); }
+        if (reconImageCenter) { reconImageCenter.sprite = s1; reconImageCenter.enabled = s1 != null; reconImageCenter.gameObject.SetActive(s1 != null); }
+        if (reconImageRight)  { reconImageRight.sprite = s2;  reconImageRight.enabled = s2 != null;  reconImageRight.gameObject.SetActive(s2 != null); }
 
-        if (remaining.Count > 0 && reconImageLeft)
-        {
-            reconImageLeft.sprite  = GetSpriteFor(remaining[0]);
-            reconImageLeft.enabled = reconImageLeft.sprite != null;
-        }
-        if (remaining.Count > 1 && reconImageRight)
-        {
-            reconImageRight.sprite  = GetSpriteFor(remaining[1]);
-            reconImageRight.enabled = reconImageRight.sprite != null;
-        }
-
-        if (reconPeekAutoHideSec > 0f) StartCoroutine(HideReconAfter(reconPeekAutoHideSec));
+        // 일정 시간 뒤 자동 숨김
+        StartCoroutine(HideReconAfter(reconPeekAutoHideSec));
     }
 }

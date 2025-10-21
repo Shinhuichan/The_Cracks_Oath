@@ -6,54 +6,84 @@ using TMPro;
 
 public class H2HMatchLoop : MonoBehaviour
 {
+    public enum EndCondition
+    {
+        TargetPoints,   // 목표 점수 도달 시 종료
+        TargetMatches   // 목표 매칭 수 소화 후 종료
+    }
+
     [Header("Core")]
     [SerializeField] CardSystem cardSystem;        // 같은 씬의 CardSystem 참조
-    [SerializeField] Mode playMode = Mode.Extend;   // 기본 Heavy
+    [SerializeField] Mode playMode = Mode.Extend;
 
     [Header("Players (Inspector)")]
     [SerializeField] AgentList player1 = AgentList.백무적;
     [SerializeField] AgentList player2 = AgentList.박민재;
 
+    [Header("End Condition")]
+    [SerializeField] EndCondition endCondition = EndCondition.TargetPoints;
+    [Min(1)] public int targetPoints = 15;         // EndCondition == TargetPoints
+    [Min(1)] public int targetMatches = 10;        // EndCondition == TargetMatches
+
     [Header("Scoring")]
-    [Min(1)] public int targetPoints = 15;         // 목표 도달 점수
     public int winPts = 3, drawPts = 1, losePts = 0;
 
     [Header("UI (TMP)")]
     [SerializeField] TMP_Text p1NameText;
-    [SerializeField] TMP_Text p1ScoreText;
+    [SerializeField] TMP_Text scoreText;
     [SerializeField] TMP_Text p2NameText;
-    [SerializeField] TMP_Text p2ScoreText;
     [SerializeField] TMP_Text statusText;          // 선택 사항
+    [SerializeField] GameObject p1Gauge, p2Gauge;
 
     [Header("Loop Speeds")]
     [SerializeField, Range(0f, 1f)] float roundDelay = 0.05f;
     [SerializeField, Range(0f, 2f)] float matchDelay = 0.25f;
 
+    [Header("Auto")]
+    [SerializeField] bool autoStart = true;
+
     Coroutine loop;
     int p1Score, p2Score;
+    int matchesPlayed;
     string p1Name, p2Name;
-    private void Start()
+
+    void Awake()
     {
-        StartLoop();
+        if (cardSystem == null) cardSystem = FindObjectOfType<CardSystem>();
     }
+
+    void Start()
+    {
+        if (autoStart) StartLoop();
+    }
+
     public void StartLoop()
     {
         StopLoop();
+        if (cardSystem == null) { Debug.LogError("CardSystem not found"); return; }
+
+        // 완전 자동 모드
+        cardSystem.enableChoiceDrawForPlayer = false;
+        cardSystem.enableChoiceDrawForAgent  = true;
+
+        // 모드 적용 + 매치 리셋
+        cardSystem.currentMode = playMode;
+        cardSystem.ApplyModeIfAvailable();
+        cardSystem.ResetForNewMatch();
 
         p1Name = player1.ToString();
         p2Name = player2.ToString();
         p1Score = p2Score = 0;
-
+        matchesPlayed = 0;
         UpdateUI();
 
-        // 모드 강제 적용
-        if (cardSystem != null)
-        {
-            cardSystem.currentMode = playMode;
-            cardSystem.ApplyModeIfAvailable(); // GameCore.CardSystem API
-        }
+        loop = StartCoroutine(StartNextFrame());
+    }
 
-        loop = StartCoroutine(RunUntilTarget());
+    IEnumerator StartNextFrame()
+    {
+        yield return null; // 한 프레임 양보
+        yield return RunLoop();
     }
 
     public void StopLoop()
@@ -61,23 +91,44 @@ public class H2HMatchLoop : MonoBehaviour
         if (loop != null) { StopCoroutine(loop); loop = null; }
     }
 
-    IEnumerator RunUntilTarget()
+    IEnumerator RunLoop()
     {
-        var A1 = AgentFactory.Create(p1Name); // AgentFactory.Create(string) 사용
-        var A2 = AgentFactory.Create(p2Name);
+        var A1 = AgentFactory.Create(player1.ToString());
+        var A2 = AgentFactory.Create(player2.ToString());
+        if (A1 == null || A2 == null) { Debug.LogError("Agent create failed"); yield break; }
 
-        while (p1Score < targetPoints && p2Score < targetPoints)
+        bool KeepGoing()
+        {
+            switch (endCondition)
+            {
+                case EndCondition.TargetPoints:
+                    return p1Score < targetPoints && p2Score < targetPoints;
+                case EndCondition.TargetMatches:
+                    return matchesPlayed < targetMatches;
+                default:
+                    return false;
+            }
+        }
+
+        while (KeepGoing())
         {
             yield return RunOneMatch(A1, A2);
+            matchesPlayed++;
             UpdateUI();
-            if (p1Score >= targetPoints || p2Score >= targetPoints) break;
-            yield return new WaitForSeconds(matchDelay);
+            if (!KeepGoing()) break;
+            if (matchDelay > 0f) yield return new WaitForSeconds(matchDelay);
         }
 
         if (statusText)
-            statusText.text = (p1Score > p2Score) ? $"{p1Name} 승리"
-                               : (p2Score > p1Score) ? $"{p2Name} 승리"
-                               : "무승부";
+        {
+            string tail = endCondition == EndCondition.TargetMatches
+                ? $"  ({matchesPlayed}/{targetMatches} 경기)"
+                : "";
+            statusText.text =
+                (p1Score > p2Score) ? $"{p1Name} 최종 승리{tail}"
+              : (p2Score > p1Score) ? $"{p2Name} 최종 승리{tail}"
+              : $"최종 무승부{tail}";
+        }
     }
 
     IEnumerator RunOneMatch(Agent A1, Agent A2)
@@ -112,8 +163,8 @@ public class H2HMatchLoop : MonoBehaviour
                 last3Opp = p2_last3Opp
             };
 
-            // 라운드 자동 해결(카드 선택 + 적용)
-            cardSystem.ResolveRoundAuto(A1, A2, ctx1, ctx2); // 내부에서 BuildUnseen/EV 등 사용
+            // 라운드 자동 해결
+            cardSystem.ResolveRoundAuto(A1, A2, ctx1, ctx2);
 
             // 제출 카드로 히스토리 갱신
             var s1 = cardSystem.lastSubmittedP1;
@@ -134,10 +185,9 @@ public class H2HMatchLoop : MonoBehaviour
             if (roundDelay > 0f) yield return new WaitForSeconds(roundDelay);
         }
 
-        // 승패 판정
+        // 승패 판정 및 점수 부여
         bool p1Dead = cardSystem.playerILost;
         bool p2Dead = cardSystem.playerIILost;
-
         int p1Life = cardSystem.playerILife;
         int p2Life = cardSystem.playerIILife;
 
@@ -163,9 +213,39 @@ public class H2HMatchLoop : MonoBehaviour
 
     void UpdateUI()
     {
-        if (p1NameText)  p1NameText.text  = p1Name ?? player1.ToString();
-        if (p2NameText)  p2NameText.text  = p2Name ?? player2.ToString();
-        if (p1ScoreText) p1ScoreText.text = p1Score.ToString();
-        if (p2ScoreText) p2ScoreText.text = p2Score.ToString();
+        if (p1NameText) p1NameText.text = p1Name ?? player1.ToString();
+        if (p2NameText) p2NameText.text = p2Name ?? player2.ToString();
+        if (scoreText)  scoreText.text  = $"{p1Score} : {p2Score}";
+
+        // 진행률(게이지) 계산
+        int goal = (endCondition == EndCondition.TargetPoints)
+            ? Mathf.Max(1, targetPoints)
+            : Mathf.Max(1, targetMatches * winPts);
+        float p1Progress = Mathf.Clamp01((float)p1Score / goal);
+        float p2Progress = Mathf.Clamp01((float)p2Score / goal);
+
+        // 진행률(두 게이지 합이 항상 1)
+        float a = p1Score;
+        float b = p2Score;
+
+        float p1Share, p2Share;
+        if (a <= 0f && b <= 0f) {          // 0:0 → 0.5 / 0.5
+            p1Share = 0.5f; p2Share = 0.5f;
+        } else if (a <= 0f) {              // 0:n → 0 / 1
+            p1Share = 0f;   p2Share = 1f;
+        } else if (b <= 0f) {              // n:0 → 1 / 0
+            p1Share = 1f;   p2Share = 0f;
+        } else {                           // 일반 비율
+            float sum = a + b;
+            p1Share = a / sum;
+            p2Share = b / sum;
+        }
+
+        // 적용
+        if (p1Gauge) p1Gauge.transform.localScale = new Vector3(Mathf.Clamp01(p1Share), 1f, 1f);
+        if (p2Gauge) p2Gauge.transform.localScale = new Vector3(Mathf.Clamp01(p2Share), 1f, 1f);
+
+        if (statusText && endCondition == EndCondition.TargetMatches)
+            statusText.text = $"경기 진행: {matchesPlayed}/{targetMatches}";
     }
 }

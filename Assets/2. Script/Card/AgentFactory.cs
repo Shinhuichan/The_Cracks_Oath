@@ -16,6 +16,10 @@ public enum AgentList
     김태양,
     이하린,
     백무적,
+    류성우,
+    서유리,
+    강은호,
+    전아람
 }
 
 namespace GameCore
@@ -36,6 +40,10 @@ namespace GameCore
             "김태양" => Build_김태양(),
             "이하린" => Build_이하린(),
             "백무적" => Build_백무적(),
+            "류성우" => Build_류성우(),
+            "서유리" => Build_서유리(),
+            "강은호" => Build_강은호(),
+            "전아람" => Build_전아람(),
             _ => Build_Default(who),
         };
 
@@ -46,54 +54,64 @@ namespace GameCore
             return A;
         }
 
+        
+        // 김현수v2 — 신중·분석형(소폭 강화)
         static Agent Build_김현수()
         {
             var A = new Agent("김현수");
 
-            // --- 플레이(제출) 규칙: 기존 그대로 ---
+            // --- 라운드 카드 선택 ---
             A.rules.Add(I =>
             {
                 int R = Math.Max(1, I.s.round);
                 bool nf = !I.s.IsFirst;
 
-                bool highB = I.Ratio(CardType.Betrayal) >= 0.28f || (nf && I.s.lastOpp == CardType.Betrayal);
-                if (I.HandHas(CardType.Doubt) && I.s.selfLife <= R && highB)
+                // 0) 생존 우선
+                bool highBetrayal = I.Ratio(CardType.Betrayal) >= 0.28f || (nf && I.s.lastOpp == CardType.Betrayal);
+                if (I.HandHas(CardType.Doubt) && I.s.selfLife <= R && highBetrayal)
                     return CardType.Doubt;
 
-                if (nf && I.s.lastOpp == CardType.Pollution && I.HandHas(CardType.Doubt)) return CardType.Doubt;
-                if (nf && I.s.lastOpp == CardType.Betrayal  && I.HandHas(CardType.Interrupt)) return CardType.Interrupt;
-
+                // 1) 직전 반복 패턴 간단 카운터(가치 보정 ↑)
                 if (nf && I.s.lastOpp == I.s.last2Opp && I.s.lastOpp != CardType.None)
                 {
                     var x = I.s.lastOpp;
                     if (x == CardType.Cooperation)
                     {
-                        if (I.s.selfLife >= I.s.oppLife && I.HandHas(CardType.Cooperation)) return CardType.Cooperation;
-                        if (I.HandHas(CardType.Pollution) && I.Ratio(CardType.Doubt) <= 0.28f) return CardType.Pollution;
+                        if (I.HandHas(CardType.Pollution) && I.Ratio(CardType.Doubt) <= 0.30f) return CardType.Pollution;
+                        if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R + 1) return CardType.Betrayal;
                     }
                     if (x == CardType.Pollution && I.HandHas(CardType.Doubt)) return CardType.Doubt;
+                    if (x == CardType.Betrayal  && I.HandHas(CardType.Interrupt)) return CardType.Interrupt;
                     if (x == CardType.Doubt     && I.HandHas(CardType.Cooperation)) return CardType.Cooperation;
                 }
 
-                if (I.HandHas(CardType.Recon) && R is >= 2 and <= 5 && I.s.selfLife >= I.s.oppLife - 1)
+                // 2) Recon 활용 강화: 초·중반, 안전·분포가 섞인 상황에서만
+                if (I.HandHas(CardType.Recon))
                 {
-                    float pc = I.Ratio(CardType.Cooperation), pd = I.Ratio(CardType.Doubt), pp = I.Ratio(CardType.Pollution);
-                    bool mixed = pc < 0.45f && pd < 0.35f && pp < 0.35f;
-                    if (mixed) return CardType.Recon;
+                    bool safe = I.s.selfLife >= I.s.oppLife - 1 && !highBetrayal;
+                    bool mixed =
+                        I.Ratio(CardType.Cooperation) < 0.45f &&
+                        I.Ratio(CardType.Doubt)       < 0.38f &&
+                        I.Ratio(CardType.Pollution)   < 0.38f;
+                    if (R >= 2 && R <= 6 && safe && mixed) return CardType.Recon;
                 }
 
+                // 3) 장기 압박: 협력 성향↑ + 의심 낮음 → Pollution
                 if (I.HandHas(CardType.Pollution) &&
-                (I.Ratio(CardType.Cooperation) >= 0.33f || (nf && I.s.lastOpp == CardType.Cooperation)) &&
-                    I.Ratio(CardType.Doubt) <= 0.28f)
+                    (I.Ratio(CardType.Cooperation) >= 0.33f || (nf && I.s.lastOpp == CardType.Cooperation)) &&
+                    I.Ratio(CardType.Doubt) <= 0.30f)
                     return CardType.Pollution;
 
-                if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R && I.Ratio(CardType.Doubt) < 0.32f)
+                // 4) 확실한 킬각만 배신
+                if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R && I.Ratio(CardType.Doubt) < 0.33f)
                     return CardType.Betrayal;
 
+                // 5) 읽힘·손패 막힘 시 제한적 Chaos
                 int atk = (I.HandHas(CardType.Betrayal) ? 1 : 0) + (I.HandHas(CardType.Pollution) ? 1 : 0);
                 if (I.HandHas(CardType.Chaos) && (atk == 0 || (nf && I.s.lastOpp == I.s.last2Opp && I.s.selfLife < I.s.oppLife)))
                     return CardType.Chaos;
 
+                // 6) 기본 선호도(무난+안전)
                 CardType[] order = {
                     CardType.Cooperation, CardType.Doubt, CardType.Recon,
                     CardType.Pollution, CardType.Interrupt, CardType.Betrayal, CardType.Chaos
@@ -107,73 +125,76 @@ namespace GameCore
                 CardType.Pollution, CardType.Interrupt, CardType.Betrayal, CardType.Chaos
             };
 
+            // --- 선택 드로우(두 장 중 1장) ---
             A.chooseFromTwo = (a, b, I) =>
             {
                 int R = Math.Max(1, I.s.round);
+                bool nf = !I.s.IsFirst;
 
                 bool HasAtk() => I.hand.Contains(CardType.Betrayal) || I.hand.Contains(CardType.Pollution);
                 bool HasDef() => I.hand.Contains(CardType.Doubt) || I.hand.Contains(CardType.Interrupt);
-                int idxOf(CardType t) => (a == t ? 0 : (b == t ? 1 : -1));
+                int idx(CardType t) => a == t ? 0 : (b == t ? 1 : -1);
 
                 // 0) 즉사 위험 시 방어 우선
-                bool lethalRisk = I.s.selfLife <= R && (I.Ratio(CardType.Betrayal) >= 0.28f || I.s.lastOpp == CardType.Betrayal);
+                bool lethalRisk = I.s.selfLife <= R && (I.Ratio(CardType.Betrayal) >= 0.28f || (nf && I.s.lastOpp == CardType.Betrayal));
                 if (lethalRisk)
                 {
-                    int i = idxOf(CardType.Doubt); if (i >= 0) return i;
-                    i = idxOf(CardType.Interrupt); if (i >= 0) return i;
+                    int i = idx(CardType.Doubt); if (i >= 0) return i;
+                    i = idx(CardType.Interrupt); if (i >= 0) return i;
                 }
 
-                // 1) 초·중반 안전할 때 Recon 선호(김현수 컨셉)
-                bool safe = I.s.selfLife >= I.s.oppLife - 1;
-                bool mixed = I.Ratio(CardType.Cooperation) < 0.45f && I.Ratio(CardType.Doubt) < 0.35f && I.Ratio(CardType.Pollution) < 0.35f;
-                if (R >= 2 && R <= 5 && safe && mixed)
+                // 1) 초·중반 안전하면 Recon 선호
+                bool safe = I.s.selfLife >= I.s.oppLife - 1 && I.Ratio(CardType.Betrayal) < 0.27f;
+                bool mixed = I.Ratio(CardType.Cooperation) < 0.45f && I.Ratio(CardType.Doubt) < 0.38f && I.Ratio(CardType.Pollution) < 0.38f;
+                if (R >= 2 && R <= 6 && safe && mixed)
                 {
-                    int i = idxOf(CardType.Recon); if (i >= 0) return i;
+                    int i = idx(CardType.Recon); if (i >= 0) return i;
                 }
 
-                // 2) 공격수단이 없으면 공격 카드 선호(가능하면 Pollution)
+                // 2) 공격수단 없으면 확보(Pollution 우선)
                 if (!HasAtk())
                 {
-                    int i = idxOf(CardType.Pollution); if (i >= 0) return i;
-                    i = idxOf(CardType.Betrayal);  if (i >= 0) return i;
+                    int i = idx(CardType.Pollution); if (i >= 0) return i;
+                    i = idx(CardType.Betrayal);      if (i >= 0) return i;
                 }
 
-                // 3) 방어수단이 없으면 Doubt/Interrupt 확보
+                // 3) 방어수단 없으면 Doubt/Interrupt 확보
                 if (!HasDef())
                 {
-                    int i = idxOf(CardType.Doubt);      if (i >= 0) return i;
-                    i = idxOf(CardType.Interrupt);      if (i >= 0) return i;
+                    int i = idx(CardType.Doubt);     if (i >= 0) return i;
+                    i = idx(CardType.Interrupt);     if (i >= 0) return i;
                 }
 
-                // 4) 킬각이면 Betrayal 확보(상대 Doubt 낮을 때)
-                if (I.s.oppLife <= R && I.Ratio(CardType.Doubt) < 0.32f)
+                // 4) 킬각이면 Betrayal 확보
+                if (I.s.oppLife <= R && I.Ratio(CardType.Doubt) < 0.33f)
                 {
-                    int i = idxOf(CardType.Betrayal); if (i >= 0) return i;
+                    int i = idx(CardType.Betrayal); if (i >= 0) return i;
                 }
 
-                // 5) 상대가 협력 성향↑ + 의심 낮음 → Pollution 확보
-                if ((I.Ratio(CardType.Cooperation) >= 0.33f || I.s.lastOpp == CardType.Cooperation) && I.Ratio(CardType.Doubt) <= 0.28f)
+                // 5) 협력↑ + 의심 낮음 → Pollution 확보
+                if ((I.Ratio(CardType.Cooperation) >= 0.33f || (nf && I.s.lastOpp == CardType.Cooperation)) && I.Ratio(CardType.Doubt) <= 0.30f)
                 {
-                    int i = idxOf(CardType.Pollution); if (i >= 0) return i;
+                    int i = idx(CardType.Pollution); if (i >= 0) return i;
                 }
 
-                // 6) 기본 선호도(무난·분석형): Coop > Doubt > Recon > Pollution > Interrupt > Betrayal
+                // 6) 기본 점수로 결정
                 int Score(CardType t) => t switch
                 {
                     CardType.Cooperation => 100,
-                    CardType.Doubt       => 90,
-                    CardType.Recon       => 80,
-                    CardType.Pollution   => 70,
-                    CardType.Interrupt   => 60,
-                    CardType.Betrayal    => 50,
+                    CardType.Doubt       => 92,
+                    CardType.Recon       => 86,
+                    CardType.Pollution   => 78,
+                    CardType.Interrupt   => 66,
+                    CardType.Betrayal    => 58,
                     _ => 0
                 };
                 int sa = Score(a), sb = Score(b);
                 if (sa != sb) return sa > sb ? 0 : 1;
 
-                // 7) 동점이면 가벼운 무작위성
+                // 7) 동점이면 소폭 무작위
                 return UnityEngine.Random.value < 0.5f ? 0 : 1;
             };
+
             return A;
         }
 
@@ -571,7 +592,7 @@ namespace GameCore
             return A;
         }
 
-        // 박민재 — 순수 계산형 + 재해(변동성) 인지 보정
+        // 박민재v2 — 강화된 계산 중심 Agent (상대 분석 배제, 상황 가치 극대화)
         static Agent Build_박민재()
         {
             var A = new Agent("박민재");
@@ -579,12 +600,95 @@ namespace GameCore
             A.rules.Add(I =>
             {
                 int R = Math.Max(1, I.s.round);
-
-                // --- 0) 재해 리스크 휴리스틱 ---
-                // 블록 전환 라운드(5의 배수)와 직후 1턴은 변동성 ↑ 로 간주
                 bool highVol = (R % 5 == 0) || (R % 5 == 1);
 
-                // --- 1) 상대 분포 추정 p[t] ---
+
+                // 즉사 가능 or 생존 방어 우선 판단
+                bool canKill = I.HandHas(CardType.Betrayal) && I.s.oppLife <= R;
+                bool mustDefend = I.s.selfLife <= R && I.HandHas(CardType.Doubt);
+                if (canKill) return CardType.Betrayal;
+                if (mustDefend) return CardType.Doubt;
+
+
+                // 손패의 정보가치/행동력 평가
+                int Eval(CardType c)
+                {
+                    int score = 0;
+                    if (c == CardType.Betrayal) score = I.s.oppLife <= R + 1 ? 7 : 3;
+                    else if (c == CardType.Pollution) score = 3;
+                    else if (c == CardType.Cooperation) score = 2;
+                    else if (c == CardType.Doubt) score = I.s.selfLife <= R + 1 ? 4 : 1;
+                    else if (c == CardType.Interrupt) score = 2;
+                    else if (c == CardType.Recon) score = (I.s.selfLife < I.s.oppLife || I.hand.Count(h => h == CardType.Betrayal || h == CardType.Pollution) == 0) ? 2 : 0;
+                    else if (c == CardType.Chaos) score = (I.s.selfLife < I.s.oppLife && !highVol) ? 1 : -1;
+                    return score;
+                }
+
+
+                CardType best = CardType.None;
+                int bestScore = int.MinValue;
+                foreach (var c in I.hand.Distinct().Where(I.HandHas))
+                {
+                    int sc = Eval(c);
+                    // 변동성 리스크 패널티 보정
+                    if (highVol && c == CardType.Chaos) sc -= 2;
+                    if (highVol && c == CardType.Pollution) sc -= 1;
+                    if (sc > bestScore) { bestScore = sc; best = c; }
+                }
+
+
+                return best;
+            });
+
+
+            A.fallback = new[]
+            {
+                CardType.Betrayal, CardType.Pollution, CardType.Cooperation,
+                CardType.Doubt, CardType.Interrupt, CardType.Recon, CardType.Chaos
+            };
+
+
+            // 강화된 선택 드로우 로직
+            A.chooseFromTwo = (a, b, I) =>
+            {
+                int R = Math.Max(1, I.s.round);
+                bool losing = I.s.selfLife < I.s.oppLife;
+                bool noAtk = !I.HandHas(CardType.Betrayal) && !I.HandHas(CardType.Pollution);
+
+
+                float V(CardType c)
+                {
+                    if (c == CardType.Betrayal) return (I.s.oppLife <= R ? 7f : 3f);
+                    if (c == CardType.Pollution) return 3f;
+                    if (c == CardType.Doubt) return (I.s.selfLife <= R + 1 ? 5f : 1f);
+                    if (c == CardType.Cooperation) return 2f;
+                    if (c == CardType.Interrupt) return 2.5f;
+                    if (c == CardType.Recon) return (noAtk || losing) ? 2.5f : 0.5f;
+                    if (c == CardType.Chaos) return (losing && R > 3) ? 1.0f : -2f;
+                    return 0f;
+                }
+
+
+                float va = V(a), vb = V(b);
+                if (Math.Abs(va - vb) < 0.1f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                return va >= vb ? 0 : 1;
+            };
+
+
+            return A;
+        }
+
+        // 정다은 — 패턴 분석·카운터형 (HistoryOpponent 없이 동작)
+        static Agent Build_정다은()
+        {
+            var A = new Agent("정다은");
+
+            // ① 라운드 카드 선택
+            A.rules.Add(I =>
+            {
+                int R = Math.Max(1, I.s.round);
+
+                // 상대 행동 분포 추정 p[t] (덱+상대패 기반 비율)
                 var p = new Dictionary<CardType, float>
                 {
                     { CardType.Cooperation, I.Ratio(CardType.Cooperation) },
@@ -595,42 +699,30 @@ namespace GameCore
                     { CardType.Interrupt,   I.Ratio(CardType.Interrupt)   },
                     { CardType.Recon,       I.Ratio(CardType.Recon)       },
                 };
-                float S = p.Values.Sum(); if (S <= 0) S = 1f;
-                foreach (var k in p.Keys.ToList()) p[k] /= S;
 
-                // --- 2) 즉사/생존 ---
-                bool lethalNow = I.HandHas(CardType.Betrayal) && I.s.oppLife <= R;
-                if (lethalNow && p[CardType.Doubt] < 0.33f) return CardType.Betrayal;
-
-                bool lethalRisk = I.s.selfLife <= R && p[CardType.Betrayal] >= 0.28f;
-                if (lethalRisk && I.HandHas(CardType.Doubt)) return CardType.Doubt;
-
-                // --- 3) 손패 품질/정보가치 ---
-                int HandScore(List<CardType> h)
+                // 최근 2수의 모드(가장 자주 낸 카드)로 소폭 가중
+                var recent = new[] { I.s.lastOpp, I.s.last2Opp }
+                    .Where(t => t != CardType.None)
+                    .ToArray();
+                if (recent.Length > 0)
                 {
-                    int s = 0;
-                    foreach (var c in h)
-                    {
-                        if (c == CardType.Betrayal) s += 3;
-                        else if (c == CardType.Pollution) s += 2;
-                        else if (c == CardType.Cooperation || c == CardType.Doubt) s += 1;
-                        else if (c == CardType.Interrupt) s += 0;
-                        else if (c == CardType.Recon) s += 0;
-                        else if (c == CardType.Chaos) s -= 1;
-                    }
-                    return s;
+                    var mode = recent.GroupBy(t => t)
+                                    .OrderByDescending(g => g.Count())
+                                    .First().Key;
+                    p[mode] *= 1.25f;
                 }
-                int hs = HandScore(I.hand);
-                bool poorAttack = !I.HandHas(CardType.Betrayal) && !I.HandHas(CardType.Pollution);
 
-                // 재해 변동성↑ 구간에서는 Chaos 가치를 낮춘다(강풍/한파 리스크 대비)
-                if (I.HandHas(CardType.Recon) && (poorAttack || hs <= 1))
-                    return CardType.Recon;
+                // 정규화
+                float sum = p.Values.Sum(); if (sum <= 0) sum = 1f;
+                foreach (var k in p.Keys.ToList()) p[k] /= sum;
 
-                if (I.HandHas(CardType.Chaos) && !highVol && (hs <= 1 || poorAttack || (!I.s.IsFirst && I.s.lastOpp == I.s.last2Opp)))
-                    return CardType.Chaos;
+                // 즉사 각 / 생존 각
+                if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R && p[CardType.Doubt] < 0.33f)
+                    return CardType.Betrayal;
+                if (I.s.selfLife <= R && p[CardType.Betrayal] >= 0.28f && I.HandHas(CardType.Doubt))
+                    return CardType.Doubt;
 
-                // --- 4) 기대값 최대화(상대-행동 분포 p에 대한 EV) ---
+                // 기대값 행렬
                 int Delta(CardType a, CardType b)
                 {
                     int r = R;
@@ -691,7 +783,7 @@ namespace GameCore
                     // Recon
                     if (a == CardType.Recon && b == CardType.Cooperation) return -1;
                     if (a == CardType.Recon && b == CardType.Doubt) return 0;
-                    if (a == CardType.Recon && b == CardType.Betrayal) return -(r + 1);
+                    if (a == CardType.Recon && b == CardType.Betrayal) return -(R + 1);
                     if (a == CardType.Recon && b == CardType.Chaos) return 0;
                     if (a == CardType.Recon && b == CardType.Pollution) return -1;
                     if (a == CardType.Recon && b == CardType.Interrupt) return -1;
@@ -706,277 +798,61 @@ namespace GameCore
                 {
                     float ev = 0f; foreach (var b in p.Keys) ev += p[b] * Delta(a, b);
 
-                    // 막판 보정
-                    if (a == CardType.Betrayal && I.s.oppLife <= R + 1) ev += p[CardType.Cooperation] * 2.5f;
-
-                    // 생존/재해 리스크 패널티
-                    if (I.s.selfLife <= R) ev -= p[CardType.Betrayal] * 3.0f;
-                    if (highVol && a == CardType.Betrayal) ev -= 0.6f;         // 강풍/낙뢰 등 변동성에 취약
-                    if (highVol && a == CardType.Chaos) ev -= 0.8f;         // 한파·강풍 리스크 고려
-                    if (highVol && a == CardType.Pollution && p[CardType.Doubt] >= 0.30f) ev -= 0.4f;
+                    // 읽힘 회피: 직전 내가 낸 카드 반복 페널티
+                    if (I.s.lastSelf == a) ev -= 0.2f;
 
                     if (ev > bestEV) { bestEV = ev; best = a; }
                 }
-
-                // 읽힘 회피: 2순위가 근접하면 소폭 스왑
-                var alt = cand.Where(t => t != best)
-                            .OrderByDescending(t => { float e = 0; foreach (var b in p.Keys) e += p[b] * Delta(t, b); return e; })
-                            .ToList();
-                if (alt.Count > 0)
-                {
-                    float secondEV = 0; foreach (var b in p.Keys) secondEV += p[b] * Delta(alt[0], b);
-                    if (secondEV > bestEV - 0.55f && UnityEngine.Random.value < 0.15f) best = alt[0];
-                }
-
                 return best;
             });
 
+            // ② 선택 드로우(두 장 중 선택) — 상대 분포 재계산 후 EV 높은 쪽 선택
+            A.chooseFromTwo = (CardType a, CardType b, DecisionInput I) =>
+            {
+                int R = Math.Max(1, I.s.round);
+
+                var p = new Dictionary<CardType, float>
+                {
+                    { CardType.Cooperation, I.Ratio(CardType.Cooperation) },
+                    { CardType.Doubt,       I.Ratio(CardType.Doubt)       },
+                    { CardType.Betrayal,    I.Ratio(CardType.Betrayal)    },
+                    { CardType.Chaos,       I.Ratio(CardType.Chaos)       },
+                    { CardType.Pollution,   I.Ratio(CardType.Pollution)   },
+                    { CardType.Interrupt,   I.Ratio(CardType.Interrupt)   },
+                    { CardType.Recon,       I.Ratio(CardType.Recon)       },
+                };
+                float sum = p.Values.Sum(); if (sum <= 0) sum = 1f;
+                foreach (var k in p.Keys.ToList()) p[k] /= sum;
+
+                int V(CardType x, CardType y)
+                {
+                    int r = R;
+                    // 필요 최소 케이스만 사용 (정다은 선택 드로우 휴리스틱)
+                    if (x == CardType.Betrayal && y == CardType.Doubt) return -(r + 1);
+                    if (x == CardType.Betrayal && y != CardType.Doubt) return  (r + 1);
+                    if (x == CardType.Doubt     && y == CardType.Betrayal) return  (r + 1);
+                    if (x == CardType.Pollution && y == CardType.Cooperation) return +2;
+                    if (x == CardType.Interrupt && (y == CardType.Betrayal || y == CardType.Doubt || y == CardType.Pollution)) return +2;
+                    if (x == CardType.Cooperation && y == CardType.Betrayal) return -(r + 1);
+                    if (x == CardType.Chaos) return 0;
+                    return 0;
+                }
+
+                float Score(CardType x) => p.Sum(kv => kv.Value * V(x, kv.Key));
+                float sa = Score(a), sb = Score(b);
+                if (System.Math.Abs(sa - sb) < 0.001f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                return sa >= sb ? 0 : 1;
+            };
+
+            // ③ 기본 우선순위
             A.fallback = new[]
             {
-                CardType.Betrayal, CardType.Pollution, CardType.Cooperation,
-                CardType.Recon, CardType.Doubt, CardType.Chaos, CardType.Interrupt
-            };
-            // 선택 드로우: 두 후보(a,b) 중 기대가치가 높은 쪽을 선택
-            A.chooseFromTwo = (CardType a, CardType b, DecisionInput I) =>
-            {
-                int R = Math.Max(1, I.s.round);
-                bool losing = I.s.selfLife < I.s.oppLife;
-                bool poorAtk = !I.HandHas(CardType.Betrayal) && !I.HandHas(CardType.Pollution);
-
-                // 관찰분포(라플라스 0.06)로 상대 성향 추정
-                float P(CardType t) =>
-                    0.06f + I.Ratio(t);
-                float norm =
-                    P(CardType.Cooperation)+P(CardType.Doubt)+P(CardType.Betrayal)+
-                    P(CardType.Chaos)+P(CardType.Pollution)+P(CardType.Interrupt)+P(CardType.Recon);
-                float Q(CardType t) => P(t) / (norm > 0 ? norm : 1f);
-
-                // 카드 기대가치 휴리스틱(계산형)
-                float V(CardType c)
-                {
-                    switch (c)
-                    {
-                        case CardType.Betrayal:
-                            return (I.s.oppLife <= R ? 7f : 3f) - 4f * Q(CardType.Doubt);   // 킬각 가중, 의심 확률 패널티
-                        case CardType.Pollution:
-                            return 3f + 2f * (1f - Q(CardType.Doubt));                      // 상대 의심 낮을수록 가치↑
-                        case CardType.Doubt:
-                            return 6f * Q(CardType.Betrayal) - 0.5f;                        // 배신 확률 방어
-                        case CardType.Cooperation:
-                            return 2f - 2f * Q(CardType.Betrayal);                          // 배신 가능성에 취약
-                        case CardType.Interrupt:
-                            return 1f + 3f * Q(CardType.Betrayal);                          // 카운터 수단
-                        case CardType.Recon:
-                            return (poorAtk || losing) ? 2.5f : 0.5f;                       // 손패/상황이 나쁠 때만 정보가치↑
-                        case CardType.Chaos:
-                            return (losing ? 1.0f : -1.5f) + (R >= 3 ? 0.3f : -0.3f);       // 변동성은 뒤질 때만 제한적으로
-                        default:
-                            return 0f;
-                    }
-                }
-
-                float va = V(a), vb = V(b);
-                if (Math.Abs(va - vb) < 0.001f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
-                return va >= vb ? 0 : 1;
+                CardType.Doubt, CardType.Interrupt, CardType.Betrayal,
+                CardType.Pollution, CardType.Cooperation, CardType.Chaos, CardType.Recon
             };
             return A;
         }
-
-        // 정다은 — 심리전 마스터: 패턴 파악 → 카운터 → 결정타
-        static Agent Build_정다은()
-        {
-            var A = new Agent("정다은");
-
-            A.rules.Add(I =>
-            {
-                int R = Math.Max(1, I.s.round);
-                bool nf = !I.s.IsFirst;
-
-                // 0) 위험 최소: 즉사 위험이면 Doubt
-                if (I.HandHas(CardType.Doubt))
-                {
-                    bool lethalRisk = I.s.selfLife <= R &&
-                                    (I.Ratio(CardType.Betrayal) >= 0.28f || (nf && I.s.lastOpp == CardType.Betrayal));
-                    if (lethalRisk) return CardType.Doubt;
-                }
-
-                // 1) 상대 패턴 모델링: 분포 + 연속 사용 가중
-                var p = new Dictionary<CardType, float>
-                {
-                    {CardType.Cooperation, 0.06f + I.Ratio(CardType.Cooperation)},
-                    {CardType.Doubt,       0.06f + I.Ratio(CardType.Doubt)},
-                    {CardType.Betrayal,    0.06f + I.Ratio(CardType.Betrayal)},
-                    {CardType.Chaos,       0.06f + I.Ratio(CardType.Chaos)},
-                    {CardType.Pollution,   0.06f + I.Ratio(CardType.Pollution)},
-                    {CardType.Interrupt,   0.06f + I.Ratio(CardType.Interrupt)},
-                    {CardType.Recon,       0.06f + I.Ratio(CardType.Recon)}
-                };
-                if (nf && I.s.lastOpp != CardType.None)
-                {
-                    // 같은 카드 2연속이면 그 카드 재현성 상승
-                    if (I.s.lastOpp == I.s.last2Opp) p[I.s.lastOpp] *= 1.40f;
-                    // 초반 협력 성향은 추가 가중
-                    if (R <= 3 && I.s.lastOpp == CardType.Cooperation) p[CardType.Cooperation] *= 1.18f;
-                }
-                float S = p.Values.Sum(); foreach (var k in p.Keys.ToList()) p[k] /= S;
-
-                // 2) 즉시 카운터: 연속 패턴은 강하게 응징
-                if (nf && I.s.lastOpp == I.s.last2Opp && I.s.lastOpp != CardType.None)
-                {
-                    var x = I.s.lastOpp;
-                    if (x == CardType.Cooperation && I.HandHas(CardType.Betrayal)) return CardType.Betrayal; // 허 찌르기
-                    if (x == CardType.Pollution && I.HandHas(CardType.Doubt)) return CardType.Doubt;
-                    if (x == CardType.Betrayal && I.HandHas(CardType.Interrupt)) return CardType.Interrupt;
-                    if (x == CardType.Doubt && I.HandHas(CardType.Cooperation)) return CardType.Cooperation;
-                    if (x == CardType.Chaos && I.HandHas(CardType.Cooperation)) return CardType.Cooperation;
-                }
-
-                // 3) 정보 우선: 초중반 안전할 때 Recon으로 상대 성향 고정
-                bool safeInfo = R <= 4 && I.s.selfLife >= I.s.oppLife - 1 && p[CardType.Betrayal] <= 0.26f;
-                bool mixed = p.Values.Max() < 0.42f; // 한쪽 치우침이 약함
-                if (I.HandHas(CardType.Recon) && safeInfo && mixed) return CardType.Recon;
-
-                // 4) 장기 포지셔닝: 협력 성향↑ + 의심 낮음 → 오염으로 압박
-                if (I.HandHas(CardType.Pollution) &&
-                    (p[CardType.Cooperation] >= 0.33f || (nf && I.s.lastOpp == CardType.Cooperation)) &&
-                    p[CardType.Doubt] <= 0.28f)
-                    return CardType.Pollution;
-
-                // 5) 결정타 타이밍: 의심 확률이 낮고 상대 체력이 라운드 이내면 배신
-                if (I.HandHas(CardType.Betrayal) &&
-                    I.s.oppLife <= R &&
-                    p[CardType.Doubt] < 0.32f)
-                    return CardType.Betrayal;
-
-                // 6) 손패가 빈약하거나 읽힘이 심하면 제한적 Chaos로 패턴 교란
-                int atk = (I.HandHas(CardType.Betrayal) ? 1 : 0) + (I.HandHas(CardType.Pollution) ? 1 : 0);
-                if (I.HandHas(CardType.Chaos) && (atk == 0 || (nf && I.s.lastOpp == I.s.last2Opp)))
-                    return CardType.Chaos;
-
-                // 7) 기본 우선순위: 카운터 중심의 균형
-                CardType[] prio = {
-                    CardType.Pollution,   // 장기 압박
-                    CardType.Cooperation, // 안전 수급
-                    CardType.Doubt,       // 방어
-                    CardType.Betrayal,    // 기회 포착
-                    CardType.Interrupt,   // 틈새 역공
-                    CardType.Recon,       // 정보
-                    CardType.Chaos        // 최후 교란
-                };
-                foreach (var c in prio) if (I.HandHas(c)) return c;
-                
-                return CardType.None;
-            });
-
-            A.fallback = new[] {
-                CardType.Pollution, CardType.Cooperation, CardType.Doubt,
-                CardType.Betrayal,  CardType.Interrupt,   CardType.Recon, CardType.Chaos
-            };
-
-            // 서명: (CardType a, CardType b, DecisionInput I) => int  // 0이면 a, 1이면 b
-            A.chooseFromTwo = (CardType a, CardType b, DecisionInput I) =>
-            {
-                int R = Math.Max(1, I.s.round);
-                bool nf = !I.s.IsFirst;
-
-                int idxOf(CardType t) => (a == t ? 0 : (b == t ? 1 : -1));
-                bool HasAtk() => I.hand.Contains(CardType.Betrayal) || I.hand.Contains(CardType.Pollution);
-                bool HasDef() => I.hand.Contains(CardType.Doubt) || I.hand.Contains(CardType.Interrupt);
-
-                // Chaos는 선택 드로우 제외(후보 한쪽만 Chaos면 다른 쪽 선택)
-                if (a == CardType.Chaos && b != CardType.Chaos) return 1;
-                if (b == CardType.Chaos && a != CardType.Chaos) return 0;
-
-                // 상대 분포 추정
-                var p = new Dictionary<CardType, float>
-                {
-                    {CardType.Cooperation, 0.06f + I.Ratio(CardType.Cooperation)},
-                    {CardType.Doubt,       0.06f + I.Ratio(CardType.Doubt)},
-                    {CardType.Betrayal,    0.06f + I.Ratio(CardType.Betrayal)},
-                    {CardType.Chaos,       0.06f + I.Ratio(CardType.Chaos)},
-                    {CardType.Pollution,   0.06f + I.Ratio(CardType.Pollution)},
-                    {CardType.Interrupt,   0.06f + I.Ratio(CardType.Interrupt)},
-                    {CardType.Recon,       0.06f + I.Ratio(CardType.Recon)}
-                };
-                if (nf && I.s.lastOpp != CardType.None && I.s.lastOpp == I.s.last2Opp)
-                    p[I.s.lastOpp] *= 1.35f;
-                float S = p.Values.Sum(); foreach (var k in p.Keys.ToList()) p[k] /= (S <= 0 ? 1f : S);
-
-                // 0) 즉사 위험 시 방어 확보
-                bool lethalRisk = I.s.selfLife <= R && (p[CardType.Betrayal] >= 0.28f || (nf && I.s.lastOpp == CardType.Betrayal));
-                if (lethalRisk)
-                {
-                    int i = idxOf(CardType.Doubt);     if (i >= 0) return i;
-                    i = idxOf(CardType.Interrupt);     if (i >= 0) return i;
-                }
-
-                // 1) 연속 패턴 카운터 카드 우선 확보
-                if (nf && I.s.lastOpp == I.s.last2Opp && I.s.lastOpp != CardType.None)
-                {
-                    var x = I.s.lastOpp;
-                    int want = -1;
-                    if (x == CardType.Cooperation) want = idxOf(CardType.Betrayal);
-                    else if (x == CardType.Pollution) want = idxOf(CardType.Doubt);
-                    else if (x == CardType.Betrayal)  want = idxOf(CardType.Interrupt);
-                    else if (x == CardType.Doubt || x == CardType.Chaos) want = idxOf(CardType.Cooperation);
-                    if (want >= 0) return want;
-                }
-
-                // 2) 초중반 안전 시 정보 선호
-                bool safeInfo = R <= 4 && I.s.selfLife >= I.s.oppLife - 1 && p[CardType.Betrayal] <= 0.26f;
-                if (safeInfo)
-                {
-                    int i = idxOf(CardType.Recon); if (i >= 0) return i;
-                }
-
-                // 3) 협력 성향↑ + 의심 낮음 → 오염 확보
-                if ((p[CardType.Cooperation] >= 0.33f || (nf && I.s.lastOpp == CardType.Cooperation)) &&
-                    p[CardType.Doubt] <= 0.28f)
-                {
-                    int i = idxOf(CardType.Pollution); if (i >= 0) return i;
-                }
-
-                // 4) 킬각 대비 카드 확보
-                if (I.s.oppLife <= R && p[CardType.Doubt] < 0.32f)
-                {
-                    int i = idxOf(CardType.Betrayal); if (i >= 0) return i;
-                }
-
-                // 5) 손패 균형 보정
-                if (!HasAtk())
-                {
-                    int i = idxOf(CardType.Pollution); if (i >= 0) return i;
-                    i = idxOf(CardType.Betrayal);      if (i >= 0) return i;
-                }
-                if (!HasDef())
-                {
-                    int i = idxOf(CardType.Doubt);     if (i >= 0) return i;
-                    i = idxOf(CardType.Interrupt);     if (i >= 0) return i;
-                }
-
-                // 6) 기본 선호 스코어(장기 압박/안전/카운터 지향)
-                float Score(CardType c)
-                {
-                    float s = 0f;
-                    if (c == CardType.Pollution)   s += 2.6f - 1.2f * p[CardType.Doubt] + 1.0f * p[CardType.Cooperation];
-                    if (c == CardType.Cooperation) s += 1.6f - 1.0f * p[CardType.Betrayal];
-                    if (c == CardType.Doubt)       s += 1.8f * p[CardType.Betrayal];
-                    if (c == CardType.Interrupt)   s += 1.2f * p[CardType.Betrayal];
-                    if (c == CardType.Betrayal)    s += (I.s.oppLife <= R ? 2.4f : 0.8f) - 1.8f * p[CardType.Doubt];
-                    if (c == CardType.Recon)       s += (R <= 5 ? 0.8f : 0.0f);
-                    return s;
-                }
-                float sa = Score(a), sb = Score(b);
-                if (!Mathf.Approximately(sa, sb)) return sa > sb ? 0 : 1;
-
-                // 동점: 약점 보완 우선 → 그다음 임의
-                if (!HasAtk()) return (a == CardType.Betrayal || a == CardType.Pollution) ? 0 : 1;
-                if (!HasDef()) return (a == CardType.Doubt || a == CardType.Interrupt) ? 0 : 1;
-                return UnityEngine.Random.value < 0.5f ? 0 : 1;
-            };
-            return A;
-        }
-
+        
         // 오태훈
         static Agent Build_오태훈()
         {
@@ -1492,266 +1368,618 @@ namespace GameCore
             return A;
         }
 
-        // 백무적 v3 — 베이지안+최근패턴+상대유형추정+EV⊕미니맥스 혼합+킬/생존/재해/읽힘 보정
+        // 백무적V4 — 초월 메타 적응형(확률 최적화 + 카운터 + 읽힘 회피)
         static Agent Build_백무적()
         {
             var A = new Agent("백무적");
 
+            // ── ① 라운드 카드 선택 ─────────────────────────────────────────
             A.rules.Add(I =>
             {
                 int R = Math.Max(1, I.s.round);
                 bool nf = !I.s.IsFirst;
 
-                // 0) 즉시 생존(직전 위험 플래그)
-                if (nf && I.s.lastOpp != CardType.None)
-                {
-                    bool oppAtk = (I.s.lastOpp == CardType.Betrayal || I.s.lastOpp == CardType.Pollution);
-                    if (oppAtk && I.HandHas(CardType.Interrupt)) return CardType.Interrupt;
-                    if (I.s.lastOpp == CardType.Pollution && I.HandHas(CardType.Doubt)) return CardType.Doubt;
-                }
+                // 라운드 경계의 변동성(5의 배수 블록 전환)을 약하게 인식
+                bool highVol = (R % 5 == 0) || (R % 5 == 1);
 
-                // 1) 상대 분포 p[b]: 라플라스 + 최근 2턴 패턴 + 위기/재해 보정
-                var p = new Dictionary<CardType, float> {
-                    {CardType.Cooperation, 0.09f + I.Ratio(CardType.Cooperation)},
-                    {CardType.Doubt,       0.09f + I.Ratio(CardType.Doubt)},
-                    {CardType.Betrayal,    0.09f + I.Ratio(CardType.Betrayal)},
-                    {CardType.Chaos,       0.09f + I.Ratio(CardType.Chaos)},
-                    {CardType.Pollution,   0.09f + I.Ratio(CardType.Pollution)},
-                    {CardType.Interrupt,   0.09f + I.Ratio(CardType.Interrupt)},
-                    {CardType.Recon,       0.09f + I.Ratio(CardType.Recon)},
+                // 상대 분포 추정 p[t] = 라플라스(0.06) + unseen 비율, 최근 2수 가중
+                var p = new Dictionary<CardType, float>
+                {
+                    { CardType.Cooperation, 0.06f + I.Ratio(CardType.Cooperation) },
+                    { CardType.Doubt,       0.06f + I.Ratio(CardType.Doubt)       },
+                    { CardType.Betrayal,    0.06f + I.Ratio(CardType.Betrayal)    },
+                    { CardType.Chaos,       0.06f + I.Ratio(CardType.Chaos)       },
+                    { CardType.Pollution,   0.06f + I.Ratio(CardType.Pollution)   },
+                    { CardType.Interrupt,   0.06f + I.Ratio(CardType.Interrupt)   },
+                    { CardType.Recon,       0.06f + I.Ratio(CardType.Recon)       },
                 };
-                void W(CardType t, float m) { p[t] *= m; }
-
                 if (nf && I.s.lastOpp != CardType.None)
                 {
-                    if (I.s.lastOpp == I.s.last2Opp) W(I.s.lastOpp, 1.60f);            // 2연속 재현
-                    else                              W(I.s.lastOpp, 1.15f);            // 단발 재현
-                    // 반응 경향(일반 메타) 보정
-                    if (I.s.lastOpp == CardType.Cooperation){ W(CardType.Cooperation,1.12f); W(CardType.Betrayal,1.08f); W(CardType.Pollution,1.06f); }
-                    if (I.s.lastOpp == CardType.Betrayal)   { W(CardType.Doubt,1.10f); W(CardType.Interrupt,1.05f); }
-                    if (I.s.lastOpp == CardType.Pollution)  { W(CardType.Doubt,1.12f); }
-                    if (I.s.lastOpp == CardType.Chaos)      { W(CardType.Interrupt,1.06f); W(CardType.Betrayal,1.05f); }
+                    p[I.s.lastOpp] *= 1.15f;                         // 직전 행동 가중
+                    if (I.s.lastOpp == I.s.last2Opp) p[I.s.lastOpp] *= 1.20f; // 반복시 추가
+                }
+                float S = p.Values.Sum(); foreach (var k in p.Keys.ToList()) p[k] /= (S <= 0 ? 1f : S);
+
+                // 정보량(엔트로피 근사)로 혼전/정찰 타이밍 판단
+                float entropy = 0f; foreach (var v in p.Values) if (v > 0) entropy += -v * (float)System.Math.Log(v + 1e-6);
+
+                // ── 0) 즉사 / 생존 ──
+                if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R && p[CardType.Doubt] < 0.35f)
+                    return CardType.Betrayal;
+                bool lethalRisk = I.s.selfLife <= R && p[CardType.Betrayal] >= 0.28f;
+                if (lethalRisk && I.HandHas(CardType.Doubt)) return CardType.Doubt;
+
+                // ── 1) 반복 패턴 강 카운터 ──
+                if (nf && I.s.lastOpp == I.s.last2Opp && I.s.lastOpp != CardType.None)
+                {
+                    var x = I.s.lastOpp;
+                    if (x == CardType.Cooperation && I.HandHas(CardType.Pollution)) return CardType.Pollution;
+                    if (x == CardType.Pollution && I.HandHas(CardType.Doubt)) return CardType.Doubt;
+                    if (x == CardType.Betrayal && I.HandHas(CardType.Interrupt)) return CardType.Interrupt;
+                    if (x == CardType.Doubt && I.HandHas(CardType.Cooperation)) return CardType.Cooperation;
                 }
 
-                // 내 체력 위험시: 상대의 공격 확률을 과대평가 → 수비 EV가 자연히 올라가게 함
-                if (I.s.selfLife <= R) { W(CardType.Betrayal,1.18f); W(CardType.Pollution,1.12f); }
-                // 상대 저체력시: 상대의 방어/회피 경향을 약간 과대평가
-                if (I.s.oppLife <= R)  { W(CardType.Doubt,1.06f); W(CardType.Interrupt,1.06f); }
+                // ── 2) 정보/포지셔닝 ──
+                bool safe = I.s.selfLife >= I.s.oppLife - 1 && p[CardType.Betrayal] <= 0.26f;
+                bool mixed = p.Values.Max() < 0.42f;              // 상대 혼합 플레이
+                if (I.HandHas(CardType.Recon) && R <= 5 && safe && (mixed || entropy > 1.7f))
+                    return CardType.Recon;
 
-                // 재해 갱신 라운드(5의 배수)는 공격성 억제
-                if (R % 5 == 0){ W(CardType.Betrayal,0.84f); W(CardType.Chaos,0.90f); W(CardType.Doubt,1.10f); }
-
-                // 상대 유형 추정(6턴 이후): 수비형/공격형/랜덤형
-                float sum0 = p.Values.Sum(); foreach (var k in p.Keys.ToList()) p[k] = Mathf.Clamp01(p[k]/(sum0<=0?1:sum0));
-                float atkLik = p[CardType.Betrayal] + p[CardType.Pollution];
-                float defLik = p[CardType.Doubt] + p[CardType.Interrupt];
-                float entropy = -p.Sum(kv => kv.Value > 0 ? kv.Value * Mathf.Log(kv.Value) : 0f); // nats
-
-                if (R >= 6){
-                    if (defLik >= 0.50f) { W(CardType.Doubt,1.08f); W(CardType.Interrupt,1.06f); }        // 수비형
-                    if (atkLik >= 0.50f) { W(CardType.Betrayal,1.08f); W(CardType.Pollution,1.06f); }     // 공격형
-                    if (entropy >= 1.8f) { W(CardType.Chaos,1.05f); W(CardType.Recon,1.05f); }            // 랜덤형
-                }
-                float S = p.Values.Sum(); foreach (var k in p.Keys.ToList()) p[k] = Mathf.Clamp01(p[k]/(S<=0?1:S));
-
-                // 2) 손패 진단 + 불확실성 대응(Chaos/Recon 게이팅)
-                int HandScore(List<CardType> h){
-                    int s=0;
-                    foreach(var c in h)
-                        s += c switch{ CardType.Betrayal=>3, CardType.Pollution=>2, CardType.Interrupt=>1, CardType.Cooperation=>1, CardType.Doubt=>1, CardType.Chaos=>-1, _=>0 };
-                    return s;
-                }
-                int atkCnt = (I.HandHas(CardType.Betrayal)?1:0) + (I.HandHas(CardType.Pollution)?1:0);
-                if (I.HandHas(CardType.Chaos)){
-                    bool poor = HandScore(I.hand) <= 1 || atkCnt == 0;
-                    bool oppPredictable = entropy < 1.2f;
-                    if (poor && !oppPredictable) return CardType.Chaos;
-                }
-                // 초반 안전 탐색
-                if (R <= 3 && entropy >= 1.7f && I.HandHas(CardType.Recon)) return CardType.Recon;
-
-                // 3) 킬각 최우선
-                if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R && p[CardType.Doubt] < 0.33f) return CardType.Betrayal;
-
-                // 4) 보상행렬
-                int V(CardType a, CardType b){
-                    int r=R;
-                    return (a,b) switch{
-                        (CardType.Cooperation, CardType.Cooperation)=>0,
-                        (CardType.Cooperation, CardType.Doubt)=>+1,
-                        (CardType.Cooperation, CardType.Betrayal)=>-(r+1),
-                        (CardType.Cooperation, CardType.Chaos)=>+1,
-                        (CardType.Cooperation, CardType.Pollution)=>-2,
-                        (CardType.Cooperation, CardType.Interrupt)=>-2,
-
-                        (CardType.Doubt, CardType.Cooperation)=>-1,
-                        (CardType.Doubt, CardType.Doubt)=>0,
-                        (CardType.Doubt, CardType.Betrayal)=> r+1,
-                        (CardType.Doubt, CardType.Pollution)=>+1,
-                        (CardType.Doubt, CardType.Interrupt)=>+1,
-
-                        (CardType.Betrayal, CardType.Cooperation)=> r+1,
-                        (CardType.Betrayal, CardType.Doubt)=>-(r+1),
-                        (CardType.Betrayal, CardType.Betrayal)=>-2*r,
-                        (CardType.Betrayal, CardType.Chaos)=> r+1,
-                        (CardType.Betrayal, CardType.Pollution)=> r+1,
-                        (CardType.Betrayal, CardType.Interrupt)=>-2,
-
-                        (CardType.Chaos, CardType.Cooperation)=>-1,
-                        (CardType.Chaos, CardType.Betrayal)=>-(r+1),
-                        (CardType.Chaos, CardType.Interrupt)=>+1,
-
-                        (CardType.Pollution, CardType.Cooperation)=>+2,
-                        (CardType.Pollution, CardType.Doubt)=>-1,
-                        (CardType.Pollution, CardType.Betrayal)=>-(r+1),
-                        (CardType.Pollution, CardType.Interrupt)=>-2,
-
-                        (CardType.Interrupt, CardType.Cooperation)=>+2,
-                        (CardType.Interrupt, CardType.Doubt)=>-1,
-                        (CardType.Interrupt, CardType.Betrayal)=>+2,
-                        (CardType.Interrupt, CardType.Pollution)=>+2,
-                        _=>0
-                    };
+                // ── 3) EV 행렬로 기대값 최대화 + 리스크 보정 ──
+                int Delta(CardType a, CardType b)
+                {
+                    int r = R;
+                    // Cooperation
+                    if (a == CardType.Cooperation && b == CardType.Cooperation) return 0;
+                    if (a == CardType.Cooperation && b == CardType.Doubt) return +1;
+                    if (a == CardType.Cooperation && b == CardType.Betrayal) return -(r + 1);
+                    if (a == CardType.Cooperation && b == CardType.Chaos) return +1;
+                    if (a == CardType.Cooperation && b == CardType.Pollution) return -2;
+                    if (a == CardType.Cooperation && b == CardType.Interrupt) return +2;
+                    if (a == CardType.Cooperation && b == CardType.Recon) return +1;
+                    // Doubt
+                    if (a == CardType.Doubt && b == CardType.Cooperation) return -1;
+                    if (a == CardType.Doubt && b == CardType.Doubt) return 0;
+                    if (a == CardType.Doubt && b == CardType.Betrayal) return r + 1;
+                    if (a == CardType.Doubt && b == CardType.Chaos) return 0;
+                    if (a == CardType.Doubt && b == CardType.Pollution) return +1;
+                    if (a == CardType.Doubt && b == CardType.Interrupt) return -1;
+                    if (a == CardType.Doubt && b == CardType.Recon) return 0;
+                    // Betrayal
+                    if (a == CardType.Betrayal && b == CardType.Cooperation) return r + 1;
+                    if (a == CardType.Betrayal && b == CardType.Doubt) return -(r + 1);
+                    if (a == CardType.Betrayal && b == CardType.Betrayal) return -2 * r;
+                    if (a == CardType.Betrayal && b == CardType.Chaos) return r + 1;
+                    if (a == CardType.Betrayal && b == CardType.Pollution) return r + 1;
+                    if (a == CardType.Betrayal && b == CardType.Interrupt) return r;
+                    if (a == CardType.Betrayal && b == CardType.Recon) return r + 1;
+                    // Chaos
+                    if (a == CardType.Chaos && b == CardType.Cooperation) return -1;
+                    if (a == CardType.Chaos && b == CardType.Doubt) return 0;
+                    if (a == CardType.Chaos && b == CardType.Betrayal) return -(r + 1);
+                    if (a == CardType.Chaos && b == CardType.Chaos) return 0;
+                    if (a == CardType.Chaos && b == CardType.Pollution) return 0;
+                    if (a == CardType.Chaos && b == CardType.Interrupt) return -1;
+                    if (a == CardType.Chaos && b == CardType.Recon) return 0;
+                    // Pollution
+                    if (a == CardType.Pollution && b == CardType.Cooperation) return +2;
+                    if (a == CardType.Pollution && b == CardType.Doubt) return -1;
+                    if (a == CardType.Pollution && b == CardType.Betrayal) return -(r + 1);
+                    if (a == CardType.Pollution && b == CardType.Chaos) return 0;
+                    if (a == CardType.Pollution && b == CardType.Pollution) return 0;
+                    if (a == CardType.Pollution && b == CardType.Interrupt) return 0;
+                    if (a == CardType.Pollution && b == CardType.Recon) return -1;
+                    // Interrupt
+                    if (a == CardType.Interrupt && b == CardType.Cooperation) return -2;
+                    if (a == CardType.Interrupt && b == CardType.Doubt) return +2;
+                    if (a == CardType.Interrupt && b == CardType.Betrayal) return +2;
+                    if (a == CardType.Interrupt && b == CardType.Chaos) return -1;
+                    if (a == CardType.Interrupt && b == CardType.Pollution) return +2;
+                    if (a == CardType.Interrupt && b == CardType.Interrupt) return 0;
+                    if (a == CardType.Interrupt && b == CardType.Recon) return +1;
+                    // Recon
+                    if (a == CardType.Recon && b == CardType.Cooperation) return -1;
+                    if (a == CardType.Recon && b == CardType.Doubt) return 0;
+                    if (a == CardType.Recon && b == CardType.Betrayal) return -(R + 1);
+                    if (a == CardType.Recon && b == CardType.Chaos) return 0;
+                    if (a == CardType.Recon && b == CardType.Pollution) return -1;
+                    if (a == CardType.Recon && b == CardType.Interrupt) return -1;
+                    if (a == CardType.Recon && b == CardType.Recon) return 0;
+                    return 0;
                 }
 
-                // 5) EV + 미니맥스 혼합 + 전술 보정으로 점수화
                 var cand = I.hand.Distinct().Where(I.HandHas).ToList();
-                CardType best = CardType.None; float bestScore = float.NegativeInfinity;
-
-                // 미니맥스용 상위 후보 b 집합
-                var topB = p.OrderByDescending(kv=>kv.Value).Take(4).Select(kv=>kv.Key).ToArray();
+                CardType best = CardType.None; float bestEV = float.NegativeInfinity;
 
                 foreach (var a in cand)
                 {
-                    float ev = 0f; foreach (var kv in p) ev += kv.Value * V(a, kv.Key);
-                    float worstTop = topB.Min(b => (float)V(a,b));
-                    float score = ev + 0.35f * worstTop;
+                    float ev = 0f; foreach (var b in p.Keys) ev += p[b] * Delta(a, b);
 
-                    // 전술 보정
-                    float pC = p[CardType.Cooperation], pD = p[CardType.Doubt];
-                    float pB = p[CardType.Betrayal],    pP = p[CardType.Pollution];
-                    float pA = pB + pP;
+                    // 막판 킬각 보정
+                    if (a == CardType.Betrayal && I.s.oppLife <= R + 1) ev += p[CardType.Cooperation] * 2.5f;
 
-                    if (a == CardType.Interrupt && pA >= 0.46f) score += 1.8f;
-                    if (a == CardType.Doubt     && pB >= 0.32f) score += 1.2f;
+                    // 리스크 보정
+                    if (highVol && a == CardType.Chaos) ev -= 0.7f;
+                    if (highVol && a == CardType.Betrayal) ev -= 0.4f;
 
-                    if (a == CardType.Pollution && pC >= 0.35f && pD <= 0.28f) score += 1.4f;
-                    if (a == CardType.Betrayal  && pC >= 0.40f && I.s.oppLife <= R+1) score += 1.2f;
+                    // 읽힘 회피: 직전 내가 낸 카드 반복 페널티
+                    if (I.s.lastSelf == a) ev -= 0.2f;
 
-                    if (R % 5 == 0 && (a == CardType.Betrayal || a == CardType.Chaos)) score -= 0.6f; // 재해 직전 보수성
-
-                    // 내 생존 저점 보정
-                    if (I.s.selfLife <= R){
-                        if (a == CardType.Betrayal) score -= 3.3f;
-                        if (a == CardType.Pollution) score -= pD * 1.6f;
-                    }
-
-                    if (score > bestScore){ bestScore = score; best = a; }
+                    if (ev > bestEV) { bestEV = ev; best = a; }
                 }
 
-                // 6) 읽힘 방지: 12% 확률로 2순위 채택(근소 차이일 때만)
-                var ranked = cand
-                    .Select(a => new { a, s = p.Sum(kv => kv.Value * V(a, kv.Key)) })
-                    .OrderByDescending(x => x.s).ToList();
-                if (ranked.Count >= 2 && ranked[1].s > bestScore - 0.50f && UnityEngine.Random.value < 0.12f)
-                    best = ranked[1].a;
-                
+                // 2순위 근접 시 확률적 스왑(읽힘 방지)
+                var alt = cand.Where(t => t != best)
+                            .OrderByDescending(t => { float e = 0; foreach (var b in p.Keys) e += p[b] * Delta(t, b); return e; })
+                            .ToList();
+                if (alt.Count > 0)
+                {
+                    float secondEV = 0; foreach (var b in p.Keys) secondEV += p[b] * Delta(alt[0], b);
+                    if (secondEV > bestEV - 0.45f && UnityEngine.Random.value < 0.18f) best = alt[0];
+                }
+
                 return best;
             });
 
-            A.fallback = new[]{
-                CardType.Doubt, CardType.Interrupt, CardType.Betrayal,
-                CardType.Pollution, CardType.Cooperation, CardType.Chaos, CardType.Recon
-            };
-            // 선택 드로우: 두 후보의 기대가치 비교(동률 시 상황 가중)
+            // ── ② 선택 드로우(2장 중 1장) ────────────────────────────────
             A.chooseFromTwo = (CardType a, CardType b, DecisionInput I) =>
             {
                 int R = Math.Max(1, I.s.round);
-                bool nf = !I.s.IsFirst;
-                bool leading = I.s.selfLife >= I.s.oppLife + 1;
-                bool poorAtk = !I.HandHas(CardType.Betrayal) && !I.HandHas(CardType.Pollution);
+                bool losing = I.s.selfLife < I.s.oppLife;
 
-                // 분포 추정
-                var p = new Dictionary<CardType, float>
+                // 간단 균형 체크
+                bool needAtk = !(I.HandHas(CardType.Betrayal) || I.HandHas(CardType.Pollution));
+                bool needDef = !(I.HandHas(CardType.Doubt) || I.HandHas(CardType.Interrupt));
+
+                // EV 근사 점수
+                float Score(CardType x)
                 {
-                    {CardType.Cooperation, 0.06f + I.Ratio(CardType.Cooperation)},
-                    {CardType.Doubt,       0.06f + I.Ratio(CardType.Doubt)},
-                    {CardType.Betrayal,    0.06f + I.Ratio(CardType.Betrayal)},
-                    {CardType.Chaos,       0.06f + I.Ratio(CardType.Chaos)},
-                    {CardType.Pollution,   0.06f + I.Ratio(CardType.Pollution)},
-                    {CardType.Interrupt,   0.06f + I.Ratio(CardType.Interrupt)},
-                    {CardType.Recon,       0.06f + I.Ratio(CardType.Recon)},
-                };
-                if (nf && I.s.lastOpp != CardType.None && I.s.lastOpp == I.s.last2Opp) p[I.s.lastOpp] *= 1.35f;
-                float S = p.Values.Sum(); foreach (var k in p.Keys.ToList()) p[k] /= (S <= 0 ? 1f : S);
-
-                int Payoff(CardType x, CardType y)
-                {
-                    int r = Math.Max(1, I.s.round);
-                    return (x, y) switch
-                    {
-                        (CardType.Cooperation, CardType.Cooperation) => 0,
-                        (CardType.Cooperation, CardType.Doubt)       => +1,
-                        (CardType.Cooperation, CardType.Betrayal)    => -(r + 1),
-                        (CardType.Cooperation, CardType.Chaos)       => +1,
-                        (CardType.Cooperation, CardType.Pollution)   => -2,
-                        (CardType.Cooperation, CardType.Interrupt)   => -2,
-
-                        (CardType.Doubt, CardType.Cooperation)       => -1,
-                        (CardType.Doubt, CardType.Doubt)             => 0,
-                        (CardType.Doubt, CardType.Betrayal)          =>  r + 1,
-                        (CardType.Doubt, CardType.Pollution)         => +1,
-                        (CardType.Doubt, CardType.Interrupt)         => +1,
-
-                        (CardType.Betrayal, CardType.Cooperation)    =>  r + 1,
-                        (CardType.Betrayal, CardType.Doubt)          => -(r + 1),
-                        (CardType.Betrayal, CardType.Betrayal)       => -2 * r,
-                        (CardType.Betrayal, CardType.Chaos)          =>  r + 1,
-                        (CardType.Betrayal, CardType.Pollution)      =>  r + 1,
-                        (CardType.Betrayal, CardType.Interrupt)      => -2,
-
-                        (CardType.Chaos, CardType.Cooperation)       => -1,
-                        (CardType.Chaos, CardType.Betrayal)          => -(r + 1),
-                        (CardType.Chaos, CardType.Interrupt)         => +1,
-
-                        (CardType.Pollution, CardType.Cooperation)   => +2,
-                        (CardType.Pollution, CardType.Doubt)         => -1,
-                        (CardType.Pollution, CardType.Betrayal)      => -(r + 1),
-                        (CardType.Pollution, CardType.Interrupt)     => -2,
-
-                        (CardType.Interrupt, CardType.Cooperation)   => +2,
-                        (CardType.Interrupt, CardType.Doubt)         => -1,
-                        (CardType.Interrupt, CardType.Betrayal)      => +2,
-                        (CardType.Interrupt, CardType.Pollution)     => +2,
-                        _ => 0
-                    };
+                    float s = 0f;
+                    if (x == CardType.Betrayal) s += (I.s.oppLife <= R ? 7f : 3.2f) - 1.8f * I.Ratio(CardType.Doubt);
+                    if (x == CardType.Pollution) s += 3.0f + 1.2f * (I.Ratio(CardType.Cooperation));
+                    if (x == CardType.Doubt) s += (I.s.selfLife <= R ? 4.8f : 1.2f);
+                    if (x == CardType.Interrupt) s += 2.6f + 1.4f * I.Ratio(CardType.Betrayal);
+                    if (x == CardType.Cooperation) s += losing ? 1.0f : 2.0f;
+                    if (x == CardType.Recon) s += (R <= 5 && (losing || needAtk)) ? 2.2f : 0.6f;
+                    if (x == CardType.Chaos) s += (losing && R >= 3 ? 0.8f : -1.5f);
+                    if (needAtk && (x == CardType.Betrayal || x == CardType.Pollution)) s += 1.5f;
+                    if (needDef && (x == CardType.Doubt || x == CardType.Interrupt)) s += 1.3f;
+                    return s;
                 }
 
-                float EV(CardType x)
+                float sa = Score(a), sb = Score(b);
+                int pick = sa >= sb ? 0 : 1;
+
+                // 동점 혹은 근접 시, 공격카드/수비카드 필요 여부로 편향
+                if (System.Math.Abs(sa - sb) < 0.15f)
                 {
-                    float ev = 0f; foreach (var y in p.Keys) ev += p[y] * Payoff(x, y);
-                    if (x == CardType.Chaos)     ev += (poorAtk || !leading ? 0.5f : -1.0f);
-                    if (x == CardType.Betrayal)  ev += (I.s.oppLife <= R ? 2.0f : 0f) - 1.1f * p[CardType.Doubt];
-                    if (x == CardType.Pollution) ev += (p[CardType.Cooperation] - 0.7f * p[CardType.Doubt]) * 1.2f;
-                    if (x == CardType.Doubt && (I.s.selfLife <= R || p[CardType.Betrayal] >= 0.30f)) ev += 1.6f;
-                    return ev;
+                    bool aOff = (a == CardType.Betrayal || a == CardType.Pollution);
+                    bool bOff = (b == CardType.Betrayal || b == CardType.Pollution);
+                    bool aDef = (a == CardType.Doubt || a == CardType.Interrupt);
+                    bool bDef = (b == CardType.Doubt || b == CardType.Interrupt);
+
+                    if (needAtk && aOff != bOff) pick = aOff ? 0 : 1;
+                    else if (needDef && aDef != bDef) pick = aDef ? 0 : 1;
+                    else pick = UnityEngine.Random.value < 0.5f ? 0 : 1;
                 }
+                return pick;
+            };
 
-                float ea = EV(a), eb = EV(b);
-                if (!Mathf.Approximately(ea, eb)) return ea > eb ? 0 : 1;
-
-                // 동률: 손패 밸런스 보정 → 안전/공격 순
-                bool needAtk = !I.HandHas(CardType.Betrayal) && !I.HandHas(CardType.Pollution);
-                bool needDef = !I.HandHas(CardType.Doubt) && !I.HandHas(CardType.Interrupt);
-                if (needAtk && (a==CardType.Betrayal || a==CardType.Pollution || b==CardType.Betrayal || b==CardType.Pollution))
-                    return (a==CardType.Betrayal || a==CardType.Pollution) ? 0 : 1;
-                if (needDef && (a==CardType.Doubt || a==CardType.Interrupt || b==CardType.Doubt || b==CardType.Interrupt))
-                    return (a==CardType.Doubt || a==CardType.Interrupt) ? 0 : 1;
-
-                // 최종 무작위 소량
-                return UnityEngine.Random.value < 0.5f ? 0 : 1;
+            // ── ③ 기본 낙하 우선순위 ─────────────────────────────────────
+            A.fallback = new[]
+            {
+                CardType.Pollution, CardType.Betrayal, CardType.Doubt,
+                CardType.Interrupt, CardType.Cooperation, CardType.Recon, CardType.Chaos
             };
             return A;
-        }    
+        }
+
+        // ──────────────────────────────────────────────
+        // 류성우 — 리스크 조절형(앞서면 보수, 뒤지면 공세)
+        // ──────────────────────────────────────────────
+        static Agent Build_류성우()
+        {
+            var A = new Agent("류성우");
+
+            A.rules.Add(I =>
+            {
+                int R = Math.Max(1, I.s.round);
+                bool losing = I.s.selfLife < I.s.oppLife;
+
+                // 상대 행동 분포(덱+상대패 비율)
+                var p = new Dictionary<CardType, float>
+                {
+                    { CardType.Cooperation, I.Ratio(CardType.Cooperation) },
+                    { CardType.Doubt,       I.Ratio(CardType.Doubt)       },
+                    { CardType.Betrayal,    I.Ratio(CardType.Betrayal)    },
+                    { CardType.Chaos,       I.Ratio(CardType.Chaos)       },
+                    { CardType.Pollution,   I.Ratio(CardType.Pollution)   },
+                    { CardType.Interrupt,   I.Ratio(CardType.Interrupt)   },
+                    { CardType.Recon,       I.Ratio(CardType.Recon)       },
+                };
+                float sum = p.Values.Sum(); if (sum <= 0) sum = 1f;
+                foreach (var k in p.Keys.ToList()) p[k] /= sum;
+
+                // 즉사/생존
+                if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R && p[CardType.Doubt] < 0.33f)
+                    return CardType.Betrayal;
+                if (I.s.selfLife <= R && p[CardType.Betrayal] >= 0.28f && I.HandHas(CardType.Doubt))
+                    return CardType.Doubt;
+
+                // 기대값 매트릭스
+                int Delta(CardType a, CardType b)
+                {
+                    int r = R;
+                    if (a == CardType.Cooperation && b == CardType.Cooperation) return 0;
+                    if (a == CardType.Cooperation && b == CardType.Doubt) return +1;
+                    if (a == CardType.Cooperation && b == CardType.Betrayal) return -(r + 1);
+                    if (a == CardType.Cooperation && b == CardType.Chaos) return +1;
+                    if (a == CardType.Cooperation && b == CardType.Pollution) return -2;
+                    if (a == CardType.Cooperation && b == CardType.Interrupt) return +2;
+                    if (a == CardType.Cooperation && b == CardType.Recon) return +1;
+
+                    if (a == CardType.Doubt && b == CardType.Cooperation) return -1;
+                    if (a == CardType.Doubt && b == CardType.Doubt) return 0;
+                    if (a == CardType.Doubt && b == CardType.Betrayal) return r + 1;
+                    if (a == CardType.Doubt && b == CardType.Chaos) return 0;
+                    if (a == CardType.Doubt && b == CardType.Pollution) return +1;
+                    if (a == CardType.Doubt && b == CardType.Interrupt) return -1;
+                    if (a == CardType.Doubt && b == CardType.Recon) return 0;
+
+                    if (a == CardType.Betrayal && b == CardType.Cooperation) return r + 1;
+                    if (a == CardType.Betrayal && b == CardType.Doubt) return -(r + 1);
+                    if (a == CardType.Betrayal && b == CardType.Betrayal) return -2 * r;
+                    if (a == CardType.Betrayal && b == CardType.Chaos) return r + 1;
+                    if (a == CardType.Betrayal && b == CardType.Pollution) return r + 1;
+                    if (a == CardType.Betrayal && b == CardType.Interrupt) return r;
+                    if (a == CardType.Betrayal && b == CardType.Recon) return r + 1;
+
+                    if (a == CardType.Chaos && b == CardType.Cooperation) return -1;
+                    if (a == CardType.Chaos && b == CardType.Doubt) return 0;
+                    if (a == CardType.Chaos && b == CardType.Betrayal) return -(r + 1);
+                    if (a == CardType.Chaos && b == CardType.Chaos) return 0;
+                    if (a == CardType.Chaos && b == CardType.Pollution) return 0;
+                    if (a == CardType.Chaos && b == CardType.Interrupt) return -1;
+                    if (a == CardType.Chaos && b == CardType.Recon) return 0;
+
+                    if (a == CardType.Pollution && b == CardType.Cooperation) return +2;
+                    if (a == CardType.Pollution && b == CardType.Doubt) return -1;
+                    if (a == CardType.Pollution && b == CardType.Betrayal) return -(r + 1);
+                    if (a == CardType.Pollution && b == CardType.Chaos) return 0;
+                    if (a == CardType.Pollution && b == CardType.Pollution) return 0;
+                    if (a == CardType.Pollution && b == CardType.Interrupt) return 0;
+                    if (a == CardType.Pollution && b == CardType.Recon) return -1;
+
+                    if (a == CardType.Interrupt && b == CardType.Cooperation) return -2;
+                    if (a == CardType.Interrupt && b == CardType.Doubt) return +2;
+                    if (a == CardType.Interrupt && b == CardType.Betrayal) return +2;
+                    if (a == CardType.Interrupt && b == CardType.Chaos) return -1;
+                    if (a == CardType.Interrupt && b == CardType.Pollution) return +2;
+                    if (a == CardType.Interrupt && b == CardType.Interrupt) return 0;
+                    if (a == CardType.Interrupt && b == CardType.Recon) return +1;
+
+                    if (a == CardType.Recon && b == CardType.Cooperation) return -1;
+                    if (a == CardType.Recon && b == CardType.Doubt) return 0;
+                    if (a == CardType.Recon && b == CardType.Betrayal) return -(r + 1);
+                    if (a == CardType.Recon && b == CardType.Chaos) return 0;
+                    if (a == CardType.Recon && b == CardType.Pollution) return -1;
+                    if (a == CardType.Recon && b == CardType.Interrupt) return -1;
+                    if (a == CardType.Recon && b == CardType.Recon) return 0;
+                    return 0;
+                }
+
+                // 후보 중 EV 최대. 지고 있으면 공격카드(배신/오염)에 가중, 앞서면 방어카드(의심/차단)에 가중
+                var cand = I.hand.Distinct().Where(I.HandHas).ToList();
+                CardType best = CardType.None; float bestEV = float.NegativeInfinity;
+
+                foreach (var a in cand)
+                {
+                    float ev = 0f; foreach (var b in p.Keys) ev += p[b] * Delta(a, b);
+                    if (losing && (a == CardType.Betrayal || a == CardType.Pollution)) ev += 0.6f;
+                    if (!losing && (a == CardType.Doubt || a == CardType.Interrupt)) ev += 0.5f;
+                    if (ev > bestEV) { bestEV = ev; best = a; }
+                }
+                return best;
+            });
+
+            A.chooseFromTwo = (a, b, I) =>
+            {
+                int R = Math.Max(1, I.s.round);
+                bool losing = I.s.selfLife < I.s.oppLife;
+
+                float P(CardType t) => I.Ratio(t);
+                float Z = new[]{
+                    P(CardType.Cooperation),P(CardType.Doubt),P(CardType.Betrayal),
+                    P(CardType.Chaos),P(CardType.Pollution),P(CardType.Interrupt),P(CardType.Recon)
+                }.Sum(); if (Z <= 0) Z = 1f;
+                float Q(CardType t) => P(t) / Z;
+
+                float V(CardType c)
+                {
+                    switch (c)
+                    {
+                        case CardType.Betrayal: return (losing ? 2.2f : 1.0f) * (I.s.oppLife <= R ? 3.0f : 1.0f) - 3.5f * Q(CardType.Doubt);
+                        case CardType.Pollution: return (losing ? 1.8f : 1.0f) + 1.5f * (1f - Q(CardType.Doubt));
+                        case CardType.Doubt: return (!losing ? 2.2f : 1.0f) * (2.5f * Q(CardType.Betrayal));
+                        case CardType.Interrupt: return (!losing ? 2.0f : 1.0f) * (2.0f * (Q(CardType.Betrayal) + Q(CardType.Doubt)));
+                        case CardType.Cooperation: return 1.0f - 1.5f * Q(CardType.Betrayal);
+                        case CardType.Recon: return (losing ? 1.2f : 0.6f);
+                        case CardType.Chaos: return losing ? 0.3f : -0.8f;
+                    }
+                    return 0f;
+                }
+
+                float va = V(a), vb = V(b);
+                if (Math.Abs(va - vb) < 0.001f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                return va >= vb ? 0 : 1;
+            };
+
+            A.fallback = new[] { CardType.Doubt, CardType.Interrupt, CardType.Pollution, CardType.Cooperation, CardType.Betrayal, CardType.Recon, CardType.Chaos };
+            return A;
+        }
+        // ──────────────────────────────────────────────
+        // 서유리 — 템포 스위처(반복 패턴 저격, 루프 깨기)
+        // ──────────────────────────────────────────────
+        static Agent Build_서유리()
+        {
+            var A = new Agent("서유리");
+
+            A.rules.Add(I =>
+            {
+                int R = Math.Max(1, I.s.round);
+
+                // 상대가 같은 패턴 반복 중이면 강하게 카운터
+                bool oppLoop = (I.s.lastOpp != CardType.None) && (I.s.lastOpp == I.s.last2Opp);
+
+                // 분포
+                var p = new Dictionary<CardType, float>{
+                    {CardType.Cooperation,I.Ratio(CardType.Cooperation)},
+                    {CardType.Doubt,      I.Ratio(CardType.Doubt)},
+                    {CardType.Betrayal,   I.Ratio(CardType.Betrayal)},
+                    {CardType.Chaos,      I.Ratio(CardType.Chaos)},
+                    {CardType.Pollution,  I.Ratio(CardType.Pollution)},
+                    {CardType.Interrupt,  I.Ratio(CardType.Interrupt)},
+                    {CardType.Recon,      I.Ratio(CardType.Recon)}
+                };
+                float s = p.Values.Sum(); if (s <= 0) s = 1f; foreach (var k in p.Keys.ToList()) p[k] /= s;
+
+                // 즉사/생존
+                if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R && p[CardType.Doubt] < 0.35f)
+                    return CardType.Betrayal;
+                if (I.s.selfLife <= R && p[CardType.Betrayal] >= 0.30f && I.HandHas(CardType.Doubt))
+                    return CardType.Doubt;
+
+                // 루프 저격 규칙
+                if (oppLoop)
+                {
+                    switch (I.s.lastOpp)
+                    {
+                        case CardType.Betrayal: if (I.HandHas(CardType.Doubt)) return CardType.Doubt; break;
+                        case CardType.Doubt: if (I.HandHas(CardType.Pollution)) return CardType.Pollution; break;
+                        case CardType.Cooperation: if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt; break;
+                        case CardType.Pollution: if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt; break;
+                    }
+                }
+
+                // 기본 우선순위: 템포 전환(공→수 또는 수→공)로 읽힘 회피
+                bool myLoop = (I.s.lastSelf != CardType.None) && (I.s.lastSelf == I.s.lastOpp);
+                if (myLoop && I.HandHas(CardType.Interrupt)) return CardType.Interrupt;
+
+                // 정보/재정비
+                bool poorAttack = !I.HandHas(CardType.Betrayal) && !I.HandHas(CardType.Pollution);
+                if (poorAttack && I.HandHas(CardType.Recon)) return CardType.Recon;
+
+                // 가벼운 EV
+                int r = R;
+                float EV(CardType a)
+                {
+                    float e = 0;
+                    foreach (var kv in p)
+                    {
+                        var b = kv.Key; float q = kv.Value;
+                        int d = 0;
+                        if (a == CardType.Pollution && b == CardType.Cooperation) d = +2;
+                        else if (a == CardType.Interrupt && (b == CardType.Betrayal || b == CardType.Doubt || b == CardType.Pollution)) d = +2;
+                        else if (a == CardType.Betrayal && b == CardType.Cooperation) d = r + 1;
+                        else if (a == CardType.Doubt && b == CardType.Betrayal) d = r + 1;
+                        else if (a == CardType.Cooperation && b == CardType.Betrayal) d = -(r + 1);
+                        e += q * d;
+                    }
+                    // 템포 전환 가중
+                    if (a != I.s.lastSelf) e += 0.25f;
+                    return e;
+                }
+
+                var cand = I.hand.Distinct().Where(I.HandHas).OrderByDescending(EV).ToList();
+                return cand[0];
+            });
+
+            A.chooseFromTwo = (a, b, I) =>
+            {
+                // 읽힘 회피: 직전 내가 낸 것과 다른 쪽에 소폭 보정
+                float bonusA = (I.s.lastSelf != a) ? 0.15f : 0f;
+                float bonusB = (I.s.lastSelf != b) ? 0.15f : 0f;
+
+                float baseV(CardType c)
+                {
+                    switch (c)
+                    {
+                        case CardType.Interrupt: return 1.5f;
+                        case CardType.Pollution: return 1.2f;
+                        case CardType.Doubt: return 1.1f;
+                        case CardType.Betrayal: return 1.0f;
+                        case CardType.Cooperation: return 0.6f;
+                        case CardType.Recon: return 0.7f;
+                        case CardType.Chaos: return 0.0f;
+                    }
+                    return 0f;
+                }
+
+                float va = baseV(a) + bonusA, vb = baseV(b) + bonusB;
+                if (Math.Abs(va - vb) < 0.001f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                return va >= vb ? 0 : 1;
+            };
+
+            A.fallback = new[] { CardType.Interrupt, CardType.Pollution, CardType.Doubt, CardType.Betrayal, CardType.Cooperation, CardType.Recon, CardType.Chaos };
+            return A;
+        }
+        // ──────────────────────────────────────────────
+        // 강은호 — 확률 회계사(미확인 카드 분포에 충실, 혼돈 기피)
+        // ──────────────────────────────────────────────
+        static Agent Build_강은호()
+        {
+            var A = new Agent("강은호");
+
+            A.rules.Add(I =>
+            {
+                int R = Math.Max(1, I.s.round);
+
+                // 분포(그대로 신뢰)
+                float P(CardType t) => I.Ratio(t);
+                float Z = P(CardType.Cooperation) + P(CardType.Doubt) + P(CardType.Betrayal) + P(CardType.Chaos) + P(CardType.Pollution) + P(CardType.Interrupt) + P(CardType.Recon);
+                if (Z <= 0) Z = 1f;
+                float Q(CardType t) => P(t) / Z;
+
+                // 안전우선: Chaos는 거의 사용 안 함
+                if (!I.HandHas(CardType.Betrayal) && !I.HandHas(CardType.Pollution) && I.HandHas(CardType.Recon))
+                    return CardType.Recon;
+
+                // 즉사/생존
+                if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R && Q(CardType.Doubt) < 0.33f)
+                    return CardType.Betrayal;
+                if (I.s.selfLife <= R && Q(CardType.Betrayal) >= 0.28f && I.HandHas(CardType.Doubt))
+                    return CardType.Doubt;
+
+                // 기대값 근사
+                float V(CardType c)
+                {
+                    switch (c)
+                    {
+                        case CardType.Pollution: return 2.0f * (1f - Q(CardType.Doubt)) - 0.2f * Q(CardType.Interrupt);
+                        case CardType.Interrupt: return 1.8f * (Q(CardType.Betrayal) + Q(CardType.Doubt) + Q(CardType.Pollution));
+                        case CardType.Doubt: return 2.2f * Q(CardType.Betrayal);
+                        case CardType.Betrayal: return (I.s.oppLife <= R ? 3.2f : 1.6f) - 3.8f * Q(CardType.Doubt);
+                        case CardType.Cooperation: return 0.8f - 1.2f * Q(CardType.Betrayal);
+                        case CardType.Recon: return 0.9f;
+                        case CardType.Chaos: return -0.6f;
+                    }
+                    return 0f;
+                }
+
+                return I.hand.Distinct().Where(I.HandHas).OrderByDescending(V).FirstOrDefault();
+            });
+
+            A.chooseFromTwo = (a, b, I) =>
+            {
+                float V(CardType c)
+                {
+                    switch (c)
+                    {
+                        case CardType.Pollution: return 1.4f;
+                        case CardType.Interrupt: return 1.2f;
+                        case CardType.Doubt: return 1.1f;
+                        case CardType.Betrayal: return 1.0f;
+                        case CardType.Cooperation: return 0.6f;
+                        case CardType.Recon: return 0.7f;
+                        case CardType.Chaos: return 0.0f;
+                    }
+                    return 0f;
+                }
+                float va = V(a), vb = V(b);
+                if (Math.Abs(va - vb) < 0.001f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                return va >= vb ? 0 : 1;
+            };
+
+            A.fallback = new[] { CardType.Pollution, CardType.Interrupt, CardType.Doubt, CardType.Betrayal, CardType.Cooperation, CardType.Recon, CardType.Chaos };
+            return A;
+        }
+        // ──────────────────────────────────────────────
+        // 전아람 — 정보 포식자(정보→일격, Recon 활용 극대화)
+        // ──────────────────────────────────────────────
+        static Agent Build_전아람()
+        {
+            var A = new Agent("전아람");
+
+            A.rules.Add(I =>
+            {
+                int R = Math.Max(1, I.s.round);
+
+                // 손패가 공격적으로 빈약하거나 초중반이면 우선 정찰
+                bool poor = !I.HandHas(CardType.Betrayal) && !I.HandHas(CardType.Pollution);
+                if ((R<=4 || poor) && I.HandHas(CardType.Recon))
+                    return CardType.Recon;
+
+                // 상대 경향(간단 추정)
+                var p = new Dictionary<CardType,float>{
+                    {CardType.Cooperation,I.Ratio(CardType.Cooperation)},
+                    {CardType.Doubt,      I.Ratio(CardType.Doubt)},
+                    {CardType.Betrayal,   I.Ratio(CardType.Betrayal)},
+                    {CardType.Chaos,      I.Ratio(CardType.Chaos)},
+                    {CardType.Pollution,  I.Ratio(CardType.Pollution)},
+                    {CardType.Interrupt,  I.Ratio(CardType.Interrupt)},
+                    {CardType.Recon,      I.Ratio(CardType.Recon)}
+                };
+                float s = p.Values.Sum(); if (s<=0) s=1f; foreach(var k in p.Keys.ToList()) p[k]/=s;
+
+                // 즉사/생존
+                if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R && p[CardType.Doubt] < 0.35f)
+                    return CardType.Betrayal;
+                if (I.s.selfLife <= R && p[CardType.Betrayal] >= 0.28f && I.HandHas(CardType.Doubt))
+                    return CardType.Doubt;
+
+                // 읽힘 회피: 내 최근 카드 반복 회피
+                CardType avoid = I.s.lastSelf;
+
+                // 간단 EV + 회피 보정
+                int r = R;
+                float Score(CardType a)
+                {
+                    float e=0;
+                    foreach(var kv in p)
+                    {
+                        var b=kv.Key; float q=kv.Value; int d=0;
+                        if (a==CardType.Betrayal && b==CardType.Cooperation) d=r+1;
+                        else if (a==CardType.Pollution && b==CardType.Cooperation) d=+2;
+                        else if (a==CardType.Doubt && b==CardType.Betrayal) d=r+1;
+                        else if (a==CardType.Interrupt && (b==CardType.Betrayal||b==CardType.Doubt||b==CardType.Pollution)) d=+2;
+                        else if (a==CardType.Cooperation && b==CardType.Betrayal) d=-(r+1);
+                        e += q*d;
+                    }
+                    if (a!=avoid) e += 0.2f;
+                    return e;
+                }
+
+                return I.hand.Distinct().Where(I.HandHas).OrderByDescending(Score).FirstOrDefault();
+            });
+
+            A.chooseFromTwo = (a,b,I) =>
+            {
+                int R = Math.Max(1, I.s.round);
+                bool losing = I.s.selfLife < I.s.oppLife;
+
+                float baseV(CardType c)
+                {
+                    switch(c)
+                    {
+                        case CardType.Recon:     return losing?1.6f:1.0f;
+                        case CardType.Betrayal:  return (I.s.oppLife<=R?3.0f:1.2f);
+                        case CardType.Pollution: return 1.4f;
+                        case CardType.Doubt:     return 1.2f;
+                        case CardType.Interrupt: return 1.1f;
+                        case CardType.Cooperation:return 0.7f;
+                        case CardType.Chaos:     return 0.1f;
+                    }
+                    return 0f;
+                }
+
+                float va = baseV(a) + (I.s.lastSelf!=a?0.15f:0f);
+                float vb = baseV(b) + (I.s.lastSelf!=b?0.15f:0f);
+                if (Math.Abs(va-vb)<0.001f) return UnityEngine.Random.value<0.5f?0:1;
+                return va>=vb?0:1;
+            };
+
+            A.fallback = new[]{ CardType.Recon, CardType.Pollution, CardType.Doubt, CardType.Betrayal, CardType.Interrupt, CardType.Cooperation, CardType.Chaos };
+            return A;
+        }
     }
 }
