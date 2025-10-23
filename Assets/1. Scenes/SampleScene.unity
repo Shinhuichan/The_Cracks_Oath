@@ -3219,8 +3219,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
-  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+    rgba: 4278190080
+  m_fontColor: {r: 0, g: 0, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -12779,8 +12779,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
-  m_fontSizeBase: 36
+  m_fontSize: 42
+  m_fontSizeBase: 42
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -14339,8 +14339,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 1680, y: 65}
+  m_AnchoredPosition: {x: 5, y: 0}
+  m_SizeDelta: {x: 1670, y: 55}
   m_Pivot: {x: 0, y: 0.5}
 --- !u!114 &479612894
 MonoBehaviour:
@@ -14355,7 +14355,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 0, b: 0, a: 1}
+  m_Color: {r: 1, g: 0.5019608, b: 0.5019608, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -28061,6 +28061,117 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 975726210}
   m_CullTransparentMesh: 1
+--- !u!1 &975876086
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 975876088}
+  - component: {fileID: 975876087}
+  - component: {fileID: 975876089}
+  m_Layer: 0
+  m_Name: AgentManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &975876087
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 975876086}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc6a4707f5ac35e42a3a7726486229aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  currentAgent:
+  - {fileID: 11400000, guid: ca490f7c384cada41ac2ebb87ce10afd, type: 2}
+  - {fileID: 11400000, guid: 49e16acc2be0d6b40babb1ace40ce2b7, type: 2}
+  - {fileID: 11400000, guid: 46891d074de2ed347ab7bd1268c0bae5, type: 2}
+  - {fileID: 11400000, guid: 86e75ec869a7e274b8ae959b924dc88e, type: 2}
+  - {fileID: 11400000, guid: 382de57b59c5c874a96b927b307dd74c, type: 2}
+  - {fileID: 11400000, guid: 35268ec7ca0a297439856fd2eeb383b6, type: 2}
+  - {fileID: 11400000, guid: dedb8cce4d46d994c8c1961e4dc5da30, type: 2}
+  - {fileID: 11400000, guid: f8e67f4e63842a34aad0da58acfc0ae8, type: 2}
+  - {fileID: 11400000, guid: 3b7465e8ba8e4984fb0664508af7dfdc, type: 2}
+  - {fileID: 11400000, guid: c0e796cd85e8ebc4c9a70583c4ab96c0, type: 2}
+  - {fileID: 11400000, guid: 6d69be5db11f7924887b3309b4d49059, type: 2}
+  - {fileID: 11400000, guid: c8f5e84885549d243b7b218ec563ccc4, type: 2}
+  - {fileID: 11400000, guid: 7c0c50cf08e39854c9213228ff5fed1e, type: 2}
+  - {fileID: 11400000, guid: 45f0538236c6fb345b4271a5f415b579, type: 2}
+  - {fileID: 11400000, guid: dc4b1cff3bb287540922cfefba68c93d, type: 2}
+--- !u!4 &975876088
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 975876086}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &975876089
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 975876086}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a030df0769e54a64fa2fe7249c2eb671, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  modes:
+  - mode: 0
+    StartHP: 10
+    maxRounds: 10
+  - mode: 1
+    StartHP: 20
+    maxRounds: 15
+  - mode: 2
+    StartHP: 40
+    maxRounds: 25
+  currentMode: 2
+  publicDeck: 
+  playerIHands: 
+  playerIIHands: 
+  discardCards: 
+  cooperationCount: 30
+  doubtCount: 30
+  betrayalCount: 3
+  chaosCount: 6
+  pollutionCount: 16
+  interruptCount: 9
+  reconCount: 6
+  startingHand: 3
+  startLife: 40
+  maxRounds: 25
+  playerILife: 0
+  playerIILife: 0
+  lastSeenByP1: 
+  lastSeenByP2: 
+  enableChoiceDrawForAgent: 1
+  opponentStyle: 0
+  enableChoiceDrawForPlayer: 1
+  disasterSpan: 5
+  disasterPool: 0000000001000000020000000300000004000000050000000600000007000000
+  lastCardDeltaP1: 0
+  lastCardDeltaP2: 0
+  lastDisasterDeltaP1: 0
+  lastDisasterDeltaP2: 0
 --- !u!1 &981685517
 GameObject:
   m_ObjectHideFlags: 0
@@ -33874,7 +33985,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1156578735}
-  - component: {fileID: 1156578734}
   - component: {fileID: 1156578733}
   - component: {fileID: 1156578736}
   m_Layer: 0
@@ -33944,56 +34054,7 @@ MonoBehaviour:
   choiceLeftImage: {fileID: 253835251}
   choiceRightImage: {fileID: 1875541961}
   disasterText: {fileID: 1791721838}
---- !u!114 &1156578734
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1156578732}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a030df0769e54a64fa2fe7249c2eb671, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  modes:
-  - mode: 0
-    StartHP: 10
-    maxRounds: 10
-  - mode: 1
-    StartHP: 20
-    maxRounds: 15
-  - mode: 2
-    StartHP: 30
-    maxRounds: 20
-  currentMode: 2
-  publicDeck: 
-  playerIHands: 
-  playerIIHands: 
-  discardCards: 
-  cooperationCount: 30
-  doubtCount: 30
-  betrayalCount: 3
-  chaosCount: 6
-  pollutionCount: 16
-  interruptCount: 9
-  reconCount: 6
-  startingHand: 3
-  startLife: 30
-  maxRounds: 20
-  playerILife: 0
-  playerIILife: 0
-  lastSeenByP1: 
-  lastSeenByP2: 
-  enableChoiceDrawForAgent: 1
-  opponentStyle: 0
-  enableChoiceDrawForPlayer: 1
-  disasterSpan: 5
-  disasterPool: 0000000001000000020000000300000004000000050000000600000007000000
-  lastCardDeltaP1: 0
-  lastCardDeltaP2: 0
-  lastDisasterDeltaP1: 0
-  lastDisasterDeltaP2: 0
+  sys: {fileID: 975876089}
 --- !u!4 &1156578735
 Transform:
   m_ObjectHideFlags: 0
@@ -41769,8 +41830,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
-  m_fontSizeBase: 36
+  m_fontSize: 42
+  m_fontSizeBase: 42
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -53372,8 +53433,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 0.5}
   m_AnchorMax: {x: 1, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 1680, y: 65}
+  m_AnchoredPosition: {x: -5, y: 0}
+  m_SizeDelta: {x: 1670, y: 55}
   m_Pivot: {x: 1, y: 0.5}
 --- !u!114 &1802713776
 MonoBehaviour:
@@ -53388,7 +53449,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 1, a: 1}
+  m_Color: {r: 0.5019608, g: 0.5019608, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -62531,7 +62592,6 @@ GameObject:
   m_Component:
   - component: {fileID: 2067143915}
   - component: {fileID: 2067143916}
-  - component: {fileID: 2067143917}
   m_Layer: 5
   m_Name: H2HBattle
   m_TagString: Untagged
@@ -62570,13 +62630,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 15bb01032aa58ac4c916baec41c92da5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  cardSystem: {fileID: 2067143917}
+  cardSystem: {fileID: 975876089}
   playMode: 2
-  player1: 2
-  player2: 12
+  player1: 3
+  player2: 11
   endCondition: 1
   targetPoints: 3000
-  targetMatches: 1000
+  targetMatches: 100
   winPts: 3
   drawPts: 1
   losePts: 0
@@ -62589,56 +62649,6 @@ MonoBehaviour:
   roundDelay: 0.01
   matchDelay: 0.02
   autoStart: 1
---- !u!114 &2067143917
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2067143914}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a030df0769e54a64fa2fe7249c2eb671, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  modes:
-  - mode: 0
-    StartHP: 10
-    maxRounds: 10
-  - mode: 1
-    StartHP: 20
-    maxRounds: 15
-  - mode: 2
-    StartHP: 30
-    maxRounds: 20
-  currentMode: 2
-  publicDeck: 
-  playerIHands: 
-  playerIIHands: 
-  discardCards: 
-  cooperationCount: 30
-  doubtCount: 30
-  betrayalCount: 3
-  chaosCount: 6
-  pollutionCount: 16
-  interruptCount: 9
-  reconCount: 6
-  startingHand: 3
-  startLife: 30
-  maxRounds: 20
-  playerILife: 0
-  playerIILife: 0
-  lastSeenByP1: 
-  lastSeenByP2: 
-  enableChoiceDrawForAgent: 1
-  opponentStyle: 0
-  enableChoiceDrawForPlayer: 1
-  disasterSpan: 5
-  disasterPool: 0000000001000000020000000300000004000000050000000600000007000000
-  lastCardDeltaP1: 0
-  lastCardDeltaP2: 0
-  lastDisasterDeltaP1: 0
-  lastDisasterDeltaP2: 0
 --- !u!1 &2067449627
 GameObject:
   m_ObjectHideFlags: 0
@@ -63391,8 +63401,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
-  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+    rgba: 4278190080
+  m_fontColor: {r: 0, g: 0, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -65133,3 +65143,4 @@ SceneRoots:
   - {fileID: 1948735003}
   - {fileID: 1580148626}
   - {fileID: 274538294}
+  - {fileID: 975876088}

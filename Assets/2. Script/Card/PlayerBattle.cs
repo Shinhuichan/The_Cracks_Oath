@@ -8,9 +8,6 @@ using GameCore;
 using System;
 using CustomInspector;
 
-
-
-[RequireComponent(typeof(CardSystem))]
 public class PlayerBattle : MonoBehaviour
 {
     [System.Serializable]
@@ -79,7 +76,7 @@ public class PlayerBattle : MonoBehaviour
     // ---------- 내부 상태 ----------
     private Dictionary<CardType, Sprite> spriteByType;
     private Dictionary<string, Sprite> nameToSprite;
-    private CardSystem sys;
+    [SerializeField] private CardSystem sys;
     private Agent agent;
     private RoundCtx pc, ac;
     private int round = 1;

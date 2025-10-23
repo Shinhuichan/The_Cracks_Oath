@@ -2,6 +2,7 @@ using UnityEngine;
 using System;
 using System.Linq;
 using System.Collections.Generic;
+
 // === 참가자 목록 ===
 public enum AgentList
 {
@@ -19,7 +20,7 @@ public enum AgentList
     류성우,
     서유리,
     강은호,
-    전아람
+    전아람,
 }
 
 namespace GameCore

@@ -191,24 +191,32 @@ public class H2HMatchLoop : MonoBehaviour
         int p1Life = cardSystem.playerILife;
         int p2Life = cardSystem.playerIILife;
 
+        // ▼ 매치 단위 점수(이 값을 합계에 더하고, ELO 결과 판정에도 사용)
+        int mP1 = 0, mP2 = 0;
+
         if ((p1Dead && p2Dead) || (!p1Dead && !p2Dead && p1Life == p2Life))
         {
-            p1Score += drawPts;
-            p2Score += drawPts;
+            mP1 = drawPts; mP2 = drawPts;
+            p1Score += mP1; p2Score += mP2;
             if (statusText) statusText.text = "매치 결과: 무승부";
         }
         else if (p2Dead || (!p1Dead && p1Life > p2Life))
         {
-            p1Score += winPts;
-            p2Score += losePts;
+            mP1 = winPts; mP2 = losePts;
+            p1Score += mP1; p2Score += mP2;
             if (statusText) statusText.text = $"매치 결과: {p1Name} 승";
         }
         else
         {
-            p2Score += winPts;
-            p1Score += losePts;
+            mP1 = losePts; mP2 = winPts;
+            p1Score += mP1; p2Score += mP2;
             if (statusText) statusText.text = $"매치 결과: {p2Name} 승";
         }
+
+        // ★ 여기 추가: ELO 갱신
+        var am = AgentManager.I;
+        var outcomeP1 = am.OutcomeFromMatchPoints(mP1, mP2);
+        am.ApplyMatchResult(player1, player2, outcomeP1);
     }
 
     void UpdateUI()
