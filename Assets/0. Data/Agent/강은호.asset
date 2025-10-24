@@ -13,4 +13,5 @@ MonoBehaviour:
   m_Name: "\uAC15\uC740\uD638"
   m_EditorClassIdentifier: Assembly-CSharp::AgentData
   agentName: 14
-  agentELO: 1000
+  records: []
+  elo: 1500

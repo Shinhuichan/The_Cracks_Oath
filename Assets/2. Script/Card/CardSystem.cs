@@ -5,7 +5,7 @@ using System.Linq;
 using System.Collections.Generic;
 using CustomInspector;
 
-public enum Mode { Quick = 0, Common, Extend }
+public enum Mode { Quick = 0, Standard, Extend }
 [System.Serializable]
 public struct PlayMode
 {
@@ -110,7 +110,7 @@ namespace GameCore
     public class CardSystem : MonoBehaviour
     {
         public PlayMode[] modes;
-        public Mode currentMode = Mode.Common;
+        public Mode currentMode = Mode.Standard;
     
         public List<CardType> publicDeck = new();
         public List<CardType> playerIHands = new();
@@ -296,8 +296,8 @@ namespace GameCore
             // --- 강풍: 40% 확률로 제출 카드 교체(양측 동일 확률)
             if (currentDisaster == NaturalDisaster.Storm)
             {
-                if (UnityEngine.Random.value < 0.25f) { playerIHands.Add(a); a = DrawOneForSubmit(); }
-                if (UnityEngine.Random.value < 0.25f) { playerIIHands.Add(b); b = DrawOneForSubmit(); }
+                if (UnityEngine.Random.value < 0.1f) { playerIHands.Add(a); a = DrawOneForSubmit(); }
+                if (UnityEngine.Random.value < 0.1f) { playerIIHands.Add(b); b = DrawOneForSubmit(); }
                 StormCheckedThisRound = true;
             }
 
@@ -495,7 +495,7 @@ namespace GameCore
             NaturalDisaster.Meteorite => "\n<size=24>각 참가자의 양초 * 2/3</size>",
             NaturalDisaster.Heatwave => "\n<size=24>Round마다 추가 양초 - 1</size>",
             NaturalDisaster.Lightning => "\n<size=24>Round마다 25% 확률로\n각 참가자의 양초 - 3</size>",
-            NaturalDisaster.Storm => "\n<size=24>Round마다 25% 확률로\n제출 카드 교체</size>",
+            NaturalDisaster.Storm => "\n<size=24>Round마다 10% 확률로\n제출 카드 교체</size>",
             NaturalDisaster.ColdWave => "\n<size=24>최대 패 수급 2장으로 제한</size>",
             NaturalDisaster.Eclipse => "\n<size=24>일반 카드의 효과를 2배로 증폭</size>",
             NaturalDisaster.Sandstorm => "\n<size=24>Pollution이 공개되면,\n각 참가자의 양초 - 1</size>",

@@ -126,7 +126,7 @@ public class PlayerBattle : MonoBehaviour
         BuildSpriteLookup();
 
         if (playerChosenImage) { playerChosenImage.preserveAspect = true; playerChosenImage.gameObject.SetActive(false); }
-        if (opponentChosenImage){ opponentChosenImage.preserveAspect = true; opponentChosenImage.gameObject.SetActive(false); }
+        if (opponentChosenImage) { opponentChosenImage.preserveAspect = true; opponentChosenImage.gameObject.SetActive(false); }
 
         if (retryButton)
         {
@@ -148,10 +148,6 @@ public class PlayerBattle : MonoBehaviour
             rr12Rounds = BuildRoundRobinEven(names12);
 
         BuildPlayerOpponentOrder();
-
-        sys.OnOfferChoiceForPlayer += HandleOfferChoiceForPlayer; // 두 장 미리보기 표시
-        sys.OnChoiceClosed         += HideChoiceUI;               // 선택 UI 닫기
-        sys.OnPlayerHandChanged    += RenderHand3;                // 손패 3장 재그리기
     }
 
     void OnValidate()
@@ -178,16 +174,36 @@ public class PlayerBattle : MonoBehaviour
         sys.opponentStyle = (agent.name == "김현수")
             ? CardSystem.AgentStyle.김현수
             : CardSystem.AgentStyle.Generic;
-            
-        pc = new RoundCtx { round = 1, selfLife = sys.startLife, oppLife = sys.startLife,
-                            lastSelf = CardType.None, lastOpp = CardType.None,
-                            last2Opp = CardType.None, last3Opp = CardType.None };
+
+        pc = new RoundCtx
+        {
+            round = 1,
+            selfLife = sys.startLife,
+            oppLife = sys.startLife,
+            lastSelf = CardType.None,
+            lastOpp = CardType.None,
+            last2Opp = CardType.None,
+            last3Opp = CardType.None
+        };
         ac = pc;
 
         if (opponentNameText) opponentNameText.text = agent.name;
+        sys.OnOfferChoiceForPlayer += HandleOfferChoiceForPlayer;
+        sys.OnChoiceClosed += HideChoiceUI;
+        sys.OnPlayerHandChanged += RenderHand3;
+
         RefreshUI();
         HookDisasterUI();
         UpdateBothRankUI();
+    }
+    void OnDestroy()
+    {
+        if (sys != null)
+        {
+            sys.OnOfferChoiceForPlayer -= HandleOfferChoiceForPlayer;
+            sys.OnChoiceClosed         -= HideChoiceUI;
+            sys.OnPlayerHandChanged    -= RenderHand3;
+        }
     }
     // Recon 표시 지연 저장
     private List<CardType> pendingReconPeek = null;
