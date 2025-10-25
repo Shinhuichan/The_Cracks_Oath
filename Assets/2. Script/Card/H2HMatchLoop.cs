@@ -88,6 +88,7 @@ public class H2HMatchLoop : MonoBehaviour
 
     public void StopLoop()
     {
+        cardSystem.SetCurrentAgents(player1, player2);
         if (loop != null) { StopCoroutine(loop); loop = null; }
     }
 
@@ -135,6 +136,7 @@ public class H2HMatchLoop : MonoBehaviour
     {
         // 매치 초기화
         cardSystem.ResetForNewMatch();
+        cardSystem.SetCurrentAgents(player1, player2);
 
         // 라운드 컨텍스트용 최근 히스토리(각 참가자 기준)
         CardType p1_lastSelf = CardType.None, p1_lastOpp = CardType.None, p1_last2Opp = CardType.None, p1_last3Opp = CardType.None;

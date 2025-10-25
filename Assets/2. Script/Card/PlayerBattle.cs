@@ -171,9 +171,7 @@ public class PlayerBattle : MonoBehaviour
         agentName = playerOpponentOrder[playerOppIdx];
         agent = AgentFactory.Create(agentName.ToString());
 
-        sys.opponentStyle = (agent.name == "김현수")
-            ? CardSystem.AgentStyle.김현수
-            : CardSystem.AgentStyle.Generic;
+        sys.SetCurrentAgents(null, agentName);
 
         pc = new RoundCtx
         {
@@ -431,7 +429,7 @@ public class PlayerBattle : MonoBehaviour
                             lastSelf = CardType.None, lastOpp = CardType.None,
                             last2Opp = CardType.None, last3Opp = CardType.None };
         ac = pc;
-
+        sys.SetCurrentAgents(null, agentName);
         if (opponentNameText) opponentNameText.text = agent.name;
 
         if (btn0) btn0.interactable = true;

@@ -4,6 +4,7 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 using CustomInspector;
+using GameCore;  // CardType
 
 public enum Mode { Quick = 0, Standard, Extend }
 [System.Serializable]
@@ -111,7 +112,12 @@ namespace GameCore
     {
         public PlayMode[] modes;
         public Mode currentMode = Mode.Standard;
-    
+
+        [Header("현재 선택된 에이전트")]
+        private AgentList? currentP1Agent;   // 플레이어가 사람이면 null
+        private AgentList  currentP2Agent;  // 상대 에이전트
+
+        [Header("카드 상태")]
         public List<CardType> publicDeck = new();
         public List<CardType> playerIHands = new();
         public List<CardType> playerIIHands = new();
@@ -238,6 +244,12 @@ namespace GameCore
             ApplyPhaseStartBonusIfNeeded();
         }
 
+        public void SetCurrentAgents(AgentList? p1, AgentList p2)
+        {
+            currentP1Agent = p1;
+            currentP2Agent = p2;
+        }
+        
         public string CurrentDisasterLabel
         {
             get
@@ -251,8 +263,10 @@ namespace GameCore
 
             // 자동 매치일 땐 선택드로우 전부 비활성 보장
             enableChoiceDrawForPlayer = false;
-            enableChoiceDrawForAgent  = true;
-
+            enableChoiceDrawForAgent = true;
+            
+            ApplyConditionIfAny(p1, true);
+            ApplyConditionIfAny(p2, false);
             currentP1 = p1;
             currentP2 = p2;
 
@@ -278,6 +292,7 @@ namespace GameCore
             phaseBonusAppliedThisRound = false;
             if (playerILost || playerIILost) return;
 
+            ApplyConditionIfAny(currentP2, false);
             StormCheckedThisRound = false;
             extraLightningAppliedThisRound = false;
 
@@ -375,9 +390,18 @@ namespace GameCore
                     if (delta > CAP) { int adj = delta - CAP; hp -= adj; disasterDelta -= adj; }
                     else if (delta < -CAP) { int adj = -CAP - delta; hp += adj; disasterDelta += adj; }
                 }
-                Cap(ref playerILife,  hpP_StartOfRound, ref lastDisasterDeltaP1);
+                Cap(ref playerILife, hpP_StartOfRound, ref lastDisasterDeltaP1);
                 Cap(ref playerIILife, hpA_StartOfRound, ref lastDisasterDeltaP2);
             }
+
+            // ▶ 재해 종료 후 condition 적용
+            var mgr = AgentManager.I;
+            if (currentP1Agent.HasValue)
+                mgr.ApplyConditionAfterRound(currentP1Agent.Value,
+                    lastCardDeltaP1 + lastDisasterDeltaP1, playerILife, playerIILife);
+
+            mgr.ApplyConditionAfterRound(currentP2Agent,
+                lastCardDeltaP2 + lastDisasterDeltaP2, playerIILife, playerILife);
 
             roundCounter++;
             var prev = currentDisaster;
@@ -402,6 +426,7 @@ namespace GameCore
                 OnDisasterStart(currentDisaster);
                 RaiseDisasterUI();
             }
+
             ApplyPhaseStartBonusIfNeeded();
         }
 
@@ -717,7 +742,7 @@ namespace GameCore
             hand.Clear();
             Draw(publicDeck, hand, drawLimit); // Chaos 리셋 시에도 한파면 최대 2장만
         }
-        
+
         // 에이전트 선택 드로우 시작부 수정
         void StartChoiceDrawForAgent()
         {
@@ -730,12 +755,13 @@ namespace GameCore
             // ▼ 에이전트가 선택 규칙을 갖고 있으면 우선 사용
             if (enableChoiceDrawForAgent && currentP2 != null && currentP2.chooseFromTwo != null)
             {
-                var ctx = new RoundCtx {            // 라운드 상황 구성
+                var ctx = new RoundCtx
+                {            // 라운드 상황 구성
                     round = roundCounter,
                     selfLife = playerIILife,
-                    oppLife  = playerILife,
+                    oppLife = playerILife,
                     lastSelf = lastSubmittedP2,
-                    lastOpp  = lastSubmittedP1
+                    lastOpp = lastSubmittedP1
                 };
                 var input = new DecisionInput(playerIIHands, ctx, BuildUnseen(false));
                 pick = currentP2.chooseFromTwo(c1, c2, input) ?? ChooseIndexForAgent(c1, c2);
@@ -746,12 +772,20 @@ namespace GameCore
             }
 
             var chosen = (pick == 0) ? c1 : c2;
-            var other  = (pick == 0) ? c2 : c1;
+            var other = (pick == 0) ? c2 : c1;
 
             playerIIHands.Add(chosen);
             int pos = UnityEngine.Random.Range(0, publicDeck.Count + 1);
             publicDeck.Insert(pos, other);
         }
+        // 내부 유틸: 라운드마다 선택 직전에 Condition 반영
+        private void ApplyConditionIfAny(GameCore.Agent agent, bool isP1)
+        {
+            // 라운드 종료 시 ResolveRoundByIndex에서만 컨디션을 적용한다.
+            // 여기서는 아무 것도 하지 않는다. (컴파일 에러를 유발하던 지역변수 의존 제거)
+        }
+
+        
         // 두 카드 중 무엇을 고를지 간단 휴리스틱
         int ChooseIndexForAgent(CardType a, CardType b)
         {

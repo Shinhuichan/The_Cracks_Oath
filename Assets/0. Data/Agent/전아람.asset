@@ -13,4 +13,32 @@ MonoBehaviour:
   m_Name: "\uC804\uC544\uB78C"
   m_EditorClassIdentifier: Assembly-CSharp::AgentData
   agentName: 15
-  agentELO: 1000
+  records:
+  - verseAgent: 2
+    matchCount: 100
+    winCount: 63
+    loseCount: 36
+    drawCount: 1
+  - verseAgent: 1
+    matchCount: 200
+    winCount: 95
+    loseCount: 101
+    drawCount: 4
+  - verseAgent: 14
+    matchCount: 100
+    winCount: 56
+    loseCount: 40
+    drawCount: 4
+  - verseAgent: 3
+    matchCount: 100
+    winCount: 49
+    loseCount: 48
+    drawCount: 3
+  - verseAgent: 12
+    matchCount: 100
+    winCount: 47
+    loseCount: 51
+    drawCount: 2
+  elo: 1484.7453672979193
+  condition: 75
+  personality: 0

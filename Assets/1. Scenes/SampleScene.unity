@@ -28109,7 +28109,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 7c0c50cf08e39854c9213228ff5fed1e, type: 2}
   - {fileID: 11400000, guid: 45f0538236c6fb345b4271a5f415b579, type: 2}
   - {fileID: 11400000, guid: dc4b1cff3bb287540922cfefba68c93d, type: 2}
-  standardCondition: 0.4
+  standardCondition: 0.15
 --- !u!4 &975876088
 Transform:
   m_ObjectHideFlags: 0
@@ -28267,11 +28267,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardSystem: {fileID: 975876089}
   playMode: 2
-  player1: 6
-  player2: 13
+  player1: 1
+  player2: 2
   endCondition: 1
   targetPoints: 3000
-  targetMatches: 1000
+  targetMatches: 100
   winPts: 3
   drawPts: 1
   losePts: 0

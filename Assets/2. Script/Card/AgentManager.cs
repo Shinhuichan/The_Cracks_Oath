@@ -54,6 +54,11 @@ public class AgentManager : SingletonBehaviour<AgentManager>
         if (myPts < oppPts) return MatchOutcome.Loss;
         return MatchOutcome.Draw;
     }
+    public AgentData GetAgentData(AgentList id)
+    {
+        // 등록 목록에서 해당 에이전트 데이터를 반환. 없으면 null
+        return currentAgent?.Find(x => x.agentName == id);
+    }
     AgentData GetData(AgentList id) => currentAgent.Find(x => x.agentName == id);
 
     // 상대별 레코드 가져오기/없으면 추가
@@ -126,87 +131,60 @@ public class AgentManager : SingletonBehaviour<AgentManager>
     /// condition을 바탕으로 의도적 '실수'를 주입해 난이도를 조절한다.
     /// pMistake: cond=0 -> 0.45, cond=50 -> 0.225, cond=100 -> 0.0
     /// </summary>
-    public static void ApplyConditionToAgent(Agent agent, float condition)
+    public void ApplyConditionAfterRound(AgentList who, int hpDeltaThisRound, int selfLife, int oppLife)
     {
-        if (agent == null) return;
+        var data = GetAgentData(who);
+        if (data == null) return;
 
-        // 0~100 → 0.0~1.0
-        float q = Mathf.Clamp01(condition / 100f);
-
-        // ===== 1) 상단 메타 규칙(킬각/세이브각) 주입 =====
-        // 이미 같은 레퍼런스를 여러 번 넣지 않도록 항상 새 델리게이트 생성 후 맨 앞에 삽입
-        Func<DecisionInput, CardType?> metaRule = I =>
+        // 무관심한: 항상 100으로 고정
+        if (data.personality == Personality.무관심한)
         {
-            int R = Mathf.Max(1, I.s.round);
+            data.condition = 100f;
+            return;
+        }
 
-            // 즉사각: 상대 남은 양초 ≤ 라운드 수, 그리고 배신이 손에 있으면 우선시
-            if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R)
-                return CardType.Betrayal;
+        // 결과 부호
+        int sign = hpDeltaThisRound == -1 ? 0 : (hpDeltaThisRound >= 0 ? +1 : -1);
 
-            // 세이브각: 내 양초가 위험하고 상대가 직전에 공격적이면 의심 우선
-            if (I.HandHas(CardType.Doubt)
-                && I.s.selfLife <= R
-                && (I.s.lastOpp == CardType.Betrayal || I.s.lastOpp == CardType.Pollution))
-                return CardType.Doubt;
+        // 기본 증감(냉소적 기준)
+        float good = +0.2f, bad = -0.2f, draw = 0f;
 
-            return null; // 다른 규칙으로 위임
-        };
-
-        // 맨 앞에 메타 규칙을 한 번만 넣기 위해 새 리스트 생성
-        var newRules = new List<Func<DecisionInput, CardType?>>(capacity: agent.rules.Count + 1);
-        newRules.Add(metaRule);
-        newRules.AddRange(agent.rules);
-        agent.rules = newRules;
-
-        // ===== 2) 선택 드로우 품질 조정 =====
-        // q가 높을수록 더 "좋은" 카드를 고르고, q가 낮을수록 실수 확률을 높인다.
-        agent.chooseFromTwo = (CardType a, CardType b, DecisionInput I) =>
+        switch (data.personality)
         {
-            int R = Mathf.Max(1, I.s.round);
+            case Personality.냉소적인:
+                good = +0.2f; bad = -0.2f; draw = 0f;
+                break;
 
-            int Score(CardType t)
-            {
-                // 기본 가치
-                int baseScore = t switch
+            case Personality.과몰입한:
+                good = +1f; bad = -1f; draw = 0f;
+                break;
+
+            case Personality.낙천적인:
+                // 좋은 결과는 크게+, 나쁜 결과도 소폭+
+                good = +1f; bad = -0.2f; draw = +0.04f;
+                break;
+
+            case Personality.비관적인:
+                // 좋은 결과도 소폭-, 나쁜 결과는 크게-
+                good = +0.2f; bad = -1f; draw = -0.04f;
+                break;
+
+            case Personality.제멋대로:
+                // 결과 무관하게 랜덤 [-3, +3]
+                data.condition = Mathf.Clamp(data.condition + UnityEngine.Random.Range(-1f, 1f), 0f, 100f);
+                return;
+
+            case Personality.감정적인:
                 {
-                    CardType.Betrayal   => 100,
-                    CardType.Doubt      => 90,
-                    CardType.Interrupt  => 85,
-                    CardType.Pollution  => 80,
-                    CardType.Cooperation=> 60,
-                    CardType.Recon      => 50,
-                    CardType.Chaos      => 10,
-                    _ => 0
-                };
+                    int diff = Mathf.Abs(selfLife - oppLife);
+                    bool bigGap = diff >= 5;
+                    if (bigGap) { good = +1f; bad = -1f; draw = 0f; } // 과몰입 모드
+                    else        { good = +0.2f; bad = -0.2f; draw = 0f;   } // 냉소 모드
+                }
+                break;
+        }
 
-                // 라운드·상황 보정
-                if (t == CardType.Betrayal && I.s.oppLife <= R) baseScore += 40; // 킬각
-                if (t == CardType.Doubt && I.s.selfLife <= R)   baseScore += 25; // 세이브각
-
-                // 덱/상대패 분포 보정(분포는 DecisionInput.Ratio)
-                // 방어가치: 상대 배신 확률이 높을수록 Doubt/Interrupt 보너스
-                baseScore += (int)(I.Ratio(CardType.Betrayal) * (t == CardType.Doubt || t == CardType.Interrupt ? 40 : 0));
-
-                return baseScore;
-            }
-
-            int sa = Score(a);
-            int sb = Score(b);
-
-            // 실수 확률: q가 낮을수록 더 자주 틀리게 선택
-            float mistakeProb = (1f - q) * AgentManager.I.standardCondition;    // 컨디션 0 → 60% 확률로 실수, 100 → 0%
-
-            bool pickBest = UnityEngine.Random.value >= mistakeProb;
-
-            if (sa == sb)
-            {
-                // 동점이면 약한 잡음 추가: 컨디션이 좋으면 더 일관성 있게 선택
-                float bias = 0.5f + 0.4f * (q - 0.5f); // q=1 → 0.7, q=0 → 0.3
-                return UnityEngine.Random.value < bias ? 0 : 1; // int 반환(= int?로 암시적 변환 가능)
-            }
-
-            if (pickBest) return sa > sb ? 0 : 1;   // 최적 선택
-            else          return sa > sb ? 1 : 0;   // 의도적 실수
-        };
+        float delta = (sign == 0) ? draw : (sign > 0 ? good : bad);
+        data.condition = Mathf.Clamp(data.condition + delta, 0f, 100f);
     }
 }
