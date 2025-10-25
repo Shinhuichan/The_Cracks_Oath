@@ -12,7 +12,9 @@ public class AgentManager : SingletonBehaviour<AgentManager>
     public List<AgentData> currentAgent;
 
     public enum MatchOutcome { Win, Draw, Loss }
-
+    
+    // condition이 0일 때 최대 실수 확률
+    public float standardCondition = 0.5f;
     public double GetElo(AgentList id)
     {
         if (currentAgent.Find(x => x.agentName == id) is not AgentData data)
@@ -192,7 +194,7 @@ public class AgentManager : SingletonBehaviour<AgentManager>
             int sb = Score(b);
 
             // 실수 확률: q가 낮을수록 더 자주 틀리게 선택
-            float mistakeProb = (1f - q) * 0.6f;    // 컨디션 0 → 60% 확률로 실수, 100 → 0%
+            float mistakeProb = (1f - q) * AgentManager.I.standardCondition;    // 컨디션 0 → 60% 확률로 실수, 100 → 0%
 
             bool pickBest = UnityEngine.Random.value >= mistakeProb;
 

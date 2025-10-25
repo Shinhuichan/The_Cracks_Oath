@@ -193,7 +193,17 @@ namespace GameCore
                 if (sa != sb) return sa > sb ? 0 : 1;
 
                 // 7) 동점이면 소폭 무작위
-                return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                int Rank(CardType t) => t switch
+                {
+                    CardType.Betrayal => 7,
+                    CardType.Pollution => 6,
+                    CardType.Doubt => 5,
+                    CardType.Interrupt => 4,
+                    CardType.Cooperation => 3,
+                    CardType.Recon => 2,
+                    _ => 1
+                };
+                return Rank(a) >= Rank(b) ? 0 : 1;
             };
 
             return A;
@@ -324,22 +334,13 @@ namespace GameCore
 
                 float sa = Score(a), sb = Score(b);
 
-                // 기본 선택
-                int pick = sa >= sb ? 0 : 1;
-
-                // 동점이면 공격 쪽 60% 편향
-                if (Mathf.Approximately(sa, sb))
+                int Rank(CardType t) => t switch
                 {
-                    bool aOff = (a == CardType.Betrayal || a == CardType.Pollution || a == CardType.Chaos);
-                    bool bOff = (b == CardType.Betrayal || b == CardType.Pollution || b == CardType.Chaos);
-                    if (aOff != bOff)
-                        pick = aOff ? (UnityEngine.Random.value < 0.60f ? 0 : 1)
-                                    : (UnityEngine.Random.value < 0.40f ? 0 : 1);
-                    else
-                        pick = UnityEngine.Random.value < 0.5f ? 0 : 1;
-                }
+                    CardType.Betrayal=>7, CardType.Pollution=>6, CardType.Chaos=>5,
+                    CardType.Interrupt=>4, CardType.Cooperation=>3, CardType.Doubt=>2, CardType.Recon=>1
+                };
+                return Rank(a) >= Rank(b) ? 0 : 1;
 
-                return pick; // 0이면 a 선택, 1이면 b 선택
             };
             return A;
         }
@@ -349,48 +350,46 @@ namespace GameCore
         {
             var A = new Agent("최용호");
 
+            A.rules.Clear();
             A.rules.Add(I =>
             {
                 int R = Math.Max(1, I.s.round);
                 bool nf = !I.s.IsFirst;
 
-                // 0) 킬각은 즉시
-                if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R) return CardType.Betrayal;
+                // 0) 확정 킬각
+                if (I.HandHas(CardType.Betrayal)  && I.s.oppLife <= R)     return CardType.Betrayal;
 
-                // 1) 초반 러시(1~3라): 배신>오염>혼돈
+                // 1) 초반 러시(1~3라) – 결정적
                 if (R <= 3)
                 {
-                    if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;
+                    if (I.HandHas(CardType.Betrayal))  return CardType.Betrayal;
                     if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
-                    if (I.HandHas(CardType.Chaos) && UnityEngine.Random.value < 0.40f) return CardType.Chaos;
+                    // Chaos는 '공격수단 없음'일 때만
+                    int atk = (I.HandHas(CardType.Betrayal)?1:0) + (I.HandHas(CardType.Pollution)?1:0);
+                    if (atk==0 && I.HandHas(CardType.Chaos)) return CardType.Chaos;
                 }
 
-                // 2) 뒤지면 더 세게 밟는다
+                // 2) 뒤지는 중이면 공격 극대화(결정적)
                 if (I.s.selfLife < I.s.oppLife)
                 {
-                    if (I.HandHas(CardType.Betrayal) && UnityEngine.Random.value < 0.70f) return CardType.Betrayal;
+                    if (I.HandHas(CardType.Betrayal))  return CardType.Betrayal;
                     if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
-                    if (I.HandHas(CardType.Chaos) && UnityEngine.Random.value < 0.35f) return CardType.Chaos;
+                    int atk = (I.HandHas(CardType.Betrayal)?1:0) + (I.HandHas(CardType.Pollution)?1:0);
+                    if (atk==0 && I.HandHas(CardType.Chaos)) return CardType.Chaos;
                 }
 
-                // 3) 간단한 즉응(아주 낮은 확률의 방어만 허용)
-                if (nf && I.s.lastOpp == CardType.Betrayal && I.HandHas(CardType.Interrupt) && UnityEngine.Random.value < 0.10f)
-                    return CardType.Interrupt;
-                if (nf && I.s.lastOpp == CardType.Pollution && I.HandHas(CardType.Doubt) && UnityEngine.Random.value < 0.10f)
-                    return CardType.Doubt;
+                // 3) 간단 대응(확률 제거)
+                if (nf && I.s.lastOpp == CardType.Betrayal && I.HandHas(CardType.Interrupt)) return CardType.Interrupt;
+                if (nf && I.s.lastOpp == CardType.Pollution && I.HandHas(CardType.Doubt))    return CardType.Doubt;
 
-                // 4) 공격 카드 없으면 가끔 리롤
-                int atk = (I.HandHas(CardType.Betrayal) ? 1 : 0) + (I.HandHas(CardType.Pollution) ? 1 : 0);
-                if (I.HandHas(CardType.Chaos) && (atk == 0 || (R % 2 == 0 && UnityEngine.Random.value < 0.25f)))
-                    return CardType.Chaos;
+                // 4) 읽힘/공격수단 없음일 때만 Chaos
+                int atk2 = (I.HandHas(CardType.Betrayal)?1:0) + (I.HandHas(CardType.Pollution)?1:0);
+                if (I.HandHas(CardType.Chaos) && (atk2==0 || (nf && I.s.lastOpp==I.s.last2Opp))) return CardType.Chaos;
 
-                // 5) 기본 우선순위: 배신 > 오염 > 혼돈 > 인터럽트 > 협력 > 의심 > 정찰(거의 사용 안 함)
-                CardType[] order = {
-                    CardType.Betrayal, CardType.Pollution, CardType.Chaos,
-                    CardType.Interrupt, CardType.Cooperation, CardType.Doubt, CardType.Recon
-                };
+                // 5) 고정 우선순위
+                CardType[] order = { CardType.Betrayal, CardType.Pollution, CardType.Interrupt,
+                                    CardType.Cooperation, CardType.Doubt, CardType.Recon, CardType.Chaos };
                 foreach (var c in order) if (I.HandHas(c)) return c;
-
                 return CardType.None;
             });
 
@@ -401,7 +400,6 @@ namespace GameCore
             // ---------- 선택 드로우(2장 중 1장) ----------
             A.chooseFromTwo = (a, b, I) =>
             {
-                // Chaos는 선택 드로우 대상에서 제외되지만, 혹시 대비
                 if (a == CardType.Chaos && b != CardType.Chaos) return 1;
                 if (b == CardType.Chaos && a != CardType.Chaos) return 0;
 
@@ -411,7 +409,7 @@ namespace GameCore
 
                 int Score(CardType x)
                 {
-                    int baseScore = x switch
+                    int s = x switch
                     {
                         CardType.Betrayal    => 100,
                         CardType.Pollution   => 80,
@@ -421,35 +419,31 @@ namespace GameCore
                         CardType.Recon       => 10,
                         _ => 0
                     };
-
-                    // 킬각/생존 보정
-                    if (x == CardType.Betrayal && I.s.oppLife <= R + 1) baseScore += 25;
-                    if (x == CardType.Doubt    && I.s.selfLife <= R)     baseScore += 20;
-
-                    // 직전 행동 카운터 보정
+                    if (x==CardType.Betrayal && I.s.oppLife <= R+1) s += 25;
+                    if (x==CardType.Doubt    && I.s.selfLife<= R)   s += 20;
                     if (nf)
                     {
-                        if (last == CardType.Cooperation && x == CardType.Betrayal) baseScore += 25;
-                        if (last == CardType.Pollution   && x == CardType.Doubt)     baseScore += 18;
-                        if (last == CardType.Betrayal    && x == CardType.Interrupt) baseScore += 22;
+                        if (last==CardType.Cooperation && x==CardType.Betrayal) s += 25;
+                        if (last==CardType.Pollution   && x==CardType.Doubt)    s += 18;
+                        if (last==CardType.Betrayal    && x==CardType.Interrupt)s += 22;
                     }
-
-                    // 손패에 공격 카드가 없으면 공격 우대
-                    int atkInHand = (I.HandHas(CardType.Betrayal) ? 1 : 0) + (I.HandHas(CardType.Pollution) ? 1 : 0);
-                    if ((x == CardType.Betrayal || x == CardType.Pollution) && atkInHand == 0) baseScore += 12;
-
-                    return baseScore;
+                    int atkInHand = (I.HandHas(CardType.Betrayal)?1:0)+(I.HandHas(CardType.Pollution)?1:0);
+                    if (atkInHand==0 && (x==CardType.Betrayal||x==CardType.Pollution)) s += 12;
+                    return s;
                 }
 
-                int sA = Score(a);
-                int sB = Score(b);
-                if (sA > sB) return 0;
-                if (sB > sA) return 1;
-
-                // 동점이면 배신/오염 우선, 그다음 임의
-                if (a == CardType.Betrayal || a == CardType.Pollution) return 0;
-                if (b == CardType.Betrayal || b == CardType.Pollution) return 1;
-                return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                int sa = Score(a), sb = Score(b);
+                if (sa==sb)
+                {
+                    // 결정적 동점 규칙: Betrayal > Pollution > Interrupt > Doubt > Cooperation > Recon > Chaos
+                    int rank(CardType x) => x switch
+                    {
+                        CardType.Betrayal=>6, CardType.Pollution=>5, CardType.Interrupt=>4,
+                        CardType.Doubt=>3, CardType.Cooperation=>2, CardType.Recon=>1, _=>0
+                    };
+                    return rank(a) >= rank(b) ? 0 : 1;
+                }
+                return sa>sb?0:1;
             };
             return A;
         }
@@ -671,10 +665,18 @@ namespace GameCore
 
 
                 float va = V(a), vb = V(b);
-                if (Math.Abs(va - vb) < 0.1f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                if (Math.Abs(va - vb) < 0.1f)
+                {
+                    // 계산가 성향: Betrayal > Pollution > Doubt > Interrupt > Cooperation > Recon > Chaos
+                    int Rank(CardType t) => t switch
+                    {
+                        CardType.Betrayal=>7, CardType.Pollution=>6, CardType.Doubt=>5,
+                        CardType.Interrupt=>4, CardType.Cooperation=>3, CardType.Recon=>2, _=>1
+                    };
+                    return Rank(a) >= Rank(b) ? 0 : 1;
+                }
                 return va >= vb ? 0 : 1;
             };
-
 
             return A;
         }
@@ -841,7 +843,16 @@ namespace GameCore
 
                 float Score(CardType x) => p.Sum(kv => kv.Value * V(x, kv.Key));
                 float sa = Score(a), sb = Score(b);
-                if (System.Math.Abs(sa - sb) < 0.001f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                if (Math.Abs(sa - sb) < 0.001f)
+                {
+                    // 결정적 우선순위: Doubt > Interrupt > Betrayal > Pollution > Cooperation > Recon > Chaos
+                    int Rank(CardType t) => t switch
+                    {
+                        CardType.Doubt=>7, CardType.Interrupt=>6, CardType.Betrayal=>5,
+                        CardType.Pollution=>4, CardType.Cooperation=>3, CardType.Recon=>2, _=>1
+                    };
+                    return Rank(a) >= Rank(b) ? 0 : 1;
+                }
                 return sa >= sb ? 0 : 1;
             };
 
@@ -988,15 +999,22 @@ namespace GameCore
                     return s;
                 }
 
-                int sa = Score(a);
-                int sb = Score(b);
-                if (sa != sb) return sa > sb ? 0 : 1;
+                int sa = Score(a), sb = Score(b);
+                if (sa == sb)
+                {
+                    // 공격 성향 우선의 결정 규칙
+                    bool aOff = (a==CardType.Betrayal || a==CardType.Pollution);
+                    bool bOff = (b==CardType.Betrayal || b==CardType.Pollution);
+                    if (aOff != bOff) return aOff ? 0 : 1;
 
-                // 동점이면 공격 카드 우선 → 그다음 임의
-                bool aOff = (a == CardType.Betrayal || a == CardType.Pollution);
-                bool bOff = (b == CardType.Betrayal || b == CardType.Pollution);
-                if (aOff != bOff) return aOff ? 0 : 1;
-                return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                    int Rank(CardType x) => x switch
+                    {
+                        CardType.Betrayal=>6, CardType.Pollution=>5, CardType.Recon=>4,
+                        CardType.Cooperation=>3, CardType.Interrupt=>2, CardType.Doubt=>1, _=>0
+                    };
+                    return Rank(a) >= Rank(b) ? 0 : 1;
+                }
+                return sa > sb ? 0 : 1;
             };
             return A;
         }
