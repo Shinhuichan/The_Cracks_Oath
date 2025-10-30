@@ -3165,7 +3165,7 @@ GameObject:
   - component: {fileID: 108797576}
   - component: {fileID: 108797575}
   m_Layer: 5
-  m_Name: score
+  m_Name: Score
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3178,17 +3178,17 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 108797573}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1, y: 1.25, z: 1.25}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1506004913}
+  m_Father: {fileID: 501090978}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_SizeDelta: {x: -10, y: -10}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &108797575
 MonoBehaviour:
@@ -3219,8 +3219,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4278190080
-  m_fontColor: {r: 0, g: 0, b: 0, a: 1}
+    rgba: 4294967295
+  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -3237,12 +3237,12 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 30
+  m_fontSize: 36
   m_fontSizeBase: 30
   m_fontWeight: 400
-  m_enableAutoSizing: 0
+  m_enableAutoSizing: 1
   m_fontSizeMin: 18
-  m_fontSizeMax: 72
+  m_fontSizeMax: 36
   m_fontStyle: 0
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 512
@@ -14858,6 +14858,7 @@ RectTransform:
   m_Children:
   - {fileID: 479612893}
   - {fileID: 1802713775}
+  - {fileID: 108797574}
   m_Father: {fileID: 1506004913}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
@@ -28094,22 +28095,22 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   currentAgent:
-  - {fileID: 11400000, guid: ca490f7c384cada41ac2ebb87ce10afd, type: 2}
-  - {fileID: 11400000, guid: 49e16acc2be0d6b40babb1ace40ce2b7, type: 2}
+  - {fileID: 11400000, guid: 340ce5a72e891ab4faf3be0dd59fbd38, type: 2}
+  - {fileID: 11400000, guid: 7a5d45baf2978c84d9cf577d59f5fc66, type: 2}
   - {fileID: 11400000, guid: 46891d074de2ed347ab7bd1268c0bae5, type: 2}
-  - {fileID: 11400000, guid: 86e75ec869a7e274b8ae959b924dc88e, type: 2}
-  - {fileID: 11400000, guid: 382de57b59c5c874a96b927b307dd74c, type: 2}
-  - {fileID: 11400000, guid: 35268ec7ca0a297439856fd2eeb383b6, type: 2}
-  - {fileID: 11400000, guid: dedb8cce4d46d994c8c1961e4dc5da30, type: 2}
-  - {fileID: 11400000, guid: f8e67f4e63842a34aad0da58acfc0ae8, type: 2}
-  - {fileID: 11400000, guid: 3b7465e8ba8e4984fb0664508af7dfdc, type: 2}
-  - {fileID: 11400000, guid: c0e796cd85e8ebc4c9a70583c4ab96c0, type: 2}
-  - {fileID: 11400000, guid: 6d69be5db11f7924887b3309b4d49059, type: 2}
-  - {fileID: 11400000, guid: c8f5e84885549d243b7b218ec563ccc4, type: 2}
-  - {fileID: 11400000, guid: 7c0c50cf08e39854c9213228ff5fed1e, type: 2}
-  - {fileID: 11400000, guid: 45f0538236c6fb345b4271a5f415b579, type: 2}
-  - {fileID: 11400000, guid: dc4b1cff3bb287540922cfefba68c93d, type: 2}
-  standardCondition: 0.15
+  - {fileID: 11400000, guid: 7dc14884f622a1c42a2e5cb7478d3d57, type: 2}
+  - {fileID: 11400000, guid: 39359ec8bf682ca4c8eae442bf3a9574, type: 2}
+  - {fileID: 11400000, guid: 0955369e646ebc64ca060a282a1b7f6f, type: 2}
+  - {fileID: 11400000, guid: 3d800811b449a6f4ea6c5bb09765f92e, type: 2}
+  - {fileID: 11400000, guid: 778205d2b7c6dcf40a9e9433f7caad1d, type: 2}
+  - {fileID: 11400000, guid: 73bab73e269066d4794665527106cdb3, type: 2}
+  - {fileID: 11400000, guid: 8649ed6fe2944514a9906e69d15527c4, type: 2}
+  - {fileID: 11400000, guid: b364e4e8605a05e488a55a8fc9e7cda2, type: 2}
+  - {fileID: 11400000, guid: e96247fe2e542ca41928eeb49874b5b4, type: 2}
+  - {fileID: 11400000, guid: 14d3ccf9c4df62e4787b9ae5b9201072, type: 2}
+  - {fileID: 11400000, guid: 9811e4c93722bac4da9ab2edb9893bbc, type: 2}
+  - {fileID: 11400000, guid: 32ffce32d4202cb469c36b33d327202c, type: 2}
+  standardCondition: 0.1
 --- !u!4 &975876088
 Transform:
   m_ObjectHideFlags: 0
@@ -28199,7 +28200,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 975876086}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: da2a57487a2e7ca42b873fa1e5fbcfd5, type: 3}
   m_Name: 
@@ -28267,17 +28268,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardSystem: {fileID: 975876089}
   playMode: 2
-  player1: 1
-  player2: 2
+  player1: 11
+  player2: 1
   endCondition: 1
   targetPoints: 3000
-  targetMatches: 100
+  targetMatches: 300
   winPts: 3
   drawPts: 1
   losePts: 0
   p1NameText: {fileID: 427708973}
-  scoreText: {fileID: 108797575}
   p2NameText: {fileID: 1432520422}
+  scoreText: {fileID: 108797575}
   statusText: {fileID: 2103390995}
   p1Gauge: {fileID: 479612892}
   p2Gauge: {fileID: 1802713774}
@@ -44401,7 +44402,6 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 501090978}
-  - {fileID: 108797574}
   m_Father: {fileID: 1240977171}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0}

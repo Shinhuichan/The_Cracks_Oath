@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System;
 using GameCore;  // AgentList
 using System.Linq;
+using System.Diagnostics;
 
 public class AgentManager : SingletonBehaviour<AgentManager>
 {
@@ -131,60 +132,102 @@ public class AgentManager : SingletonBehaviour<AgentManager>
     /// condition을 바탕으로 의도적 '실수'를 주입해 난이도를 조절한다.
     /// pMistake: cond=0 -> 0.45, cond=50 -> 0.225, cond=100 -> 0.0
     /// </summary>
+    // 기존 시그니처는 유지(호환). 상대 변화량을 모르면 0으로 전달.
     public void ApplyConditionAfterRound(AgentList who, int hpDeltaThisRound, int selfLife, int oppLife)
+    {
+        ApplyConditionAfterRound(who, hpDeltaThisRound, 0, selfLife, oppLife);
+    }
+
+    // 새 오버로드: 상대 양초 변화량까지 반영(가학적인 성격 용)
+    public void ApplyConditionAfterRound(AgentList who, int hpDeltaThisRound, int oppDeltaThisRound, int selfLife, int oppLife)
     {
         var data = GetAgentData(who);
         if (data == null) return;
 
-        // 무관심한: 항상 100으로 고정
-        if (data.personality == Personality.무관심한)
-        {
-            data.condition = 100f;
-            return;
-        }
-
-        // 결과 부호
+        // 결과 부호 (이 줄은 요구대로 그대로 둠)
         int sign = hpDeltaThisRound == -1 ? 0 : (hpDeltaThisRound >= 0 ? +1 : -1);
 
-        // 기본 증감(냉소적 기준)
-        float good = +0.2f, bad = -0.2f, draw = 0f;
+        float delta = 0f;
 
         switch (data.personality)
         {
             case Personality.냉소적인:
-                good = +0.2f; bad = -0.2f; draw = 0f;
+                delta = sign == 0 ? 0f : (sign > 0 ? +0.2f : -0.2f);
                 break;
 
             case Personality.과몰입한:
-                good = +1f; bad = -1f; draw = 0f;
-                break;
-
-            case Personality.낙천적인:
-                // 좋은 결과는 크게+, 나쁜 결과도 소폭+
-                good = +1f; bad = -0.2f; draw = +0.04f;
-                break;
-
-            case Personality.비관적인:
-                // 좋은 결과도 소폭-, 나쁜 결과는 크게-
-                good = +0.2f; bad = -1f; draw = -0.04f;
+                delta = sign == 0 ? 0f : (sign > 0 ? +0.6f : -0.6f);
                 break;
 
             case Personality.제멋대로:
-                // 결과 무관하게 랜덤 [-3, +3]
-                data.condition = Mathf.Clamp(data.condition + UnityEngine.Random.Range(-1f, 1f), 0f, 100f);
-                return;
+                delta = UnityEngine.Random.Range(-0.6f, 0.6f);
+                break;
 
             case Personality.감정적인:
-                {
-                    int diff = Mathf.Abs(selfLife - oppLife);
-                    bool bigGap = diff >= 5;
-                    if (bigGap) { good = +1f; bad = -1f; draw = 0f; } // 과몰입 모드
-                    else        { good = +0.2f; bad = -0.2f; draw = 0f;   } // 냉소 모드
-                }
+            {
+                int diff = Mathf.Abs(selfLife - oppLife);
+                bool calm = diff <= 5;           // 냉소 모드
+                bool frenzy = diff >= 6;         // 과몰입 모드
+                if (sign == 0) delta = 0f;
+                else if (sign > 0) delta = calm ? +0.2f : +0.6f;
+                else delta = frenzy ? -0.6f : -0.2f;
+                break;
+            }
+
+            case Personality.완벽주의:
+                data.condition = 100f;
+                return;
+
+            case Personality.불안정한:
+            {
+                // 결과가 -1 이상이면 가중 +, -2 이하이면 가중 -
+                if (sign >= 0)
+                    delta = UnityEngine.Random.Range(0.2f, 0.6f);
+                else
+                    delta = -UnityEngine.Random.Range(0.2f, 0.6f);
+                break;
+            }
+
+            case Personality.실리주의:
+            {
+                // 상대별 전적이 없으면 0.5로 간주
+                var rec = (data.records != null && data.records.Count > 0)
+                    ? data.records.OrderByDescending(r => r.matchCount).First()
+                    : new AgentRecord();
+                float winRate = rec.matchCount > 0 ? (float)rec.winCount / rec.matchCount : 0.5f;
+
+                if (winRate >= 0.55f)       delta = +0.4f;
+                else if (winRate <= 0.45f)  delta = -0.4f;
+                else                        delta = 0f;
+                break;
+            }
+
+            case Personality.도전적인:
+            {
+                if (selfLife > oppLife)     delta = +0.4f;
+                else if (selfLife < oppLife)delta = -0.4f;
+                else                        delta = 0f;
+                break;
+            }
+
+            // ⚠ enum에 아래 항목을 추가해야 함: Personality.가학적인
+            case Personality.가학적인:
+            {
+                int d = oppDeltaThisRound; // 상대 양초 변화량(+면 상대 회복/득점, -면 상대 손실)
+
+                if (d >= 1)        delta = -(d * 0.2f + 0.4f);
+                else if (d == 0)   delta = -0.4f;
+                else if (d == -2)  delta = +0.25f;
+                else if (d <= -3)  delta = +(Mathf.Abs(d) * 0.125f + 0.25f);
+                else               delta = 0f; // d == -1 등 기타
+                break;
+            }
+            default:
+                // 기본은 냉소적과 동일
+                delta = sign == 0 ? 0f : (sign > 0 ? +0.2f : -0.2f);
                 break;
         }
 
-        float delta = (sign == 0) ? draw : (sign > 0 ? good : bad);
         data.condition = Mathf.Clamp(data.condition + delta, 0f, 100f);
     }
 }

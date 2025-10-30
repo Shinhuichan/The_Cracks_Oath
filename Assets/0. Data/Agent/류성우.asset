@@ -9,46 +9,16 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 0}
+  m_Script: {fileID: 11500000, guid: 36f56d37b0e3bc245a1bd4ba0a9a2e09, type: 3}
   m_Name: "\uB958\uC131\uC6B0"
-  m_EditorClassIdentifier: Assembly-CSharp::AgentData
+  m_EditorClassIdentifier: 
   agentName: 12
   records:
-  - verseAgent: 8
-    matchCount: 100
-    winCount: 62
-    loseCount: 35
-    drawCount: 3
-  - verseAgent: 9
-    matchCount: 200
-    winCount: 95
-    loseCount: 100
-    drawCount: 5
   - verseAgent: 13
-    matchCount: 100
-    winCount: 50
-    loseCount: 48
-    drawCount: 2
-  - verseAgent: 2
-    matchCount: 100
-    winCount: 50
-    loseCount: 48
-    drawCount: 2
-  - verseAgent: 3
-    matchCount: 51
-    winCount: 29
-    loseCount: 21
-    drawCount: 1
-  - verseAgent: 15
-    matchCount: 100
-    winCount: 51
-    loseCount: 47
-    drawCount: 2
-  - verseAgent: 11
-    matchCount: 100
-    winCount: 38
-    loseCount: 59
-    drawCount: 3
-  elo: 1453.065915073598
+    matchCount: 300
+    winCount: 164
+    loseCount: 128
+    drawCount: 8
+  elo: 1577.4719757730968
   condition: 75
-  personality: 5
+  personality: 6

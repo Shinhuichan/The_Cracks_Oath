@@ -396,14 +396,30 @@ namespace GameCore
 
             // ▶ 재해 종료 후 condition 적용
             var mgr = AgentManager.I;
-            if (currentP1Agent.HasValue)
-                mgr.ApplyConditionAfterRound(currentP1Agent.Value,
-                    lastCardDeltaP1 + lastDisasterDeltaP1, playerILife, playerIILife);
 
-            mgr.ApplyConditionAfterRound(currentP2Agent,
-                lastCardDeltaP2 + lastDisasterDeltaP2, playerIILife, playerILife);
+            // P1이 에이전트일 때만 P1 적용
+            if (currentP1Agent.HasValue)
+            {
+                mgr.ApplyConditionAfterRound(
+                    currentP1Agent.Value,
+                    lastCardDeltaP1 + lastDisasterDeltaP1,     // 내 변화량
+                    lastCardDeltaP2 + lastDisasterDeltaP2,     // 상대 변화량(가학적 성격용)
+                    playerILife,                                // 내 현재 HP
+                    playerIILife                                // 상대 현재 HP
+                );
+            }
+
+            // P2는 항상 에이전트이므로 항상 적용
+            mgr.ApplyConditionAfterRound(
+                currentP2Agent,
+                lastCardDeltaP2 + lastDisasterDeltaP2,
+                lastCardDeltaP1 + lastDisasterDeltaP1,
+                playerIILife,
+                playerILife
+            );
 
             roundCounter++;
+
             var prev = currentDisaster;
             if ((roundCounter - 1) % disasterSpan == 0)
             {

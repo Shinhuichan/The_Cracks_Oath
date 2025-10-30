@@ -482,7 +482,7 @@ namespace GameCore
                     if (x == CardType.Pollution && I.HandHas(CardType.Doubt)) return CardType.Doubt;
                     if (x == CardType.Betrayal && I.HandHas(CardType.Interrupt)) return CardType.Interrupt;
                     if (x == CardType.Doubt && I.HandHas(CardType.Cooperation)) return CardType.Cooperation;
-                    if (x == CardType.Chaos && I.HandHas(CardType.Cooperation)) return CardType.Cooperation;
+                    if (x == CardType.Chaos && I.HandHas(CardType.Recon)) return CardType.Recon;
                 }
 
                 // 2) 초중반(1~4R): 정보/포지셔닝 반반
@@ -604,7 +604,6 @@ namespace GameCore
                 if (canKill) return CardType.Betrayal;
                 if (mustDefend) return CardType.Doubt;
 
-
                 // 손패의 정보가치/행동력 평가
                 int Eval(CardType c)
                 {
@@ -619,7 +618,6 @@ namespace GameCore
                     return score;
                 }
 
-
                 CardType best = CardType.None;
                 int bestScore = int.MinValue;
                 foreach (var c in I.hand.Distinct().Where(I.HandHas))
@@ -631,10 +629,8 @@ namespace GameCore
                     if (sc > bestScore) { bestScore = sc; best = c; }
                 }
 
-
                 return best;
             });
-
 
             A.fallback = new[]
             {
@@ -642,14 +638,12 @@ namespace GameCore
                 CardType.Doubt, CardType.Interrupt, CardType.Recon, CardType.Chaos
             };
 
-
             // 강화된 선택 드로우 로직
             A.chooseFromTwo = (a, b, I) =>
             {
                 int R = Math.Max(1, I.s.round);
                 bool losing = I.s.selfLife < I.s.oppLife;
                 bool noAtk = !I.HandHas(CardType.Betrayal) && !I.HandHas(CardType.Pollution);
-
 
                 float V(CardType c)
                 {
@@ -662,7 +656,6 @@ namespace GameCore
                     if (c == CardType.Chaos) return (losing && R > 3) ? 1.0f : -2f;
                     return 0f;
                 }
-
 
                 float va = V(a), vb = V(b);
                 if (Math.Abs(va - vb) < 0.1f)
