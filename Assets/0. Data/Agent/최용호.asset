@@ -13,7 +13,11 @@ MonoBehaviour:
   m_Name: "\uCD5C\uC6A9\uD638"
   m_EditorClassIdentifier: 
   agentName: 3
-  records: []
-  elo: 1500
-  condition: 75
-  personality: 7
+  records:
+  - verseAgent: 1
+    matchCount: 100
+    winCount: 65
+    loseCount: 34
+    drawCount: 1
+  elo: 1565.2540401741983
+  personality: 2

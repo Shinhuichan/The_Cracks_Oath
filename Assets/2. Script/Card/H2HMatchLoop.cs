@@ -14,7 +14,7 @@ public class H2HMatchLoop : MonoBehaviour
     }
 
     [Header("Core")]
-    [SerializeField] CardSystem cardSystem;        // 같은 씬의 CardSystem 참조
+    public CardSystem cardSystem;        // 같은 씬의 CardSystem 참조
     [SerializeField] Mode playMode = Mode.Extend;
 
     [Header("Players (Inspector)")]
@@ -50,6 +50,7 @@ public class H2HMatchLoop : MonoBehaviour
 
     void Awake()
     {
+        UnityEngine.Random.InitState((int)System.DateTime.Now.Ticks);
         if (cardSystem == null) cardSystem = FindObjectOfType<CardSystem>();
     }
 
@@ -66,7 +67,9 @@ void OnApplicationQuit() { GameLogger.FlushAll(); }
         StopLoop();
         if (cardSystem == null) { Debug.LogError("CardSystem not found"); return; }
 
-GameLogger.Init();
+        GameLogger.Init();
+        AgentManager.I.InitializeAllWeights(); // ▼ [이 줄을 추가하세요]
+
         // 완전 자동 모드
         cardSystem.enableChoiceDrawForPlayer = false;
         cardSystem.enableChoiceDrawForAgent  = true;
@@ -183,8 +186,6 @@ GameLogger.LogMatchStart(new GameLogger.MatchStart {
 // --- 라운드 전 상태 캡처 ---
 int aLifeBefore = cardSystem.playerILife;
 int bLifeBefore = cardSystem.playerIILife;
-// (조건치가 노출되지 않으므로 0으로 기록) 
-float aCondBefore = 0f, bCondBefore = 0f;
 
 // 라운드 자동 해결
 cardSystem.ResolveRoundAuto(A1, A2, ctx1, ctx2);
@@ -205,10 +206,10 @@ GameLogger.LogRound(new GameLogger.RoundRow {
     p2Card = bCard,
     p1LifeAfter = aLifeAfter,
     p2LifeAfter = bLifeAfter,
-    p1Delta = aLifeAfter - aLifeBefore,
-    p2Delta = bLifeAfter - bLifeBefore,
-    disaster = cardSystem.currentDisaster.ToString(),              // CardSystem에서 직접 노출 안 됨
-    swappedByStorm = false,     // 동일
+    p1Delta = cardSystem.lastCardDeltaP1,
+    p2Delta = cardSystem.lastCardDeltaP2,
+    disaster = cardSystem.currentDisaster.ToString(),
+    swappedByStorm = false,     // CardSystem 수정이 더 필요함 (현재는 무시)
 });
 
             // 제출 카드로 히스토리 갱신
@@ -261,14 +262,15 @@ GameLogger.LogRound(new GameLogger.RoundRow {
 // 매치 종료 로그
 var winner =
     (p1Dead && p2Dead) || (!p1Dead && !p2Dead && p1Life == p2Life) ? "Draw" :
-    (p2Dead || (!p1Dead && p1Life > p2Life)) ? "P1" : "P2";
+    (p2Dead || (!p1Dead && p1Life > p2Life)) ? player1.ToString() : player2.ToString();
 
 GameLogger.LogMatchEnd(
     new GameLogger.MatchEnd {
         matchId = matchId,
         totalRounds = R - 1,
         winner = winner,
-        loser = (winner.Equals("A")) ? "P2" : (winner.Equals("Draw")) ? "Draw" : "P1",
+        // "A"를 "P1"로 수정
+        loser = (winner.Equals(player1.ToString())) ? player2.ToString() : (winner.Equals("Draw")) ? "Draw" : player1.ToString(), // ← 수정됨
     },
     new GameLogger.MatchStart {
         matchId = matchId,

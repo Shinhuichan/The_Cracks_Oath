@@ -28110,7 +28110,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 14d3ccf9c4df62e4787b9ae5b9201072, type: 2}
   - {fileID: 11400000, guid: 9811e4c93722bac4da9ab2edb9893bbc, type: 2}
   - {fileID: 11400000, guid: 32ffce32d4202cb469c36b33d327202c, type: 2}
-  standardCondition: 0.1
+  saveFileName: agent_learning_data.json
 --- !u!4 &975876088
 Transform:
   m_ObjectHideFlags: 0
@@ -28268,11 +28268,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardSystem: {fileID: 975876089}
   playMode: 2
-  player1: 11
-  player2: 1
+  player1: 6
+  player2: 13
   endCondition: 1
   targetPoints: 3000
-  targetMatches: 300
+  targetMatches: 100
   winPts: 3
   drawPts: 1
   losePts: 0

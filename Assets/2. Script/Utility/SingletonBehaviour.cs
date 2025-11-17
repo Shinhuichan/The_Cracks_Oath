@@ -1,5 +1,8 @@
 using UnityEngine;
 
+
+// 상속받는 모든 Singleton Class는 이 변수를 반드시 구현해야 합니다.
+// protected override bool IsDontDestroy() => true; // 씬 전환 시 파괴되지 않도록 설정
 public abstract class SingletonBehaviour<T> : MonoBehaviour where T : MonoBehaviour
 {
     private static T _instance;

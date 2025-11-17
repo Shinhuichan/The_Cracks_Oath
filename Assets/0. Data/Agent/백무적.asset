@@ -20,5 +20,4 @@ MonoBehaviour:
     loseCount: 95
     drawCount: 6
   elo: 1542.0950593771556
-  condition: 75
-  personality: 4
+  personality: 5

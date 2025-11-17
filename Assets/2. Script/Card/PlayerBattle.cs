@@ -220,12 +220,12 @@ public class PlayerBattle : MonoBehaviour
 
         var pCard = sys.playerIHands[playerIndex];
 
-        // 상대 선택 추정은 그대로
+        // 상대 선택 추정
         var oppHandBefore = new List<CardType>(sys.playerIIHands);
         var unseenA = BuildUnseen(false);
-        var aCard = agent.Choose(new DecisionInput(sys.playerIIHands, ac, unseenA));
+        // ▼ [수정됨] 5번째 인자에 (AgentList)0 추가 (플레이어는 ID가 없으므로 0)
+        var aCard = agent.Choose(new DecisionInput(sys.playerIIHands, ac, unseenA, agent.id, (AgentList)0));
         int aIndex = IndexOfType(sys.playerIIHands, aCard); if (aIndex < 0) aIndex = 0;
-
         int hpPBefore = sys.playerILife, hpABefore = sys.playerIILife;
 
         pendingReconPeek = null; // 라운드 시작마다 초기화
@@ -666,8 +666,10 @@ public class PlayerBattle : MonoBehaviour
         int r = 1;
         while (r <= sim.maxRounds && !sim.playerILost && !sim.playerIILost)
         {
-            var t1 = ag1.Choose(new DecisionInput(sim.playerIHands,  c1, sim.BuildUnseen(true)));
-            var t2 = ag2.Choose(new DecisionInput(sim.playerIIHands, c2, sim.BuildUnseen(false)));
+            // ▼ [수정됨] 서로의 ID를 상대 ID(5번째 인자)로 전달
+            var t1 = ag1.Choose(new DecisionInput(sim.playerIHands,  c1, sim.BuildUnseen(true), ag1.id, ag2.id));
+            var t2 = ag2.Choose(new DecisionInput(sim.playerIIHands, c2, sim.BuildUnseen(false), ag2.id, ag1.id));
+            
             int i1 = IndexOfType(sim.playerIHands,  t1); if (i1 < 0) i1 = 0;
             int i2 = IndexOfType(sim.playerIIHands, t2); if (i2 < 0) i2 = 0;
 
@@ -728,8 +730,9 @@ public class PlayerBattle : MonoBehaviour
         int r = 1;
         while (r <= sys.maxRounds && !sim.playerILost && !sim.playerIILost)
         {
-            var t1 = ag1.Choose(new DecisionInput(sim.playerIHands,  c1, sim.BuildUnseen(true)));
-            var t2 = ag2.Choose(new DecisionInput(sim.playerIIHands, c2, sim.BuildUnseen(false)));
+            // ▼ [수정됨] 서로의 ID를 상대 ID(5번째 인자)로 전달
+            var t1 = ag1.Choose(new DecisionInput(sim.playerIHands,  c1, sim.BuildUnseen(true), ag1.id, ag2.id));
+            var t2 = ag2.Choose(new DecisionInput(sim.playerIIHands, c2, sim.BuildUnseen(false), ag2.id, ag1.id));
             int i1 = IndexOfType(sim.playerIHands,  t1); if (i1 < 0) i1 = 0;
             int i2 = IndexOfType(sim.playerIIHands, t2); if (i2 < 0) i2 = 0;
             sim.ResolveRoundByIndex(i1, i2);

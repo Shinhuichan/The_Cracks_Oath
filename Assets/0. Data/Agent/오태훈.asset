@@ -15,5 +15,4 @@ MonoBehaviour:
   agentName: 7
   records: []
   elo: 1500
-  condition: 75
-  personality: 5
+  personality: 2

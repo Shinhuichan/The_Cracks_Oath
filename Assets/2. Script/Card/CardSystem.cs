@@ -42,15 +42,13 @@ namespace GameCore
     public sealed class Agent
     {
         public string name;
+        public readonly AgentList id; // ▼ [추가됨] AI 자신의 ID
         public List<Func<DecisionInput, CardType?>> rules = new();
-
-        // ▼ 추가: 두 장 중 1장 선택 드로우용(0 또는 1 반환, null이면 시스템 기본 휴리스틱 사용)
-        public Func<CardType, CardType, DecisionInput, int?> chooseFromTwo;
-
-        public CardType[] fallback =
-            { CardType.Cooperation, CardType.Doubt, CardType.Pollution, CardType.Betrayal, CardType.Chaos, CardType.Interrupt };
-
-        public Agent(string name) { this.name = name; }
+        public Agent(string name, AgentList id) // ▼ [수정됨] 생성자에 id 추가
+        {
+            this.name = name;
+            this.id = id; // ▼ [추가됨]
+        }
 
         public CardType Choose(DecisionInput I)
         {
@@ -63,6 +61,10 @@ namespace GameCore
                 if (I.HandHas(t)) return t;
             return I.FirstOrNone();
         }
+        // ▼ 추가: 두 장 중 1장 선택 드로우용(0 또는 1 반환, null이면 시스템 기본 휴리스틱 사용)
+        public Func<CardType, CardType, DecisionInput, int?> chooseFromTwo;
+        public CardType[] fallback =
+            { CardType.Cooperation, CardType.Doubt, CardType.Pollution, CardType.Betrayal, CardType.Chaos, CardType.Interrupt };
     }
 
     // ===== 규칙 입력 =====
@@ -75,20 +77,25 @@ namespace GameCore
 }
     public readonly struct DecisionInput
     {
+        public readonly AgentList selfID;
+        public readonly AgentList opponentID; // ▼ [추가됨]
+
         public readonly List<CardType> hand;
         public readonly RoundCtx s;
-
-        // “아직 확인 못 한 카드” = 덱 + 상대 패
         public readonly IReadOnlyDictionary<CardType, int> unseen;
         public readonly int unseenTotal;
 
+        // ▼ [수정됨] 생성자에 opponentID 추가
         public DecisionInput(List<CardType> hand, RoundCtx s,
-                             IReadOnlyDictionary<CardType, int> unseen)
+                             IReadOnlyDictionary<CardType, int> unseen,
+                             AgentList selfID, AgentList opponentID) 
         {
             this.hand = hand;
             this.s = s;
             this.unseen = unseen ?? EmptyCounts;
             this.unseenTotal = this.unseen.Values.Sum();
+            this.selfID = selfID;
+            this.opponentID = opponentID; // ▼ [추가됨]
         }
 
         static readonly IReadOnlyDictionary<CardType, int> EmptyCounts =
@@ -265,8 +272,6 @@ namespace GameCore
             enableChoiceDrawForPlayer = false;
             enableChoiceDrawForAgent = true;
             
-            ApplyConditionIfAny(p1, true);
-            ApplyConditionIfAny(p2, false);
             currentP1 = p1;
             currentP2 = p2;
 
@@ -279,8 +284,9 @@ namespace GameCore
             var unseenForP1 = BuildUnseen(true);
             var unseenForP2 = BuildUnseen(false);
 
-            var pick1 = p1.Choose(new DecisionInput(playerIHands,  ctxP1, unseenForP1));
-            var pick2 = p2.Choose(new DecisionInput(playerIIHands, ctxP2, unseenForP2));
+            // ▼ [수정됨] 생성자에 p1.id와 p2.id를 전달합니다.
+            var pick1 = p1.Choose(new DecisionInput(playerIHands,  ctxP1, unseenForP1, p1.id, p2.id));
+            var pick2 = p2.Choose(new DecisionInput(playerIIHands, ctxP2, unseenForP2, p2.id, p1.id));
 
             int idx1 = IndexOfFirst(playerIHands, pick1);
             int idx2 = IndexOfFirst(playerIIHands, pick2);
@@ -292,7 +298,6 @@ namespace GameCore
             phaseBonusAppliedThisRound = false;
             if (playerILost || playerIILost) return;
 
-            ApplyConditionIfAny(currentP2, false);
             StormCheckedThisRound = false;
             extraLightningAppliedThisRound = false;
 
@@ -397,26 +402,50 @@ namespace GameCore
             // ▶ 재해 종료 후 condition 적용
             var mgr = AgentManager.I;
 
-            // P1이 에이전트일 때만 P1 적용
+            // ▼▼▼ [학습 트리거 추가] ▼▼▼
+            // P1 학습
             if (currentP1Agent.HasValue)
             {
-                mgr.ApplyConditionAfterRound(
+                AgentManager.I.LearnFromRound(
                     currentP1Agent.Value,
-                    lastCardDeltaP1 + lastDisasterDeltaP1,     // 내 변화량
-                    lastCardDeltaP2 + lastDisasterDeltaP2,     // 상대 변화량(가학적 성격용)
-                    playerILife,                                // 내 현재 HP
-                    playerIILife                                // 상대 현재 HP
+                    lastSubmittedP1,                  // 내가 낸 카드
+                    lastCardDeltaP1 + lastDisasterDeltaP1, // 이번 라운드 나의 순수 득실
+                    playerILife,
+                    playerIILife
                 );
             }
 
-            // P2는 항상 에이전트이므로 항상 적용
-            mgr.ApplyConditionAfterRound(
+            // P2 학습 (P2는 항상 Agent임)
+            AgentManager.I.LearnFromRound(
                 currentP2Agent,
+                lastSubmittedP2,
                 lastCardDeltaP2 + lastDisasterDeltaP2,
-                lastCardDeltaP1 + lastDisasterDeltaP1,
                 playerIILife,
                 playerILife
             );
+            // ▲▲▲ [학습 트리거 종료] ▲▲▲
+            
+            // ▼▼▼ [PatternBreaker 추가] 패턴 관찰 및 분석 연결 ▼▼▼
+            
+            // 1. 관찰 (Observe): 이번 라운드에 상대가 무엇을 냈는지 기록
+            if (currentP1Agent.HasValue)
+            {
+                // P1(서유리 등)이 P2를 관찰
+                AgentManager.I.ObserveOpponentMove(currentP1Agent.Value, currentP2Agent, lastSubmittedP2);
+            }
+            
+            // P2가 P1을 관찰 (P1이 사람이면 null 대신 임시 ID 사용)
+            AgentManager.I.ObserveOpponentMove(currentP2Agent, currentP1Agent ?? AgentList.백무적, lastSubmittedP1);
+
+            // 2. 분석 (Analyze): 매치가 끝났다면 패턴을 추출하여 영구 저장
+            if (IsMatchEnded)
+            {
+                if (currentP1Agent.HasValue)
+                    AgentManager.I.AnalyzeMatchPatterns(currentP1Agent.Value, currentP2Agent);
+                
+                AgentManager.I.AnalyzeMatchPatterns(currentP2Agent, currentP1Agent ?? AgentList.백무적);
+            }
+            // ▲▲▲ [PatternBreaker 종료] ▲▲▲
 
             roundCounter++;
 
@@ -651,31 +680,118 @@ namespace GameCore
         public bool IsMatchEnded => playerILost || playerIILost || IsLastRound;
         // ───────────────────────────────────────────────
 
-        // 누락된 메서드: 플레이어 선택 드로우 시작
-        void StartChoiceDrawForPlayer()
+        // 1. 기존 StartChoiceDrawForAgent를 삭제하거나 이름을 변경하여 
+        //    양쪽 플레이어 모두 처리 가능한 일반화된 함수로 만듭니다.
+        void ExecuteAgentDraft(Agent agent, List<CardType> hand, bool isP1)
         {
-            // 매치 종료/대기 중이면 무시
-            if (IsMatchEnded || waitingChoice) return;
+            if (publicDeck.Count == 0) return;
 
-            // H2H처럼 UI 구독자가 없거나 기능을 끈 경우 → 자동 드로우(Chaos 제외 1장)
-            bool noUI = OnOfferChoiceForPlayer == null;
-            if (!enableChoiceDrawForPlayer || noUI)
+            // Chaos 제외하고 2장 뽑기 시도 (덱 상황에 따라 1장일 수도 있음)
+            var c1 = DrawNonChaosFromPublic();
+            if (c1 == CardType.None) return; // 덱 고갈
+
+            // 두 번째 장이 없으면 그냥 첫 번째 장 먹고 끝
+            if (publicDeck.Count == 0)
             {
-                var c = DrawNonChaosFromPublic();              // 기존 DrawOne 대신 Chaos 제외
-                if (c != CardType.None) playerIHands.Add(c);
-                OnPlayerHandChanged?.Invoke(new List<CardType>(playerIHands));
+                hand.Add(c1);
+                return; 
+            }
+
+            var c2 = DrawNonChaosFromPublic();
+            if (c2 == CardType.None) // 혹시라도 c1 뽑고 비었을 경우
+            {
+                hand.Add(c1);
                 return;
             }
 
-            // Chaos 제외 2장 제시
-            pendingA = DrawNonChaosFromPublic();
-            pendingB = DrawNonChaosFromPublic();
+            int pick;
+            // 에이전트별 선택 로직 (Draft 전용)
+            if (agent != null && agent.chooseFromTwo != null)
+            {
+                var ctx = new RoundCtx { /* ...생략... */ };
+                var unseen = BuildUnseen(isP1);
 
-            waitingChoice = true;
-            // UI에 두 장 통지(구독자가 없으면 null-safe)
-            OnOfferChoiceForPlayer?.Invoke(pendingA, pendingB);
+                // ▼ [수정됨] 상대방 ID 추론하여 전달
+                // (currentP2가 null이면 Human/None으로 간주하여 0 전달)
+                AgentList oppID = isP1 
+                    ? (currentP2 != null ? currentP2.id : (AgentList)0) 
+                    : (currentP1 != null ? currentP1.id : (AgentList)0);
+
+                var input = new DecisionInput(hand, ctx, unseen, agent.id, oppID);
+
+                pick = agent.chooseFromTwo(c1, c2, input) ?? ChooseIndexForAgent(c1, c2, hand, isP1);
+            }
+            else
+            {
+                // 기본 휴리스틱 사용
+                pick = ChooseIndexForAgent(c1, c2, hand, isP1);
+            }
+
+            var chosen = (pick == 0) ? c1 : c2;
+            var other = (pick == 0) ? c2 : c1;
+
+            hand.Add(chosen);
+            
+            // 선택받지 못한 카드는 덱의 랜덤한 위치로 반환
+            int pos = UnityEngine.Random.Range(0, publicDeck.Count + 1);
+            publicDeck.Insert(pos, other);
+            
+            // P1인 경우 손패 변경 이벤트 알림
+            if (isP1) OnPlayerHandChanged?.Invoke(new List<CardType>(hand));
+        }
+        // 2. 휴리스틱 함수도 손패(hand)와 상황을 알 수 있게 수정
+        int ChooseIndexForAgent(CardType a, CardType b, List<CardType> currentHand, bool isP1)
+        {
+            // Chaos 회피
+            if (a == CardType.Chaos && b != CardType.Chaos) return 1;
+            if (b == CardType.Chaos && a != CardType.Chaos) return 0;
+
+            // 현재 내 손패 상황
+            bool hasAtk = currentHand.Contains(CardType.Betrayal) || currentHand.Contains(CardType.Pollution);
+            bool hasDef = currentHand.Contains(CardType.Doubt) || currentHand.Contains(CardType.Interrupt);
+
+            int myLife = isP1 ? playerILife : playerIILife;
+            // int oppLife = isP1 ? playerIILife : playerILife; // 필요시 사용
+
+            int R = Mathf.Max(1, roundCounter);
+            // 배신 카드 집착 조건: 내 체력이 낮을 때 더 공격적으로? (원래 로직 유지하되 myLife 참조 수정)
+            bool killA = (a == CardType.Betrayal) && (myLife <= R); 
+            bool killB = (b == CardType.Betrayal) && (myLife <= R);
+            if (killA != killB) return killA ? 0 : 1;
+
+            if (!hasDef)
+            {
+                bool aDef = (a == CardType.Doubt || a == CardType.Interrupt);
+                bool bDef = (b == CardType.Doubt || b == CardType.Interrupt);
+                if (aDef != bDef) return aDef ? 0 : 1;
+            }
+            if (!hasAtk)
+            {
+                bool aAtk = (a == CardType.Betrayal || a == CardType.Pollution);
+                bool bAtk = (b == CardType.Betrayal || b == CardType.Pollution);
+                if (aAtk != bAtk) return aAtk ? 0 : 1;
+            }
+
+            // 점수제 비교
+            int Score(CardType t) => t switch
+            {
+                CardType.Betrayal => 100,
+                CardType.Doubt => 90,
+                CardType.Interrupt => 85,
+                CardType.Pollution => 80,
+                CardType.Cooperation => 60,
+                CardType.Recon => 50,
+                CardType.Chaos => 10,
+                _ => 0
+            };
+            int sa = Score(a), sb = Score(b);
+            if (sa != sb) return sa > sb ? 0 : 1;
+
+            return UnityEngine.Random.value < 0.5f ? 0 : 1;
         }
         bool carryAfterColdWaveP1 = false, carryAfterColdWaveP2 = false;
+        
+        // 3. 핵심: DrawToLimitByDisaster 수정
         private void DrawToLimitByDisaster(bool isP1)
         {
             if (IsMatchEnded) return;
@@ -683,7 +799,7 @@ namespace GameCore
 
             int limit = (currentDisaster == NaturalDisaster.ColdWave) ? 2 : 3;
 
-            // 1) 한파 '시작' 라운드: 이번 라운드만 드로우 스킵
+            // (한파 시작/종료 로직은 기존 코드 유지...)
             if (currentDisaster == NaturalDisaster.ColdWave)
             {
                 bool justStarted = isP1 ? coldWaveJustStartedP1 : coldWaveJustStartedP2;
@@ -691,14 +807,13 @@ namespace GameCore
                 {
                     if (isP1) coldWaveJustStartedP1 = false; else coldWaveJustStartedP2 = false;
                     if (waitingChoice) { waitingChoice = false; OnChoiceClosed?.Invoke(); }
-                    return; // 손패 2장 유지
+                    return; 
                 }
             }
-
-            // 2) 한파 '종료' 라운드 복구: 선택 없이 즉시 3장까지
             bool recover = isP1 ? coldWaveRecoverThisRoundP1 : coldWaveRecoverThisRoundP2;
             if (recover && currentDisaster != NaturalDisaster.ColdWave)
             {
+                // 복구 시에는 그냥 랜덤 드로우 (Draft까지 하면 너무 복잡해지므로 유지)
                 while (hand.Count < 3)
                 {
                     var c = DrawOne(publicDeck);
@@ -710,23 +825,44 @@ namespace GameCore
                 return;
             }
 
-            // 3) 평시/한파 진행 라운드: 상한까지 정상 드로우
+            // [수정된 부분] 일반/한파 중 드로우
             while (hand.Count < limit)
             {
-                if (isP1 && enableChoiceDrawForPlayer)
+                if (isP1)
                 {
-                    StartChoiceDrawForPlayer(); // 2장 중 1장 선택 UI
-                    return; // 선택 콜백에서 이어서 채움
-                }
-                else if (!isP1 && enableChoiceDrawForAgent)
-                {
-                    StartChoiceDrawForAgent();  // 에이전트 선택 로직
+                    // P1: 사람(UI)인가?
+                    if (enableChoiceDrawForPlayer)
+                    {
+                        ExecuteAgentDraft(null, playerIHands, true);
+                        return;
+                    }
+                    // P1: AI(H2H)인가? -> ★ 여기가 핵심 수정 사항 ★
+                    else if (currentP1 != null) // ResolveRoundAuto에서 currentP1이 할당됨
+                    {
+                        // P1도 P2와 똑같이 Draft 로직 수행
+                        ExecuteAgentDraft(currentP1, playerIHands, true);
+                    }
+                    else
+                    {
+                        // Agent 정보도 없고 UI도 아니면 그냥 Random (Fallback)
+                        var c = DrawOne(publicDeck);
+                        if (c == CardType.None) return;
+                        hand.Add(c);
+                    }
                 }
                 else
                 {
-                    var c = DrawOne(publicDeck);
-                    if (c == CardType.None) return;
-                    hand.Add(c);
+                    // P2: 에이전트 드로우가 켜져있으면 Draft (기본값 true)
+                    if (enableChoiceDrawForAgent)
+                    {
+                        ExecuteAgentDraft(currentP2, playerIIHands, false);
+                    }
+                    else
+                    {
+                        var c = DrawOne(publicDeck);
+                        if (c == CardType.None) return;
+                        hand.Add(c);
+                    }
                 }
             }
         }
@@ -758,95 +894,7 @@ namespace GameCore
             hand.Clear();
             Draw(publicDeck, hand, drawLimit); // Chaos 리셋 시에도 한파면 최대 2장만
         }
-
-        // 에이전트 선택 드로우 시작부 수정
-        void StartChoiceDrawForAgent()
-        {
-            if (publicDeck.Count == 0) return;
-
-            var c1 = DrawNonChaosFromPublic();
-            var c2 = DrawNonChaosFromPublic();
-
-            int pick;
-            // ▼ 에이전트가 선택 규칙을 갖고 있으면 우선 사용
-            if (enableChoiceDrawForAgent && currentP2 != null && currentP2.chooseFromTwo != null)
-            {
-                var ctx = new RoundCtx
-                {            // 라운드 상황 구성
-                    round = roundCounter,
-                    selfLife = playerIILife,
-                    oppLife = playerILife,
-                    lastSelf = lastSubmittedP2,
-                    lastOpp = lastSubmittedP1
-                };
-                var input = new DecisionInput(playerIIHands, ctx, BuildUnseen(false));
-                pick = currentP2.chooseFromTwo(c1, c2, input) ?? ChooseIndexForAgent(c1, c2);
-            }
-            else
-            {
-                pick = ChooseIndexForAgent(c1, c2); // 기존 휴리스틱
-            }
-
-            var chosen = (pick == 0) ? c1 : c2;
-            var other = (pick == 0) ? c2 : c1;
-
-            playerIIHands.Add(chosen);
-            int pos = UnityEngine.Random.Range(0, publicDeck.Count + 1);
-            publicDeck.Insert(pos, other);
-        }
-        // 내부 유틸: 라운드마다 선택 직전에 Condition 반영
-        private void ApplyConditionIfAny(GameCore.Agent agent, bool isP1)
-        {
-            // 라운드 종료 시 ResolveRoundByIndex에서만 컨디션을 적용한다.
-            // 여기서는 아무 것도 하지 않는다. (컴파일 에러를 유발하던 지역변수 의존 제거)
-        }
-
         
-        // 두 카드 중 무엇을 고를지 간단 휴리스틱
-        int ChooseIndexForAgent(CardType a, CardType b)
-        {
-            // Chaos 회피
-            if (a == CardType.Chaos && b != CardType.Chaos) return 1;
-            if (b == CardType.Chaos && a != CardType.Chaos) return 0;
-
-            // 현재 상대 손패 상황
-            bool hasAtk = playerIIHands.Contains(CardType.Betrayal) || playerIIHands.Contains(CardType.Pollution);
-            bool hasDef = playerIIHands.Contains(CardType.Doubt) || playerIIHands.Contains(CardType.Interrupt);
-
-            int R = Mathf.Max(1, roundCounter);
-            bool killA = (a == CardType.Betrayal) && (playerILife <= R);
-            bool killB = (b == CardType.Betrayal) && (playerILife <= R);
-            if (killA != killB) return killA ? 0 : 1;
-
-            if (!hasDef)
-            {
-                bool aDef = (a == CardType.Doubt || a == CardType.Interrupt);
-                bool bDef = (b == CardType.Doubt || b == CardType.Interrupt);
-                if (aDef != bDef) return aDef ? 0 : 1;
-            }
-            if (!hasAtk)
-            {
-                bool aAtk = (a == CardType.Betrayal || a == CardType.Pollution);
-                bool bAtk = (b == CardType.Betrayal || b == CardType.Pollution);
-                if (aAtk != bAtk) return aAtk ? 0 : 1;
-            }
-
-            int Score(CardType t) => t switch
-            {
-                CardType.Betrayal => 100,
-                CardType.Doubt => 90,
-                CardType.Interrupt => 85,
-                CardType.Pollution => 80,
-                CardType.Cooperation => 60,
-                CardType.Recon => 50,
-                CardType.Chaos => 10,
-                _ => 0
-            };
-            int sa = Score(a), sb = Score(b);
-            if (sa != sb) return sa > sb ? 0 : 1;
-
-            return UnityEngine.Random.value < 0.5f ? 0 : 1;
-        }
         // 페이즈 시작 보너스(동점이면 없음)
         bool phaseBonusAppliedThisRound = false;
         void ApplyPhaseStartBonusIfNeeded()
