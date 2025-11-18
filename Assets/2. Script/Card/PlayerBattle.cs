@@ -281,6 +281,7 @@ public class PlayerBattle : MonoBehaviour
     string FmtDelta(int d) => d == 0 ? "0" : (d > 0 ? $"+{d}" : d.ToString());
 
     // ---------- 종료 판정 ----------
+    // 1. CheckEnd 함수 수정
     void CheckEnd()
     {
         if (finished) return;
@@ -291,21 +292,20 @@ public class PlayerBattle : MonoBehaviour
             if (btn1) btn1.interactable = false;
             if (btn2) btn2.interactable = false;
 
-            // ▼ 미니 직접 경기인 경우: 리그 기록/시뮬 생략하고 콜백으로 점수 전달
+            // ▼ 미니 직접 경기인 경우 (기존 로직 유지)
             if (inMini && miniAllowInput)
             {
                 var (pPts, aPts) = ComputeCurrentMatchPts();
-                miniAllowInput = false;           // 입력 종료
-                onMiniDone?.Invoke(pPts, aPts);   // 미니 점수 반영
+                miniAllowInput = false;           
+                onMiniDone?.Invoke(pPts, aPts);   
                 onMiniDone = null;
 
-                // 미니 경기에서는 재시작/다음매치 버튼 숨김
                 if (retryButton) retryButton.gameObject.SetActive(true);
                 if (nextMatchButton) nextMatchButton.gameObject.SetActive(false);
             }
             else
             {
-                // ▼ 일반 매치인 경우: 리그 기록/시뮬 진행
+                // ▼ 일반 매치인 경우: 흐름 제어 코루틴 시작
                 AwardPlayerMatchPoints();
                 UpdateBothRankUI();
 
@@ -324,19 +324,39 @@ public class PlayerBattle : MonoBehaviour
                         resultText.text = $"결과: {verdict}  |  총 라운드 {round - 1}";
                 }
 
-                if (retryButton) { retryButton.gameObject.SetActive(true); retryButton.interactable = true; }
-                if (nextMatchButton) { nextMatchButton.gameObject.SetActive(true); nextMatchButton.interactable = true; }
-
-                if (playerDoneAll) suppressOtherMatchOutput = true;
-
-                if (simulateOthers) StartCoroutine(SimulateAIRoundCoroutine());
-
-                if (playerDoneAll && rr12Consumed.Count >= rr12Rounds.Count)
-                {
-                    if (nextMatchButton) { nextMatchButton.interactable = false; nextMatchButton.gameObject.SetActive(false); }
-                    StartCoroutine(ShowFinalStandingsCoroutine());
-                }
+                // ★★★ [핵심 수정] 비동기 처리를 위한 코루틴 호출로 변경 ★★★
+                StartCoroutine(ProcessMatchEndSequence(playerDoneAll));
             }
+        }
+    }
+
+    // 2. [추가됨] 매치 종료 후 처리 순서를 보장하는 코루틴
+    IEnumerator ProcessMatchEndSequence(bool playerDoneAll)
+    {
+        // 재시작/다음 버튼은 일단 켜둠
+        if (retryButton) { retryButton.gameObject.SetActive(true); retryButton.interactable = true; }
+        if (nextMatchButton) { nextMatchButton.gameObject.SetActive(true); nextMatchButton.interactable = true; }
+
+        if (playerDoneAll) suppressOtherMatchOutput = true;
+
+        // 1) AI 리그 시뮬레이션이 켜져 있다면 실행하고 '완료될 때까지 대기'
+        if (simulateOthers) 
+        {
+            yield return StartCoroutine(SimulateAIRoundCoroutine());
+        }
+
+        // 2) 시뮬레이션 종료 후 조건 검사 (이제 카운트가 정상적으로 올라가 있음)
+        if (playerDoneAll && rr12Consumed.Count >= rr12Rounds.Count)
+        {
+            // 모든 경기가 끝났으므로 '다음 매치' 버튼 숨김
+            if (nextMatchButton) 
+            { 
+                nextMatchButton.interactable = false; 
+                nextMatchButton.gameObject.SetActive(false); 
+            }
+            
+            // 최종 순위표 출력 실행
+            yield return StartCoroutine(ShowFinalStandingsCoroutine());
         }
     }
     private (int pPts, int aPts) ComputeCurrentMatchPts()

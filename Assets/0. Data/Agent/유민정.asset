@@ -13,12 +13,45 @@ MonoBehaviour:
   m_Name: "\uC720\uBBFC\uC815"
   m_EditorClassIdentifier: 
   agentName: 8
+  title: Iron Wall
+  description: "\uADF8\uB140\uB294 \uC2A4\uC2A4\uB85C\uB97C \u2018\uC8FC\uC778\uACF5\u2019\uC774\uB77C
+    \uC0DD\uAC01\uD558\uC9C0 \uC54A\uB294\uB2E4. \uB298 \uD0C0\uC778\uC758 \uD750\uB984\uC744
+    \uC77D\uACE0 \uB530\uB77C\uAC04\uB2E4. \uC218\uBE44\uD615 \uD50C\uB808\uC774\uC5B4\uC9C0\uB9CC,
+    \uB2E8\uC21C\uD55C \uBC29\uC5B4\uAC00 \uC544\uB2C8\uB77C \u2018\uD0C0\uC778\uC758
+    \uB9AC\uB4EC\u2019\uC744 \uC774\uC6A9\uD558\uB294 \uC804\uB7B5\uAC00\uB2E4. \uC0C1\uB300\uAC00
+    \uACF5\uACA9\uC801\uC73C\uB85C \uB098\uC624\uBA74 \uADF8 \uAE30\uC138\uB97C \uD761\uC218\uD558\uACE0,
+    \uC870\uC6A9\uD55C \uD310\uC5D0\uC120 \uBC29\uC2EC\uC744 \uC720\uB3C4\uD55C\uB2E4.
+    \uC190\uD328\uB97C \uB178\uCD9C\uD558\uC9C0 \uC54A\uACE0, Recon\uBCF4\uB2E4 \uC2EC\uB9AC\uC801
+    \uCD94\uCE21\uC5D0 \uC758\uC874\uD55C\uB2E4. Condition \uBCC0\uD654\uAC00 \uC644\uB9CC\uD558\uBA70,
+    \uAC89\uC73C\uB860 \uBB34\uD45C\uC815\uD558\uB2E4. \uADF8\uB7EC\uB098 \uC18D\uC73C\uB85C\uB294
+    \uBAA8\uB4E0 \uC0C1\uD669\uC744 \uAD00\uCC30\uD558\uACE0 \uAE30\uB85D\uD55C\uB2E4.
+    \u201C\uC138\uC0C1\uC740 \uB098\uB97C \uC911\uC2EC\uC73C\uB85C \uB3CC\uC9C0 \uC54A\uC544.
+    \uD558\uC9C0\uB9CC \uB09C \uADF8\uAC78 \uC774\uC6A9\uD560 \uAC70\uC57C.\u201D
+    \uADF8\uB140\uB294 \uACB0\uCF54 \uC2A4\uD3EC\uD2B8\uB77C\uC774\uD2B8\uB97C \uC6D0\uD558\uC9C0
+    \uC54A\uC9C0\uB9CC, \uB9C8\uC9C0\uB9C9\uC5D4 \uC5B8\uC81C\uB098 \uC0B4\uC544\uB0A8\uB294\uB2E4."
+  threatLevel: 0
+  stats:
+    Lethality: 25
+    Survivability: 95
+    Calculation: 45
+    Adaptability: 55
+    Insight: 55
+    Unpredictability: 35
+  personality: 3
+  elo: 1442.6229702202504
   records:
   - verseAgent: 4
     matchCount: 129
     winCount: 75
     loseCount: 48
     drawCount: 6
-  elo: 1564.8322167653118
-  condition: 75
-  personality: 3
+  - verseAgent: 14
+    matchCount: 13000
+    winCount: 5647
+    loseCount: 7133
+    drawCount: 220
+  - verseAgent: 15
+    matchCount: 10000
+    winCount: 2864
+    loseCount: 6989
+    drawCount: 147

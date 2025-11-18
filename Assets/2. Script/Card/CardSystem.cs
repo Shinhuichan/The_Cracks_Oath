@@ -181,7 +181,24 @@ namespace GameCore
         GameCore.CardSystem.NaturalDisaster lastDisaster;
 
         // 자연재해
-        public enum NaturalDisaster { Peace, Meteorite, Heatwave, Lightning, Storm, ColdWave, Eclipse, Sandstorm }
+        // 1. Enum에 새 재해 추가
+        public enum NaturalDisaster
+        {
+            None = 0,
+            Peace,      // 평화
+            Lightning,  // 낙뢰
+            Sandstorm,  // 황사
+            Meteorite,  // 운석 충돌
+            Heatwave,   // 폭염
+            Eclipse,    // 월식
+            Storm,      // 폭풍
+            ColdWave,   // 한파
+            
+            // ▼ [추가됨]
+            Drought,    // 가뭄: 회복 불가
+            Plague,     // 역병: 같은 카드 연속 제출 시 패널티
+            MidnightSun // 백야: 라운드 기본 소모 0
+        }
 
         [Header("Natural Disaster")]
         [SerializeField] int disasterSpan = 5; // 5라운드마다 교체
@@ -340,6 +357,12 @@ namespace GameCore
                 dSelf *= 2;
                 dOpp  *= 2;
             }
+            // ▼ [추가됨] 가뭄(Drought) 효과: 회복(양수) 무효화
+            if (currentDisaster == NaturalDisaster.Drought)
+            {
+                if (dSelf > 0) dSelf = 0;
+                if (dOpp > 0) dOpp = 0;
+            }
 
             playerILife  += dSelf;
             playerIILife += dOpp;
@@ -424,7 +447,7 @@ namespace GameCore
                 playerILife
             );
             // ▲▲▲ [학습 트리거 종료] ▲▲▲
-            
+
             // ▼▼▼ [PatternBreaker 추가] 패턴 관찰 및 분석 연결 ▼▼▼
             
             // 1. 관찰 (Observe): 이번 라운드에 상대가 무엇을 냈는지 기록
@@ -555,6 +578,9 @@ namespace GameCore
             NaturalDisaster.ColdWave   => "<color=blue>한파</color>",
             NaturalDisaster.Eclipse    => "<color=#888>월식</color>",
             NaturalDisaster.Sandstorm  => "<color=#caa566>황사</color>",
+            NaturalDisaster.MidnightSun  => "<color=#00FFFF>백야</color>",
+            NaturalDisaster.Drought    => "<color=#A52A2A>가뭄</color>",
+            NaturalDisaster.Plague     => "<color=#006400>역병</color>",
             _ => d.ToString()
         };
 
@@ -569,6 +595,9 @@ namespace GameCore
             NaturalDisaster.ColdWave => "\n<size=24>최대 패 수급 2장으로 제한</size>",
             NaturalDisaster.Eclipse => "\n<size=24>일반 카드의 효과를 2배로 증폭</size>",
             NaturalDisaster.Sandstorm => "\n<size=24>Pollution이 공개되면,\n각 참가자의 양초 - 1</size>",
+            NaturalDisaster.MidnightSun => "\n<size=24>Round마다 양초 - 0</size>",
+            NaturalDisaster.Drought => "\n<size=24>회복 효과 무효화</size>",
+            NaturalDisaster.Plague => "\n<size=24>같은 카드 연속 제출 시\n양초 - 2</size>",
             _ => ""
         };
         
@@ -602,6 +631,7 @@ namespace GameCore
             {
                 case NaturalDisaster.Peace:    return 1; // 기본 규칙
                 case NaturalDisaster.Heatwave: return 2; // 폭염
+                case NaturalDisaster.MidnightSun: return 0; // 백야
                 default:                       return 1; // 나머지는 기본 1
             }
         }
@@ -647,6 +677,23 @@ namespace GameCore
                         }
                         break;
                     }
+                case NaturalDisaster.Plague:
+                    {
+                        // 같은 카드 연속 제출 시 양초 -2
+                        if (a == lastSubmittedP1 && a != CardType.None)
+                        {
+                            playerILife = Mathf.Max(0, playerILife - 2);
+                            lastDisasterDeltaP1 -= 2;
+                            playerILost |= playerILife <= 0;
+                        }
+                        if (b == lastSubmittedP2 && b != CardType.None)
+                        {
+                            playerIILife = Mathf.Max(0, playerIILife - 2);
+                            lastDisasterDeltaP2 -= 2;
+                            playerIILost |= playerIILife <= 0;
+                        }
+                        break;
+                    }
                 case NaturalDisaster.Peace:
                 case NaturalDisaster.Heatwave:
                 case NaturalDisaster.Meteorite:
@@ -674,7 +721,42 @@ namespace GameCore
         void Draw(List<CardType> deck, List<CardType> hand, int n)
         { for(int i=0;i<n;i++){ var c=DrawOne(deck); if(c==CardType.None) break; hand.Add(c);} }
         void DrawToThree(List<CardType> hand) { int need = 3 - hand.Count; if (need > 0) Draw(publicDeck, hand, need); }
+        
+        // ▼ [추가됨] 플레이어 UI 전용 드로우 함수
+        public void StartChoiceDrawForPlayer()
+        {
+            if (waitingChoice) return; // 이미 선택창이 떠있으면 중복 실행 방지
+            if (publicDeck.Count == 0) return;
 
+            // 1. Chaos가 아닌 카드 1장 뽑기
+            var c1 = DrawNonChaosFromPublic();
+            if (c1 == CardType.None) return; // 덱 고갈
+
+            // 2. 덱에 1장밖에 없었으면 선택 없이 그냥 가짐
+            if (publicDeck.Count == 0)
+            {
+                playerIHands.Add(c1);
+                OnPlayerHandChanged?.Invoke(new List<CardType>(playerIHands));
+                return;
+            }
+
+            // 3. 두 번째 카드 뽑기
+            var c2 = DrawNonChaosFromPublic();
+            if (c2 == CardType.None) 
+            {
+                playerIHands.Add(c1);
+                OnPlayerHandChanged?.Invoke(new List<CardType>(playerIHands));
+                return;
+            }
+
+            // 4. 선택 대기 상태로 전환 및 UI 이벤트 발생
+            pendingA = c1;
+            pendingB = c2;
+            waitingChoice = true;
+            
+            // PlayerBattle.cs가 이 이벤트를 받아 UI를 띄움
+            OnOfferChoiceForPlayer?.Invoke(pendingA, pendingB);
+        }
         // ───────────────────────────────────────────────
         // 누락된 프로퍼티: 매치 종료 여부
         public bool IsMatchEnded => playerILost || playerIILost || IsLastRound;
@@ -825,7 +907,6 @@ namespace GameCore
                 return;
             }
 
-            // [수정된 부분] 일반/한파 중 드로우
             while (hand.Count < limit)
             {
                 if (isP1)
@@ -833,13 +914,14 @@ namespace GameCore
                     // P1: 사람(UI)인가?
                     if (enableChoiceDrawForPlayer)
                     {
-                        ExecuteAgentDraft(null, playerIHands, true);
-                        return;
+                        // ▼ [수정됨] ExecuteAgentDraft 대신 UI 전용 함수 호출
+                        StartChoiceDrawForPlayer(); 
+                        return; // UI가 열리면 대기해야 하므로 리턴
                     }
-                    // P1: AI(H2H)인가? -> ★ 여기가 핵심 수정 사항 ★
-                    else if (currentP1 != null) // ResolveRoundAuto에서 currentP1이 할당됨
+                    // P1: AI(H2H)인가?
+                    else if (currentP1 != null) 
                     {
-                        // P1도 P2와 똑같이 Draft 로직 수행
+                        // P1 AI는 즉시 계산하여 선택 (시뮬레이션용)
                         ExecuteAgentDraft(currentP1, playerIHands, true);
                     }
                     else

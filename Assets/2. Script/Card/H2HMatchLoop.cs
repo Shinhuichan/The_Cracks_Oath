@@ -1,334 +1,209 @@
-// File: H2HMatchLoop.cs
 using UnityEngine;
+using UnityEngine.UI; 
 using System.Collections;
-using GameCore;          // Agent, RoundCtx, CardSystem, Mode
+using GameCore;
 using TMPro;
-using System.Drawing;
 
 public class H2HMatchLoop : MonoBehaviour
 {
-    public enum EndCondition
+    [Header("References")]
+    public CardSystem cardSystem;
+    
+    [Header("UI - Gauges (GameObject Scale)")]
+    public GameObject p1WinRateBar;      
+    public GameObject p2WinRateBar;      
+    
+    [Header("UI - Labels")]
+    public TMP_Text winRateText;    
+    public TMP_Text matchCountText; 
+    public TMP_Text logText;        
+
+    [Header("UI - P1 Stats")]
+    public TMP_Text p1WinText;
+    public TMP_Text p1DrawText;
+    public TMP_Text p1LoseText;
+
+    [Header("UI - P2 Stats")]
+    public TMP_Text p2WinText;
+    public TMP_Text p2DrawText;
+    public TMP_Text p2LoseText;
+
+    [Header("Settings")]
+    public AgentList p1Name = AgentList.김현수;
+    public AgentList p2Name = AgentList.이수진;
+    public int targetMatches = 100;
+    public float delayBetweenMatches = 0.0f;
+    public bool autoStart = false;
+
+    // 내부 변수
+    private int p1Wins = 0;
+    private int p2Wins = 0;
+    private int draws = 0;
+    private int matchesPlayed = 0;
+    private bool isRunning = false;
+
+    private void Start()
     {
-        TargetPoints,   // 목표 점수 도달 시 종료
-        TargetMatches   // 목표 매칭 수 소화 후 종료
+        if (autoStart) StartMatchLoop();
     }
 
-    [Header("Core")]
-    public CardSystem cardSystem;        // 같은 씬의 CardSystem 참조
-    [SerializeField] Mode playMode = Mode.Extend;
-
-    [Header("Players (Inspector)")]
-    [SerializeField] AgentList player1 = AgentList.백무적;
-    [SerializeField] AgentList player2 = AgentList.박민재;
-
-    [Header("End Condition")]
-    [SerializeField] EndCondition endCondition = EndCondition.TargetPoints;
-    [Min(1)] public int targetPoints = 15;         // EndCondition == TargetPoints
-    [Min(1)] public int targetMatches = 10;        // EndCondition == TargetMatches
-
-    [Header("Scoring")]
-    public int winPts = 3, drawPts = 1, losePts = 0;
-
-    [Header("UI (TMP)")]
-    [SerializeField] TMP_Text p1NameText;
-    [SerializeField] TMP_Text p2NameText;
-    [SerializeField] TMP_Text scoreText;
-    [SerializeField] TMP_Text statusText;          // 선택 사항
-    [SerializeField] GameObject p1Gauge, p2Gauge;
-
-    [Header("Loop Speeds")]
-    [SerializeField, Range(0f, 1f)] float roundDelay = 0.05f;
-    [SerializeField, Range(0f, 2f)] float matchDelay = 0.25f;
-
-    [Header("Auto")]
-    [SerializeField] bool autoStart = true;
-
-    Coroutine loop;
-    int p1Score, p2Score;
-    int matchesPlayed;
-    string p1Name, p2Name;
-
-    void Awake()
+    public void StartMatchLoop()
     {
-        UnityEngine.Random.InitState((int)System.DateTime.Now.Ticks);
-        if (cardSystem == null) cardSystem = FindObjectOfType<CardSystem>();
-    }
-
-    void Start()
-    {
-        if (autoStart) StartLoop();
-    }
-
-void OnDisable()  { GameLogger.FlushAll(); }
-void OnApplicationQuit() { GameLogger.FlushAll(); }
-
-    public void StartLoop()
-    {
-        StopLoop();
-        if (cardSystem == null) { Debug.LogError("CardSystem not found"); return; }
-
-        GameLogger.Init();
-        AgentManager.I.InitializeAllWeights(); // ▼ [이 줄을 추가하세요]
-
-        // 완전 자동 모드
-        cardSystem.enableChoiceDrawForPlayer = false;
-        cardSystem.enableChoiceDrawForAgent  = true;
-
-        // 모드 적용 + 매치 리셋
-        cardSystem.currentMode = playMode;
-        cardSystem.ApplyModeIfAvailable();
-        cardSystem.ResetForNewMatch();
-
-        p1Name = player1.ToString();
-        p2Name = player2.ToString();
-        p1Score = p2Score = 0;
-        matchesPlayed = 0;
-        UpdateUI();
-
-        loop = StartCoroutine(StartNextFrame());
-    }
-
-    IEnumerator StartNextFrame()
-    {
-        yield return null; // 한 프레임 양보
-        yield return RunLoop();
+        if (isRunning) return;
+        StartCoroutine(RunMatchLoop());
     }
 
     public void StopLoop()
     {
-        cardSystem.SetCurrentAgents(player1, player2);
-        if (loop != null) { StopCoroutine(loop); loop = null; }
+        isRunning = false;
     }
 
-    IEnumerator RunLoop()
+    IEnumerator RunMatchLoop()
     {
-        var A1 = AgentFactory.Create(player1.ToString());
-        var A2 = AgentFactory.Create(player2.ToString());
-        if (A1 == null || A2 == null) { Debug.LogError("Agent create failed"); yield break; }
+        isRunning = true;
+        p1Wins = 0; p2Wins = 0; draws = 0; matchesPlayed = 0;
 
-        bool KeepGoing()
-        {
-            switch (endCondition)
-            {
-                case EndCondition.TargetPoints:
-                    return p1Score < targetPoints && p2Score < targetPoints;
-                case EndCondition.TargetMatches:
-                    return matchesPlayed < targetMatches;
-                default:
-                    return false;
-            }
-        }
+        UpdateUI();
 
-        while (KeepGoing())
+        // 에이전트 생성
+        Agent p1Agent = AgentFactory.Create(p1Name.ToString());
+        Agent p2Agent = AgentFactory.Create(p2Name.ToString());
+
+        if (logText) logText.text = $"Match Start: {p1Name} vs {p2Name}\n";
+
+        while (matchesPlayed < targetMatches && isRunning)
         {
-            yield return RunOneMatch(A1, A2);
             matchesPlayed++;
-            UpdateUI();
-            if (!KeepGoing()) break;
-            if (matchDelay > 0f) yield return new WaitForSeconds(matchDelay);
-        }
 
-        if (statusText)
-        {
-            string tail = endCondition == EndCondition.TargetMatches
-                ? $"  ({matchesPlayed}/{targetMatches} 경기)"
-                : "";
-            statusText.text =
-                (p1Score > p2Score) ? $"{p1Name} 최종 승리{tail}"
-              : (p2Score > p1Score) ? $"{p2Name} 최종 승리{tail}"
-              : $"최종 무승부{tail}";
-        }
-    }
+            // 1. 매치 ID 생성 및 주입 (로그용)
+            string matchID = System.Guid.NewGuid().ToString();
 
-    IEnumerator RunOneMatch(Agent A1, Agent A2)
-    {
-        // 매치 초기화
-// 매치 식별자(중복 방지: 시각+이름)
-string matchId = System.DateTime.UtcNow.ToString("yyyyMMddHHmmssfff") + "_" + player1 + "_vs_" + player2;
+            // 2. CardSystem 초기화
+            cardSystem.ResetForNewMatch();
+            cardSystem.enableChoiceDrawForPlayer = false;
+            cardSystem.enableChoiceDrawForAgent = true;
 
-// 시작 로그(시작행은 End에서 완성해도 되지만, 식별자 고정용으로 남김)
-GameLogger.LogMatchStart(new GameLogger.MatchStart {
-    matchId = matchId,
-    p1 = player1.ToString(),
-    p2 = player2.ToString(),
-    mode = playMode.ToString(),
-});
-        cardSystem.ResetForNewMatch();
-        cardSystem.SetCurrentAgents(player1, player2);
+            RoundCtx ctx1 = new RoundCtx { round = 1, selfLife = cardSystem.startLife, oppLife = cardSystem.startLife };
+            RoundCtx ctx2 = new RoundCtx { round = 1, selfLife = cardSystem.startLife, oppLife = cardSystem.startLife };
 
-        // 라운드 컨텍스트용 최근 히스토리(각 참가자 기준)
-        CardType p1_lastSelf = CardType.None, p1_lastOpp = CardType.None, p1_last2Opp = CardType.None, p1_last3Opp = CardType.None;
-        CardType p2_lastSelf = CardType.None, p2_lastOpp = CardType.None, p2_last2Opp = CardType.None, p2_last3Opp = CardType.None;
+            // 3. 매치 진행 루프
+            while (!cardSystem.IsMatchEnded)
+            {
+                cardSystem.ResolveRoundAuto(p1Agent, p2Agent, ctx1, ctx2);
+                UpdateContext(ctx1, cardSystem.playerILife, cardSystem.playerIILife, cardSystem.lastSubmittedP1, cardSystem.lastSubmittedP2);
+                UpdateContext(ctx2, cardSystem.playerIILife, cardSystem.playerILife, cardSystem.lastSubmittedP2, cardSystem.lastSubmittedP1);
+            }
 
-        int R = 1;
-        while (!cardSystem.playerILost && !cardSystem.playerIILost && R <= cardSystem.maxRounds)
-        {
-            // 양측 컨텍스트 작성
-            var ctx1 = new RoundCtx {
-                round = R,
-                selfLife = cardSystem.playerILife,
-                oppLife  = cardSystem.playerIILife,
-                lastSelf = p1_lastSelf,
-                lastOpp  = p1_lastOpp,
-                last2Opp = p1_last2Opp,
-                last3Opp = p1_last3Opp
-            };
-            var ctx2 = new RoundCtx {
-                round = R,
-                selfLife = cardSystem.playerIILife,
-                oppLife  = cardSystem.playerILife,
-                lastSelf = p2_lastSelf,
-                lastOpp  = p2_lastOpp,
-                last2Opp = p2_last2Opp,
-                last3Opp = p2_last3Opp
-            };
+            // 4. 결과 집계
+            bool p1Win = false, p2Win = false;
+            string winnerName = "Draw";
+            string loserName = "Draw";
             
-// --- 라운드 전 상태 캡처 ---
-int aLifeBefore = cardSystem.playerILife;
-int bLifeBefore = cardSystem.playerIILife;
+            // AgentManager에 전달할 승패 결과
+            AgentManager.MatchOutcome outcomeP1 = AgentManager.MatchOutcome.Draw;
 
-// 라운드 자동 해결
-cardSystem.ResolveRoundAuto(A1, A2, ctx1, ctx2);
+            if (cardSystem.playerILost && cardSystem.playerIILost) 
+            { 
+                /* Draw */ 
+                outcomeP1 = AgentManager.MatchOutcome.Draw;
+            }
+            else if (cardSystem.playerILost) 
+            { 
+                p2Win = true; 
+                winnerName = p2Name.ToString(); 
+                loserName = p1Name.ToString();
+                outcomeP1 = AgentManager.MatchOutcome.Loss;
+            }
+            else if (cardSystem.playerIILost) 
+            { 
+                p1Win = true; 
+                winnerName = p1Name.ToString(); 
+                loserName = p2Name.ToString();
+                outcomeP1 = AgentManager.MatchOutcome.Win;
+            }
+            else if (cardSystem.playerILife == cardSystem.playerIILife) 
+            { 
+                /* Draw */
+                outcomeP1 = AgentManager.MatchOutcome.Draw;
+            }
+            else if (cardSystem.playerILife > cardSystem.playerIILife) 
+            { 
+                p1Win = true; 
+                winnerName = p1Name.ToString(); 
+                loserName = p2Name.ToString();
+                outcomeP1 = AgentManager.MatchOutcome.Win;
+            }
+            else 
+            { 
+                p2Win = true; 
+                winnerName = p2Name.ToString(); 
+                loserName = p1Name.ToString();
+                outcomeP1 = AgentManager.MatchOutcome.Loss;
+            }
 
-// --- 제출 카드/라운드 후 상태 ---
-var aCard = cardSystem.lastSubmittedP1;  // 이미 존재(히스토리 갱신에 사용)
-var bCard = cardSystem.lastSubmittedP2;
+            if (p1Win) p1Wins++;
+            else if (p2Win) p2Wins++;
+            else draws++;
 
-int aLifeAfter = cardSystem.playerILife;
-int bLifeAfter = cardSystem.playerIILife;
+            // 5. [복구됨] AgentManager에 전적 기록 (AgentData 업데이트)
+            if (AgentManager.I != null) { AgentManager.I.ApplyMatchResult(p1Name, p2Name, outcomeP1); }
 
-GameLogger.LogRound(new GameLogger.RoundRow {
-    matchId = matchId,
-    round = R,
-    p1Hand = cardSystem.playerIHands,
-    p2Hand = cardSystem.playerIIHands,
-    p1Card = aCard,
-    p2Card = bCard,
-    p1LifeAfter = aLifeAfter,
-    p2LifeAfter = bLifeAfter,
-    p1Delta = cardSystem.lastCardDeltaP1,
-    p2Delta = cardSystem.lastCardDeltaP2,
-    disaster = cardSystem.currentDisaster.ToString(),
-    swappedByStorm = false,     // CardSystem 수정이 더 필요함 (현재는 무시)
-});
+            UpdateUI();
 
-            // 제출 카드로 히스토리 갱신
-            var s1 = cardSystem.lastSubmittedP1;
-            var s2 = cardSystem.lastSubmittedP2;
-
-            // P1 기준
-            p1_last3Opp = p1_last2Opp;
-            p1_last2Opp = p1_lastOpp;
-            p1_lastOpp  = s2;
-            p1_lastSelf = s1;
-            // P2 기준
-            p2_last3Opp = p2_last2Opp;
-            p2_last2Opp = p2_lastOpp;
-            p2_lastOpp  = s1;
-            p2_lastSelf = s2;
-
-            R++;
-            if (roundDelay > 0f) yield return new WaitForSeconds(roundDelay);
+            if (delayBetweenMatches > 0) yield return new WaitForSeconds(delayBetweenMatches);
+            else yield return null;
         }
 
-        // 승패 판정 및 점수 부여
-        bool p1Dead = cardSystem.playerILost;
-        bool p2Dead = cardSystem.playerIILost;
-        int p1Life = cardSystem.playerILife;
-        int p2Life = cardSystem.playerIILife;
-
-        // ▼ 매치 단위 점수(이 값을 합계에 더하고, ELO 결과 판정에도 사용)
-        int mP1 = 0, mP2 = 0;
-
-        if ((p1Dead && p2Dead) || (!p1Dead && !p2Dead && p1Life == p2Life))
-        {
-            mP1 = drawPts; mP2 = drawPts;
-            p1Score += mP1; p2Score += mP2;
-            if (statusText) statusText.text = "매치 결과: 무승부";
-        }
-        else if (p2Dead || (!p1Dead && p1Life > p2Life))
-        {
-            mP1 = winPts; mP2 = losePts;
-            p1Score += mP1; p2Score += mP2;
-            if (statusText) statusText.text = $"매치 결과: {p1Name} 승";
-        }
-        else
-        {
-            mP1 = losePts; mP2 = winPts;
-            p1Score += mP1; p2Score += mP2;
-            if (statusText) statusText.text = $"매치 결과: {p2Name} 승";
-        }
-
-// 매치 종료 로그
-var winner =
-    (p1Dead && p2Dead) || (!p1Dead && !p2Dead && p1Life == p2Life) ? "Draw" :
-    (p2Dead || (!p1Dead && p1Life > p2Life)) ? player1.ToString() : player2.ToString();
-
-GameLogger.LogMatchEnd(
-    new GameLogger.MatchEnd {
-        matchId = matchId,
-        totalRounds = R - 1,
-        winner = winner,
-        // "A"를 "P1"로 수정
-        loser = (winner.Equals(player1.ToString())) ? player2.ToString() : (winner.Equals("Draw")) ? "Draw" : player1.ToString(), // ← 수정됨
-    },
-    new GameLogger.MatchStart {
-        matchId = matchId,
-        p1 = player1.ToString(), p2 = player2.ToString(),
-        mode = playMode.ToString()
+        isRunning = false;
+        if (logText) logText.text += $"\n[Finished] Total: {matchesPlayed} | {p1Name}:{p1Wins} | {p2Name}:{p2Wins} | Draw:{draws}";
     }
-);
-        // ★ 여기 추가: ELO 갱신
-        var am = AgentManager.I;
-        var outcomeP1 = am.OutcomeFromMatchPoints(mP1, mP2);
-        am.ApplyMatchResult(player1, player2, outcomeP1);
+
+    void UpdateContext(RoundCtx ctx, int selfHp, int oppHp, CardType lastSelf, CardType lastOpp)
+    {
+        ctx.round++;
+        ctx.selfLife = selfHp;
+        ctx.oppLife = oppHp;
+        ctx.last3Opp = ctx.last2Opp;
+        ctx.last2Opp = ctx.lastOpp;
+        ctx.lastOpp = lastOpp;
+        ctx.lastSelf = lastSelf;
     }
 
     void UpdateUI()
     {
-        if (p1NameText) p1NameText.text = p1Name ?? player1.ToString();
-        if (p2NameText) p2NameText.text = p2Name ?? player2.ToString();
-        if (scoreText)
+        float total = matchesPlayed > 0 ? matchesPlayed : 1;
+
+        // 게이지 바 (GameObject Scale)
+        if (p1WinRateBar)
         {
-            int sum = p1Score + p2Score;
-            if (sum > 0)
-            {
-                float p1Pct = (float)p1Score / sum;
-                float p2Pct = 1f - p1Pct;
-                scoreText.text = $"{p1Score}<color=red>[{p1Pct * 100f:0.#}%]</color> : {p2Score}<color=blue>[{p2Pct * 100f:0.#}%]</color>";
-            }
-            else { scoreText.text = $"{p1Score}<color=red>[0%]</color> : {p2Score}<color=blue>[0%]</color>"; }
+            Vector3 s = p1WinRateBar.transform.localScale;
+            s.x = (float)p1Wins / total;
+            p1WinRateBar.transform.localScale = s;
+        }
+        if (p2WinRateBar)
+        {
+            Vector3 s = p2WinRateBar.transform.localScale;
+            s.x = (float)p2Wins / total;
+            p2WinRateBar.transform.localScale = s;
         }
 
-        // 진행률(게이지) 계산
-        int goal = (endCondition == EndCondition.TargetPoints)
-            ? Mathf.Max(1, targetPoints)
-            : Mathf.Max(1, targetMatches * winPts);
-        float p1Progress = Mathf.Clamp01((float)p1Score / goal);
-        float p2Progress = Mathf.Clamp01((float)p2Score / goal);
-
-        // 진행률(두 게이지 합이 항상 1)
-        float a = p1Score;
-        float b = p2Score;
-
-        float p1Share, p2Share;
-        if (a <= 0f && b <= 0f) {          // 0:0 → 0.5 / 0.5
-            p1Share = 0.5f; p2Share = 0.5f;
-        } else if (a <= 0f) {              // 0:n → 0 / 1
-            p1Share = 0f;   p2Share = 1f;
-        } else if (b <= 0f) {              // n:0 → 1 / 0
-            p1Share = 1f;   p2Share = 0f;
-        } else {                           // 일반 비율
-            float sum = a + b;
-            p1Share = a / sum;
-            p2Share = b / sum;
+        // 텍스트
+        if (winRateText)
+        {
+            float p1Rate = (float)p1Wins / total * 100f;
+            float p2Rate = (float)p2Wins / total * 100f;
+            winRateText.text = $"{p1Name} {p1Rate:F1}%  vs  {p2Name} {p2Rate:F1}%";
         }
 
-        // 적용
-        if (p1Gauge) p1Gauge.transform.localScale = new Vector3(Mathf.Clamp01(p1Share), 1f, 1f);
-        if (p2Gauge) p2Gauge.transform.localScale = new Vector3(Mathf.Clamp01(p2Share), 1f, 1f);
+        if (matchCountText) matchCountText.text = $"{matchesPlayed} / {targetMatches}";
 
-        if (statusText && endCondition == EndCondition.TargetMatches)
-            statusText.text = $"경기 진행: {matchesPlayed}/{targetMatches}";
+        // 상세 스탯
+        if (p1WinText)  p1WinText.text  = $"Win: {p1Wins}";
+        if (p1DrawText) p1DrawText.text = $"Draw: {draws}";
+        if (p1LoseText) p1LoseText.text = $"Lose: {p2Wins}";
+
+        if (p2WinText)  p2WinText.text  = $"Win: {p2Wins}";
+        if (p2DrawText) p2DrawText.text = $"Draw: {draws}";
+        if (p2LoseText) p2LoseText.text = $"Lose: {p1Wins}";
     }
 }

@@ -13,6 +13,55 @@ MonoBehaviour:
   m_Name: "\uC804\uC544\uB78C"
   m_EditorClassIdentifier: 
   agentName: 15
-  records: []
-  elo: 1500
+  title: Info Hunter
+  description: "\uC815\uBCF4\uB97C \uAC00\uC7A5 \uC2E0\uB8B0\uD55C\uB2E4. \uCD08\uBC18\uC5D4
+    Recon\uACFC Doubt\uB9CC\uC73C\uB85C \uC0C1\uD669\uC744 \uBD84\uC11D\uD558\uACE0,
+    \uC911\uBC18 \uC774\uD6C4 Betrayal\uB85C \uB9C8\uBB34\uB9AC\uD55C\uB2E4. \uAC10\uC815\uC774
+    \uC5C6\uC5B4 \uBCF4\uC774\uC9C0\uB9CC, \uC0AC\uC2E4\uC740 \uAD00\uCC30\uC744
+    \uC990\uAE34\uB2E4. \uBAA8\uB4E0 \uCC38\uAC00\uC790\uC758 \uD328\uD134, \uB300\uD654,
+    \uD45C\uC815\uC744 \uC218\uC9D1\uD55C\uB2E4. \uADF8\uB140\uC758 \uC804\uD22C\uB294
+    \uB9C8\uCE58 \uCCA9\uBCF4 \uC791\uC804 \uAC19\uB2E4. \uADF8\uB140\uB294 \uB3D9\uB9F9\uC744
+    \uB9FA\uC5B4\uB3C4 \uC808\uB300 \uC815\uBCF4\uB97C 100% \uACF5\uC720\uD558\uC9C0
+    \uC54A\uB294\uB2E4. \uC0C1\uB300\uC758 \uC190\uC744 \uBCF4\uC558\uB2E4\uACE0
+    \uD574\uB3C4, \uD45C\uD604\uC740 \uBC18\uB300\uB2E4. \u201C\uBAA8\uB4E0 \uC9C4\uC2E4\uC740
+    \uC870\uC791\uB420 \uC218 \uC788\uB2E4.\u201D \uAC8C\uC784 \uD6C4\uC5D0\uB3C4
+    \uB204\uAC00 \uC774\uACBC\uB294\uC9C0\uBCF4\uB2E4 \u201C\uB204\uAC00 \uAC00\uC7A5
+    \uB9CE\uC740 \uC815\uBCF4\uB97C \uAC00\uC84C\uB294\uAC00\u201D\uB97C \uC911\uC694\uC2DC\uD55C\uB2E4.
+    Condition \uBCC0\uD654\uB294 \uB0C9\uC815\uD558\uAC8C \uD1B5\uC81C\uB41C\uB2E4.
+    \uC644\uBCBD\uD55C \uC815\uBCF4\uC8FC\uC758\uC790."
+  threatLevel: 4
+  stats:
+    Lethality: 65
+    Survivability: 55
+    Calculation: 75
+    Adaptability: 65
+    Insight: 92
+    Unpredictability: 45
   personality: 4
+  elo: 1551.1295275097343
+  records:
+  - verseAgent: 10
+    matchCount: 3000
+    winCount: 1921
+    loseCount: 1029
+    drawCount: 50
+  - verseAgent: 8
+    matchCount: 10000
+    winCount: 6989
+    loseCount: 2864
+    drawCount: 147
+  - verseAgent: 3
+    matchCount: 10000
+    winCount: 5196
+    loseCount: 4589
+    drawCount: 215
+  - verseAgent: 13
+    matchCount: 10000
+    winCount: 3631
+    loseCount: 6149
+    drawCount: 220
+  - verseAgent: 5
+    matchCount: 10000
+    winCount: 4618
+    loseCount: 5181
+    drawCount: 201

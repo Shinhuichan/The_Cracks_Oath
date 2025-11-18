@@ -13,11 +13,88 @@ MonoBehaviour:
   m_Name: "\uC815\uB2E4\uC740"
   m_EditorClassIdentifier: 
   agentName: 6
+  title: The Analyst
+  description: "\uC804\uC9C1 \uC0C1\uB2F4\uAC00\uB85C, \uC778\uAC04\uC758 \uBD88\uC548\uACFC
+    \uC695\uB9DD\uC744 \uC5F0\uAD6C\uD558\uB358 \uADF8\uB140\uB294 \u2018\uC2EC\uB9AC
+    \uC870\uC791\u2019\uC758 \uADC0\uC7AC\uB2E4. \uB2E8 \uD55C \uBC88\uC758 \uD45C\uC815
+    \uBCC0\uD654, \uB2E8 \uD55C \uC904\uC758 \uB300\uC0AC\uB85C \uC0C1\uB300\uC758
+    \uD328\uB97C \uCD94\uB860\uD55C\uB2E4. \uADF8\uB140\uC758 \uACB0\uD22C\uB294
+    \uCE74\uB4DC \uC2F8\uC6C0\uC774 \uC544\uB2C8\uB77C \uC2E0\uACBD\uC804\uC774\uB2E4.
+    \uC0C1\uB300\uAC00 Doubt\uC744 \uB0BC\uC9C0, Cooperation\uC744 \uB0BC\uC9C0 \uC774\uBBF8
+    \uC608\uACAC\uD55C \uB4EF \uD589\uB3D9\uD55C\uB2E4. \uAC10\uC815\uC801\uC73C\uB85C
+    \uD754\uB4E4\uB9AC\uB294 \uCC38\uAC00\uC790\uC77C\uC218\uB85D \uADF8\uB140\uC758
+    \uBA39\uC787\uAC10\uC774\uB2E4. Recon\uACFC Interrupt\uB97C \uAD50\uCC28 \uC0AC\uC6A9\uD558\uBA70
+    \uC0C1\uB300\uB97C \uB04A\uC784\uC5C6\uC774 \uD63C\uB780\uC2DC\uD0A8\uB2E4. \uADF8\uB140\uB294
+    \uC5F0\uD569\uC744 \uB9FA\uC744 \uB54C\uC870\uCC28 \uC0C1\uB300\uC758 \uC815\uC2E0\uC801
+    \uC57D\uC810\uC744 \uD30C\uC545\uD574, \uADF8 \uC5F0\uD569\uC744 \u2018\uC790\uC2E0\uC758
+    \uB3C4\uAD6C\u2019\uB85C \uB9CC\uB4E0\uB2E4. \uD45C\uBA74\uC0C1 \uD3C9\uD654\uB85C\uC6B0\uB098,
+    \uB0B4\uBD80\uC5D0\uC120 \uCE58\uBC00\uD55C \uC870\uC885\uC774 \uC9C4\uD589\uB41C\uB2E4.
+    \u201C\uC778\uAC04\uC758 \uD310\uB2E8\uC5D4 \uD56D\uC0C1 \uD2C8\uC774 \uC788\uB2E4.\u201D
+    \uADF8\uB140\uC758 \uB208\uBE5B\uC740 \uD56D\uC0C1 \uADF8\uAC83\uC744 \uACC4\uC0B0\uD558\uACE0
+    \uC788\uB2E4."
+  threatLevel: 4
+  stats:
+    Lethality: 55
+    Survivability: 65
+    Calculation: 75
+    Adaptability: 90
+    Insight: 85
+    Unpredictability: 45
+  personality: 1
+  elo: 1563.2098697804456
   records:
   - verseAgent: 5
-    matchCount: 100
-    winCount: 46
-    loseCount: 52
-    drawCount: 2
-  elo: 1436.1637478989314
-  personality: 1
+    matchCount: 20100
+    winCount: 10079
+    loseCount: 9652
+    drawCount: 369
+  - verseAgent: 7
+    matchCount: 10000
+    winCount: 6023
+    loseCount: 3798
+    drawCount: 179
+  - verseAgent: 11
+    matchCount: 20000
+    winCount: 8393
+    loseCount: 11217
+    drawCount: 390
+  - verseAgent: 14
+    matchCount: 10000
+    winCount: 6504
+    loseCount: 3319
+    drawCount: 177
+  - verseAgent: 12
+    matchCount: 10000
+    winCount: 5914
+    loseCount: 3889
+    drawCount: 197
+  - verseAgent: 9
+    matchCount: 10000
+    winCount: 6309
+    loseCount: 3530
+    drawCount: 161
+  - verseAgent: 13
+    matchCount: 40000
+    winCount: 17435
+    loseCount: 21743
+    drawCount: 822
+  - verseAgent: 4
+    matchCount: 10000
+    winCount: 5873
+    loseCount: 3941
+    drawCount: 186
+  - verseAgent: 2
+    matchCount: 10000
+    winCount: 6163
+    loseCount: 3636
+    drawCount: 201
+  - verseAgent: 15
+    matchCount: 20000
+    winCount: 10824
+    loseCount: 8780
+    drawCount: 396
+  - verseAgent: 3
+    matchCount: 10000
+    winCount: 5312
+    loseCount: 4512
+    drawCount: 176

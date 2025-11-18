@@ -13,16 +13,70 @@ MonoBehaviour:
   m_Name: "\uC774\uC218\uC9C4"
   m_EditorClassIdentifier: 
   agentName: 2
+  title: High Roller
+  description: "\uADF8\uB140\uB294 \uC0B6 \uC790\uCCB4\uB97C \uC2E4\uD5D8\uC73C\uB85C
+    \uBCF8\uB2E4. \uC5EC\uD589 \uC911\uC5D0\uB3C4 \uAC8C\uC784\uAE30\uB97C \uAEBC\uB0B4\uACE0,
+    \uCE5C\uAD6C\uB4E4\uACFC \uC989\uC11D \uB0B4\uAE30\uB97C \uC990\uAE34\uB2E4.
+    \uC704\uD5D8\uD55C \uC120\uD0DD\uC774 \uB450\uB835\uC9C0 \uC54A\uB2E4. \uC624\uD788\uB824
+    \u201C\uB9AC\uC2A4\uD06C\uB294 \uC7AC\uBBF8\uC758 \uC5F0\uB8CC\u201D\uB77C\uACE0
+    \uBBFF\uB294\uB2E4. \uADF8\uB140\uC758 \uD50C\uB808\uC774\uB294 \uC885\uC885
+    \uBB34\uBAA8\uD558\uC9C0\uB9CC, \uC0C1\uB300\uB294 \uC608\uCE21\uD560 \uC218
+    \uC5C6\uC5B4 \uACF5\uD3EC\uB97C \uB290\uB080\uB2E4. Betrayal\uC774\uB098 Chaos
+    \uAC19\uC740 \uBD88\uC548\uC815\uD55C \uCE74\uB4DC\uC77C\uC218\uB85D \uADF8\uB140\uC758
+    \uC190\uC5D0\uC120 \uC608\uC220\uC774 \uB41C\uB2E4. \uC190\uD328\uB97C \uBC84\uB9AC\uBA70
+    \uC6C3\uACE0, \uD328\uBC30 \uD6C4\uC5D0\uB3C4 \u201C\uC774\uBC88\uC5D4 \uD750\uB984\uC774
+    \uB2EC\uB790\uB124\u201D\uB77C\uBA70 \uBBF8\uC18C \uC9D3\uB294\uB2E4. \uB3D9\uB9F9\uC744
+    \uB9FA\uB354\uB77C\uB3C4 \uADF8\uAC83\uC740 \uC21C\uAC04\uC758 \uC720\uB300\uC77C
+    \uBFD0, \uACC4\uC0B0\uC774 \uC544\uB2C8\uB2E4. \uADF8\uB140\uC758 Condition\uC740
+    \uADF9\uB2E8\uC801\uC73C\uB85C \uC694\uB3D9\uCE5C\uB2E4. \uADF8\uB7EC\uB098,
+    \uC774 \uBD88\uC548\uC815\uD568\uC774 \uADF8\uB140\uC758 \uC0DD\uBA85\uB825\uC774\uB2E4.
+    \uC5B8\uC81C\uB098 \uC0C8\uB85C\uC6B4 \uBCC0\uC218\uB97C \uB9CC\uB4E4\uC5B4\uB0B4\uB294
+    \uC790\uC720\uB85C\uC6B4 \uD3ED\uD48D. \uC774\uC218\uC9C4\uACFC \uB300\uACB0\uD558\uB294
+    \uAC83\uC740 \uC0C1\uB300\uC758 \uC2E4\uB825\uC774 \uC544\uB2CC \u2018\uC6B4\uBA85\u2019\uACFC
+    \uC2F8\uC6B0\uB294 \uAC83\uC774\uB2E4."
+  threatLevel: 2
+  stats:
+    Lethality: 96
+    Survivability: 35
+    Calculation: 40
+    Adaptability: 50
+    Insight: 50
+    Unpredictability: 98
+  personality: 2
+  elo: 1434.7498286378416
   records:
   - verseAgent: 1
-    matchCount: 200
-    winCount: 109
-    loseCount: 86
-    drawCount: 5
+    matchCount: 10200
+    winCount: 6454
+    loseCount: 3579
+    drawCount: 167
   - verseAgent: 5
-    matchCount: 100
-    winCount: 47
-    loseCount: 51
-    drawCount: 2
-  elo: 1562.9986198135805
-  personality: 2
+    matchCount: 10100
+    winCount: 3580
+    loseCount: 6319
+    drawCount: 201
+  - verseAgent: 10
+    matchCount: 10000
+    winCount: 6996
+    loseCount: 2880
+    drawCount: 124
+  - verseAgent: 13
+    matchCount: 10000
+    winCount: 3479
+    loseCount: 6322
+    drawCount: 199
+  - verseAgent: 7
+    matchCount: 10000
+    winCount: 4058
+    loseCount: 5708
+    drawCount: 234
+  - verseAgent: 8
+    matchCount: 10000
+    winCount: 5493
+    loseCount: 4328
+    drawCount: 179
+  - verseAgent: 6
+    matchCount: 10000
+    winCount: 3636
+    loseCount: 6163
+    drawCount: 201

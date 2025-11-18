@@ -539,4 +539,55 @@ public class AgentManager : SingletonBehaviour<AgentManager>
         return bestPrediction;
     }
     #endregion
+
+    #region 백무적 전용 (Omni-Computation)
+    /// <summary>
+    /// [백무적 전용] 상대방이 다음에 낼 카드의 '확률 분포'를 예측합니다.
+    /// 패턴이 있으면 패턴을 따르고, 없으면 과거 통계를 기반으로 추론합니다.
+    /// </summary>
+    public Dictionary<CardType, float> GetPredictedProbabilities(AgentList observer, AgentList target, RoundCtx ctx)
+    {
+        var probs = new Dictionary<CardType, float>();
+        foreach (CardType c in Enum.GetValues(typeof(CardType))) 
+            if(c != CardType.None) probs[c] = 0.05f; // 기본 확률 (약간의 불확실성)
+
+        string obsKey = observer.ToString();
+        string tarKey = target.ToString();
+
+        // 1. 패턴 기반 예측 (가장 강력한 단서)
+        if (runtimePatterns.ContainsKey(obsKey) && runtimePatterns[obsKey].ContainsKey(tarKey))
+        {
+            var knownList = runtimePatterns[obsKey][tarKey];
+            var recent = new List<CardType> { ctx.last3Opp, ctx.last2Opp, ctx.lastOpp };
+            
+            foreach (var patObj in knownList)
+            {
+                // 패턴 매칭 확인
+                bool match = true;
+                if (patObj.sequence.Count < 4) match = false;
+                else
+                {
+                    for (int i = 0; i < 3; i++)
+                        if (patObj.sequence[i] != recent[i]) { match = false; break; }
+                }
+
+                if (match)
+                {
+                    CardType next = patObj.sequence[3];
+                    if (probs.ContainsKey(next))
+                        probs[next] += (patObj.frequency * 5.0f); // 패턴 빈도에 높은 가중치 부여
+                }
+            }
+        }
+
+        // 2. 정규화 (확률의 합을 1.0으로 맞춤)
+        float total = probs.Values.Sum();
+        if (total > 0)
+        {
+            foreach (var key in probs.Keys.ToList()) probs[key] /= total;
+        }
+
+        return probs;
+    }
+    #endregion
 }
