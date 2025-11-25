@@ -28,7 +28,7 @@ MonoBehaviour:
     \uADF8\uB140\uB97C \uB3C5\uD2B9\uD55C \uC874\uC7AC\uB85C \uB9CC\uB4E0\uB2E4.
     \uC2F8\uC6C0\uC774 \uAE38\uC5B4\uC9C8\uC218\uB85D \uADF8\uB140\uB294 \uB354 \uCC3D\uC758\uC801\uC73C\uB85C
     \uBBF8\uCCD0\uAC04\uB2E4."
-  threatLevel: 5
+  threatLevel: 6
   stats:
     Lethality: 75
     Survivability: 65

@@ -11429,14 +11429,14 @@ RectTransform:
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 1692676300}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 420, y: -152.5}
-  m_SizeDelta: {x: 162.5, y: 225}
+  m_SizeDelta: {x: 195, y: 280}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &367918953
 MonoBehaviour:
@@ -28669,6 +28669,8 @@ MonoBehaviour:
   pollutionCount: 15
   interruptCount: 10
   reconCount: 6
+  curseCount: 4
+  sacrificeCount: 6
   startingHand: 3
   startLife: 40
   maxRounds: 25
@@ -28709,7 +28711,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 975876086}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: da2a57487a2e7ca42b873fa1e5fbcfd5, type: 3}
   m_Name: 
@@ -28732,19 +28734,25 @@ MonoBehaviour:
   agentDisasterDeltaText: {fileID: 2132608188}
   cardVisuals:
   - cardName: Cooperation
-    sprite: {fileID: 21300000, guid: 5bc06a3440b31344fb96c9fb92159173, type: 3}
+    sprite: {fileID: 21300000, guid: 61a41362117250f4f99d4f04967ee0f4, type: 3}
   - cardName: Doubt
-    sprite: {fileID: 21300000, guid: 2997a084460804345a15fe684a54e8f3, type: 3}
+    sprite: {fileID: 21300000, guid: f858078988a0da64faeccd4592949f4c, type: 3}
   - cardName: Betrayal
-    sprite: {fileID: 21300000, guid: 230591d19cb73f246930d7bc5e810ebb, type: 3}
+    sprite: {fileID: 21300000, guid: 6c2732d95d70e18448e3a91ab4470425, type: 3}
   - cardName: Chaos
-    sprite: {fileID: 21300000, guid: ddb07e4fbacbcd54fa57c5f15e48809b, type: 3}
+    sprite: {fileID: 21300000, guid: 082155df324b0cd408b50a648028db06, type: 3}
   - cardName: Pollution
-    sprite: {fileID: 21300000, guid: fd9d2de66abda304195248834687f74e, type: 3}
+    sprite: {fileID: 21300000, guid: e1e28c59febc5774d92fa3c105e5c479, type: 3}
   - cardName: Interrupt
-    sprite: {fileID: 21300000, guid: 7d7366702d95f26439b37d0b6eb835d8, type: 3}
+    sprite: {fileID: 21300000, guid: 059450da07f63494ea85cd3d084e6c9e, type: 3}
   - cardName: Recon
-    sprite: {fileID: 21300000, guid: 3fa2224f9895cc74ebb02d51dc83a00c, type: 3}
+    sprite: {fileID: 21300000, guid: 0aa6f40757819824698fd8dd3af93ca7, type: 3}
+  - cardName: Curse
+    sprite: {fileID: 21300000, guid: c38b0b77f1705a64fa1c201e8fe6f046, type: 3}
+  - cardName: Recycle
+    sprite: {fileID: 21300000, guid: dd4b16ba65e957449abc7518ba2ed66e, type: 3}
+  - cardName: Sacrifice
+    sprite: {fileID: 21300000, guid: 775741a9a00edd54d8a2242efe8e4ad3, type: 3}
   fallbackSprite: {fileID: 0}
   playerChosenImage: {fileID: 156396287}
   opponentChosenImage: {fileID: 316117109}
@@ -28787,8 +28795,8 @@ MonoBehaviour:
   p2WinText: {fileID: 2077601041}
   p2DrawText: {fileID: 19676391}
   p2LoseText: {fileID: 649983849}
-  p1Name: 1
-  p2Name: 10
+  p1Name: 10
+  p2Name: 11
   targetMatches: 10000
   delayBetweenMatches: 0
   autoStart: 1
@@ -28957,14 +28965,14 @@ RectTransform:
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 1692676300}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 700, y: -152.5}
-  m_SizeDelta: {x: 162.5, y: 225}
+  m_SizeDelta: {x: 195, y: 280}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &985083712
 MonoBehaviour:
@@ -55437,14 +55445,14 @@ RectTransform:
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 1692676300}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 140, y: -152.5}
-  m_SizeDelta: {x: 162.5, y: 225}
+  m_SizeDelta: {x: 195, y: 280}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1818754308
 MonoBehaviour:

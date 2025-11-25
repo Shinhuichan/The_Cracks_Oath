@@ -17,7 +17,8 @@ public struct PlayMode
 
 namespace GameCore
 {
-    public enum CardType { None = 0, Cooperation, Doubt, Betrayal, Chaos, Pollution, Interrupt, Recon }
+    // 1. Enum에 Sacrifice 추가
+    public enum CardType { None = 0, Cooperation, Doubt, Betrayal, Chaos, Pollution, Interrupt, Recon, Curse, Sacrifice }
 
     // ===== 라운드 컨텍스트 =====
     [Serializable]
@@ -102,7 +103,9 @@ namespace GameCore
             new Dictionary<CardType, int>
             {
                 {CardType.Cooperation,0},{CardType.Doubt,0},{CardType.Betrayal,0},
-                {CardType.Chaos,0},{CardType.Pollution,0},{CardType.Interrupt,0}
+                {CardType.Chaos,0},{CardType.Pollution,0},{CardType.Interrupt,0},
+                {CardType.Recon,0}, {CardType.Curse,0},
+                {CardType.Sacrifice, 0} // ▼ 추가
             };
 
         public bool HandHas(CardType t, int n = 1) => hand.Count(x => x == t) >= n;
@@ -132,7 +135,7 @@ namespace GameCore
 
         [Header("덱 구성")]
         public int cooperationCount = 20; 
-        public int doubtCount = 20, betrayalCount = 3, chaosCount = 7, pollutionCount = 10, interruptCount = 4, reconCount = 6;
+        public int doubtCount = 20, betrayalCount = 3, chaosCount = 7, pollutionCount = 10, interruptCount = 4, reconCount = 6, curseCount = 0, sacrificeCount = 0;
 
         [Header("게임 설정")]
         [ReadOnly] public int startingHand = 3;
@@ -158,9 +161,15 @@ namespace GameCore
             public bool repSelf, repOpp;
             public bool selfUseRound, oppUseRound;
             public bool reconSelf, reconOpp;
+            public bool curseSelf, curseOpp; // ▼ 추가: 저주 부여 여부
 
-            public Effect(int s, int o, bool rs=false, bool ro=false, bool sr=false, bool ornd=false, bool rSelf=false, bool rOpp=false)
-            { self = s; opp = o; repSelf = rs; repOpp = ro; selfUseRound = sr; oppUseRound = ornd; reconSelf = rSelf; reconOpp = rOpp; }
+            // 생성자 업데이트
+            public Effect(int s, int o, bool rs=false, bool ro=false, bool sr=false, bool ornd=false, bool rSelf=false, bool rOpp=false, bool cSelf=false, bool cOpp=false)
+            { 
+                self = s; opp = o; repSelf = rs; repOpp = ro; selfUseRound = sr; oppUseRound = ornd; 
+                reconSelf = rSelf; reconOpp = rOpp;
+                curseSelf = cSelf; curseOpp = cOpp; // ▼ 초기화
+            }
         }
         Dictionary<string, Effect> E;
 
@@ -174,6 +183,14 @@ namespace GameCore
 
         bool waitingChoice = false;
         GameCore.CardType pendingA, pendingB;
+
+        // ▼ 추가: 저주 지속 라운드 (0이면 저주 없음)
+        private int curseDurationP1 = 0;
+        private int curseDurationP2 = 0;
+
+        // ▼ 추가: Sacrifice 누적 제출 횟수 추적
+        private int sacrificePlayedP1 = 0;
+        private int sacrificePlayedP2 = 0;
 
         // 한파 제어 플래그
         bool coldWaveJustStartedP1, coldWaveJustStartedP2;   // 한파가 ‘시작한’ 그 라운드에서만 드로우 스킵
@@ -338,9 +355,22 @@ namespace GameCore
                 StormCheckedThisRound = true;
             }
 
-            // ▼ 최종 제출 카드 기록(스프라이트 표시용)
-            lastSubmittedP1 = a;
-            lastSubmittedP2 = b;
+            // ▼▼▼ [신규] Sacrifice 카운트 및 특수 승리 체크 ▼▼▼
+            if (a == CardType.Sacrifice) sacrificePlayedP1++;
+            if (b == CardType.Sacrifice) sacrificePlayedP2++;
+
+            // 4장 모으면 즉시 승리 (상대를 패배 처리)
+            // 동시 달성 시 무승부(둘 다 패배) 처리가 되도록 플래그 설정
+            bool p1Win = sacrificePlayedP1 >= 4;
+            bool p2Win = sacrificePlayedP2 >= 4;
+
+            if (p1Win) playerIILost = true;
+            if (p2Win) playerILost = true;
+
+            // 특수 승리가 발생했으면 여기서 라운드 종료 처리 가능
+            // 단, '일반 카드 효과 처리 단계'라고 하셨으므로 아래 데미지 계산은 수행하되,
+            // 이미 Lost 상태이므로 결과에 반영됩니다.
+            // ▲▲▲ [신규 구현 종료] ▲▲▲
 
             var ef = E[$"{a}-{b}"];
 
@@ -367,6 +397,10 @@ namespace GameCore
             playerILife  += dSelf;
             playerIILife += dOpp;
             
+            // ★ [수정] 카드 효과 직후 최대 체력 제한
+            playerILife  = Mathf.Min(playerILife, startLife);
+            playerIILife = Mathf.Min(playerIILife, startLife);
+            
             // ★ 카드 피해 누적 기록 추가
             lastCardDeltaP1 += (playerILife  - hpP_beforeCards);
             lastCardDeltaP2 += (playerIILife - hpA_beforeCards);
@@ -375,7 +409,12 @@ namespace GameCore
             if (ef.repOpp)  ReplaceHand(playerIIHands);
 
             // (C) 라운드 종료: 재해 → 라운드 피로 → 드로우
-            ApplyDisasterEndEffects(a, b);
+            // [중요] 이때 lastSubmittedP1/P2는 여전히 "이전 라운드"의 카드여야 합니다.
+            ApplyDisasterEndEffects(a, b); 
+
+            // [수정] 재해 판정이 끝난 '후'에 이번 라운드 카드로 갱신합니다.
+            lastSubmittedP1 = a;
+            lastSubmittedP2 = b;
             if (playerILost || playerIILost) return;
 
             int baseLoss = GetRoundEndLossByDisaster();
@@ -407,6 +446,28 @@ namespace GameCore
                 lastSeenByP1 = new List<CardType>(playerIIHands.Take(3));
             if (ef.reconOpp)
                 lastSeenByP2 = new List<CardType>(playerIHands.Take(3));
+
+            // ▼▼▼ [신규] Curse 효과 처리 (Recon 이후) ▼▼▼
+            // 1. 저주 부여 (이번 턴 상성에 따라)
+            // 상대가 방어(Doubt, Interrupt)가 아니어서 ef.curseOpp가 true라면, 상대에게 2라운드 저주 부여
+            if (ef.curseOpp) curseDurationP2 = 2; 
+            if (ef.curseSelf) curseDurationP1 = 2; // 상대가 나에게 저주를 걸었을 때
+
+            // 2. 저주 데미지 처리 (라운드 종료 시점)
+            // 지속 시간이 남아있으면 데미지 1 입히고 시간 감소
+            if (curseDurationP1 > 0)
+            {
+                playerILife = Mathf.Max(0, playerILife - 1);
+                lastCardDeltaP1 -= 1; // 카드에 의한 피해로 간주
+                curseDurationP1--;
+            }
+            if (curseDurationP2 > 0)
+            {
+                playerIILife = Mathf.Max(0, playerIILife - 1);
+                lastCardDeltaP2 -= 1;
+                curseDurationP2--;
+            }
+            // ▲▲▲ [신규 구현 종료] ▲▲▲
 
             // Peace: 라운드 총 변화량을 ±5로 캡(캡에 의한 보정은 재해 피해로 기록)
             if (currentDisaster == NaturalDisaster.Peace)
@@ -503,7 +564,8 @@ namespace GameCore
             var unseen = new Dictionary<CardType, int>
             {
                 {CardType.Cooperation,0},{CardType.Doubt,0},{CardType.Betrayal,0},
-                {CardType.Chaos,0},{CardType.Pollution,0},{CardType.Interrupt,0},{CardType.Recon,0}
+                {CardType.Chaos,0},{CardType.Pollution,0},{CardType.Interrupt,0},{CardType.Recon,0},
+                {CardType.Curse, 0}, {CardType.Sacrifice, 0} // ▼ 추가
             };
             void Acc(IEnumerable<CardType> src)
             {
@@ -530,6 +592,13 @@ namespace GameCore
             lastSeenByP2.Clear();
             roundCounter = 1;
 
+            // ▼ 추가: 저주 상태 초기화
+            curseDurationP1 = 0;
+            curseDurationP2 = 0;
+            // ▼ 추가: 카운트 초기화
+            sacrificePlayedP1 = 0;
+            sacrificePlayedP2 = 0;
+
             // 선택 모드 재적용 후 초기화
             ApplyModeIfAvailable();
 
@@ -541,6 +610,8 @@ namespace GameCore
             Add(publicDeck, CardType.Pollution, pollutionCount);
             Add(publicDeck, CardType.Interrupt, interruptCount);
             Add(publicDeck, CardType.Recon, reconCount);
+            Add(publicDeck, CardType.Curse, curseCount);
+            Add(publicDeck, CardType.Sacrifice, sacrificeCount); // ▼ 추가
 
             publicDeck.Shuffle();
             Draw(publicDeck, playerIHands, startingHand);  // fix
@@ -854,13 +925,24 @@ namespace GameCore
                 if (aAtk != bAtk) return aAtk ? 0 : 1;
             }
 
+            // Sacrifice 우선순위 로직:
+            // 이미 3장을 냈다면 마지막 1장은 무조건 1순위(승리 확정)
+            int mySacrificeCount = isP1 ? sacrificePlayedP1 : sacrificePlayedP2;
+            if (mySacrificeCount == 3)
+            {
+                if (a == CardType.Sacrifice) return 0;
+                if (b == CardType.Sacrifice) return 1;
+            }
+
             // 점수제 비교
             int Score(CardType t) => t switch
             {
                 CardType.Betrayal => 100,
+                CardType.Curse => 95,      // ▼ 추가: 꽤 높은 우선순위 부여
                 CardType.Doubt => 90,
                 CardType.Interrupt => 85,
                 CardType.Pollution => 80,
+                CardType.Sacrifice => 65,  // ▼ Cooperation보다 약간 높게 설정 (모으는 전략)
                 CardType.Cooperation => 60,
                 CardType.Recon => 50,
                 CardType.Chaos => 10,
@@ -1044,7 +1126,7 @@ namespace GameCore
         void BuildEffects_WithRecon()
         {
             E = new Dictionary<string, Effect>();
-            var C=CardType.Cooperation; var D=CardType.Doubt; var B=CardType.Betrayal; var X=CardType.Chaos; var P=CardType.Pollution; var I=CardType.Interrupt; var Rn=CardType.Recon;
+            var C=CardType.Cooperation; var D=CardType.Doubt; var B=CardType.Betrayal; var X=CardType.Chaos; var P=CardType.Pollution; var I=CardType.Interrupt; var Rn=CardType.Recon; var Cu=CardType.Curse; var S=CardType.Sacrifice; // 단축어
 
             E[$"{C}-{C}"]=new(+1,+1);
             E[$"{C}-{D}"]=new(+1,0);
@@ -1053,6 +1135,8 @@ namespace GameCore
             E[$"{C}-{P}"]=new(-1,+1);
             E[$"{C}-{I}"]=new(+1,-1);
             E[$"{C}-{Rn}"]=new(+1,0, false,false,false,false, false, true);
+            E[$"{C}-{Cu}"] = new(0, 0, cSelf: true);
+            E[$"{C}-{S}"] = new(+1, -1);
 
             E[$"{D}-{C}"]=new(0,+1);
             E[$"{D}-{D}"]=new(0,0);
@@ -1061,6 +1145,8 @@ namespace GameCore
             E[$"{D}-{P}"]=new(0,-1);
             E[$"{D}-{I}"]=new(-1,+1);
             E[$"{D}-{Rn}"]=new(0,0, false,false,false,false, false, true);
+            E[$"{D}-{Cu}"]=new(0, 0, cOpp: true);
+            E[$"{D}-{S}"] = new(0, -1);
 
             E[$"{B}-{C}"]=new(+1,-1, false,false, false,true);
             E[$"{B}-{D}"]=new(-1,+1, false,false, true,false);
@@ -1069,6 +1155,8 @@ namespace GameCore
             E[$"{B}-{P}"]=new(+1,-1, false,false, false,true);
             E[$"{B}-{I}"]=new(-1,+1);
             E[$"{B}-{Rn}"]=new(+1,-1, false,false, false,true);
+            E[$"{B}-{Cu}"]=new(+1, -1, false, false, false, true, cSelf: true);
+            E[$"{B}-{S}"]=new(+1,-2, false,false, false,true);
 
             E[$"{X}-{C}"]=new(0,+1,  true,false);
             E[$"{X}-{D}"]=new(0,0,   true,false);
@@ -1076,15 +1164,19 @@ namespace GameCore
             E[$"{X}-{X}"]=new(0,0,   true,true);
             E[$"{X}-{P}"]=new(-1,0,  true,false);
             E[$"{X}-{I}"]=new(0,-1,  true,false);
-            E[$"{X}-{Rn}"]=new(0,0,  true,false, false,false, false, true);
+            E[$"{X}-{Rn}"]=new(0,0,  true, false, false, false, false, true);
+            E[$"{X}-{Cu}"] = new(0, 0, true, false, cSelf: true);
+            E[$"{X}-{S}"] = new(0, -1, true,false);
 
             E[$"{P}-{C}"]=new(+1,-1);
             E[$"{P}-{D}"]=new(-1,0);
-            E[$"{P}-{B}"]=new(-1,+1, false,false, true,false);
-            E[$"{P}-{X}"]=new(0,-1,  false,true);
+            E[$"{P}-{B}"]=new(-1,+1, false, false, true,false);
+            E[$"{P}-{X}"]=new(0,-1,  false, true);
             E[$"{P}-{P}"]=new(-1,-1);
             E[$"{P}-{I}"]=new(-1,+1);
-            E[$"{P}-{Rn}"]=new(0,-1, false,false,false,false, false, true);
+            E[$"{P}-{Rn}"]=new(0,-1, false, false, false, false, false, true);
+            E[$"{P}-{Cu}"] = new(0, -1, cSelf: true);
+            E[$"{P}-{S}"] = new(-1, -2);
 
             E[$"{I}-{C}"]=new(-1,+1);
             E[$"{I}-{D}"]=new(+1,-1);
@@ -1093,6 +1185,8 @@ namespace GameCore
             E[$"{I}-{P}"]=new(+1,-1);
             E[$"{I}-{I}"]=new(0,0);
             E[$"{I}-{Rn}"]=new(-1,0);
+            E[$"{I}-{Cu}"] = new(+1, -1, cSelf: false);
+            E[$"{I}-{S}"] = new(+1, -2);
 
             E[$"{Rn}-{C}"]=new(0,+1,  false,false,false,false, true,false);
             E[$"{Rn}-{D}"]=new(0,0,   false,false,false,false, true,false);
@@ -1101,6 +1195,29 @@ namespace GameCore
             E[$"{Rn}-{P}"]=new(-1,0,  false,false,false,false,  true,false);
             E[$"{Rn}-{I}"]=new(0,-1,  false,false,false,false,  true,false);
             E[$"{Rn}-{Rn}"]=new(0,0,  false,false,false,false,  true,true);
-        }
+            E[$"{Rn}-{Cu}"] = new(0, 0, false,false,false,false, true,false, cSelf: true);
+            E[$"{Rn}-{S}"] = new(0, -1, false,false,false,false, true,false);
+
+            E[$"{Cu}-{C}"] = new(+1, +1, cOpp: true);
+            E[$"{Cu}-{D}"] = new(0, 0, cSelf: true);
+            E[$"{Cu}-{B}"] = new(-1, +1, false, false, true, false, cOpp: true);
+            E[$"{Cu}-{X}"] = new(0, 0, false, true, cOpp: true);
+            E[$"{Cu}-{P}"] = new(-1, 0, cOpp: true);
+            E[$"{Cu}-{I}"] = new(-1, +1);
+            E[$"{Cu}-{Rn}"] = new(0, 0, false, false, false, false, false, true, cOpp: true);
+            E[$"{Cu}-{Cu}"] = new(0, 0, cSelf: true, cOpp: true);
+            E[$"{Cu}-{S}"] = new(0, -1, cOpp: true);
+
+            E[$"{S}-{C}"] = new(-1, +1);
+            E[$"{S}-{D}"] = new(-1, 0);
+            E[$"{S}-{B}"] = new(-2, +1, false, false, true, false);
+            E[$"{S}-{X}"] = new(-1, 0, false, true);
+            E[$"{S}-{P}"] = new(-2, -1);
+            E[$"{S}-{I}"] = new(-1, +1);
+            E[$"{S}-{Rn}"] = new(-1, 0, false, false, false, false, false, true);
+            E[$"{S}-{Cu}"] = new(0, -1, cSelf: true);
+            E[$"{S}-{S}"] = new(-1, -1);
+
+        } 
     }
 }
