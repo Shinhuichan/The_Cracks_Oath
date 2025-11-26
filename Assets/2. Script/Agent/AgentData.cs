@@ -8,7 +8,7 @@ public enum Personality
     Static, Pragmatic, Aggressive, Defensive, Specialist, Erratic, Emotional
 }
 
-public enum ThreatLevel {재앙, 무지, 미숙, 준수, 유능, 압도, 최강}
+public enum ThreatLevel {Prey, Unstable, Gamblers, Challengers, Masters, Grandmasters, Absolute}
 
 [System.Serializable]
 public struct AgentStats

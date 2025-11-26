@@ -57,179 +57,162 @@ namespace GameCore
             return A;
         }
         
-        // 김현수v3 — 신중·분석형 (Curse/Sacrifice 대응 추가)
+        // Kim Hyun-su v4 — The Shield: Prudent Analyst (Data-driven Defense & Late-game Investment Monopoly)
         static Agent Build_김현수(AgentList id)
         {
             var A = new Agent("김현수", id);
 
-            // --- 라운드 카드 선택 ---
             A.rules.Add(I =>
             {
                 var weights = AgentManager.I.GetWeights(I.selfID);
                 int R = Math.Max(1, I.s.round);
                 bool nf = !I.s.IsFirst;
-                var history = I.HistoryOpponent(); // 상대방 기록 조회
+                var history = I.HistoryOpponent(); 
 
-                // 상대의 성향 데이터 분석 (Cooperation 비율 등)
-                float oppCoopRatio = I.Ratio(CardType.Cooperation);
-                float oppReconRatio = I.Ratio(CardType.Recon);
+                // [Data Analysis]
+                float oppBetrayalProb = I.Ratio(CardType.Betrayal);
+                float oppCurseProb = I.Ratio(CardType.Curse);
+                bool isOpponentAggressive = (oppBetrayalProb + oppCurseProb) > 0.35f;
                 
-                // [신규] 상대의 Sacrifice 전략 감지
-                // 상대가 이미 Sacrifice를 3장 이상 냈다면, 4장째에 즉시 패배하므로
-                // 방어고 뭐고 무조건 상대를 죽여야 함 (최우선 순위)
-                int oppSacrificeCount = history.Count(x => x == CardType.Sacrifice);
-                if (oppSacrificeCount >= 3)
+                // [The Shield] Crisis Detection System
+                // Activate defense if health is critical (<= 3) or attack probability is high
+                bool isEmergency = I.s.selfLife <= 3;
+                bool expectAttack = isOpponentAggressive || (nf && (I.s.lastOpp == CardType.Betrayal || I.s.lastOpp == CardType.Curse));
+
+                // 1. [Survival First] Ironclad Defense
+                // "Defeat comes from a single mistake." -> Eliminate risk completely
+                if (isEmergency || expectAttack)
                 {
-                    // 킬각을 낼 수 있다면 배신
-                    if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;
-                    // 차선책 오염
-                    if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
+                    if (I.HandHas(CardType.Doubt)) return CardType.Doubt;       // Guaranteed defense
+                    if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt; // Break the flow
                 }
 
-                // 0) 생존 우선 (가중치 무시)
-                // Curse는 방어하지 않으면 2뎀 누적되므로, 체력이 낮을 땐 Doubt 가치 상승
-                bool highBetrayal = I.Ratio(CardType.Betrayal) >= 0.28f || (nf && I.s.lastOpp == CardType.Betrayal);
-                bool highCurse = I.Ratio(CardType.Curse) >= 0.20f; // 저주 위험도
-                
-                // 상대가 저주나 배신을 쓸 것 같고 내 피가 간당간당하면 방어
-                if (I.s.selfLife <= R + 2 && (highBetrayal || highCurse))
-                {
-                    if (I.HandHas(CardType.Doubt)) return CardType.Doubt;
-                }
-
-                // 1) [신규] Curse 활용: 냉소적 효율성
-                // 상대가 협력(Coop)하거나 정찰(Recon)하려 할 때 저주를 걸면 확정 이득
-                // (Coop 상대로는 +1점 먹고 상대는 저주걸림 / Recon 상대로는 정보 주고 저주검)
-                if (I.HandHas(CardType.Curse))
-                {
-                    // 상대가 협력/정찰 위주거나, 방어(Doubt/Interrupt) 비율이 낮을 때
-                    bool opponentIsSoft = (oppCoopRatio + oppReconRatio) > 0.4f;
-                    bool opponentLowDef = I.Ratio(CardType.Doubt) < 0.25f && I.Ratio(CardType.Interrupt) < 0.15f;
-
-                    if (opponentIsSoft && opponentLowDef)
-                        return CardType.Curse;
-                }
-
-                // 2) 직전 반복 패턴 카운터 (데이터 기반)
-                if (nf && I.s.lastOpp == I.s.last2Opp && I.s.lastOpp != CardType.None)
-                {
-                    var x = I.s.lastOpp;
-                    // 상대가 Sacrifice를 연속으로 낸다면? -> 미친 짓이므로 배신으로 응징
-                    if (x == CardType.Sacrifice && I.HandHas(CardType.Betrayal)) return CardType.Betrayal;
-                    
-                    if (x == CardType.Cooperation)
-                    {
-                        // 협력엔 저주가 특효약 (김현수 스타일)
-                        if (I.HandHas(CardType.Curse)) return CardType.Curse;
-                        if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
-                    }
-                    if (x == CardType.Pollution && I.HandHas(CardType.Doubt)) return CardType.Doubt;
-                }
-
-                // 3) Recon 활용 (정보 우위)
+                // 2. [Data Collection] Utilize Recon
+                // "Information superiority is survival." -> Scout early or when situation is unclear
                 if (I.HandHas(CardType.Recon))
                 {
-                    // 생명력 여유가 있고, 아직 상대 덱 파악이 덜 됐으면(초반)
-                    bool safe = I.s.selfLife >= I.s.oppLife;
-                    if (R >= 1 && R <= 5 && safe) return CardType.Recon;
+                    // Scout if opponent's hand is largely unknown or next move is uncertain
+                    if (R <= 4 || I.unseenTotal > 15) 
+                        return CardType.Recon;
                 }
 
-                // 4) 장기 압박 (Pollution / Curse)
-                // Curse가 있다면 Pollution보다 우선순위를 높게 둠 (데미지 기대값 2 vs 1)
-                if (I.HandHas(CardType.Curse) && I.Ratio(CardType.Doubt) <= 0.30f)
-                    return CardType.Curse;
-                
-                if (I.HandHas(CardType.Pollution) &&
-                    (I.Ratio(CardType.Cooperation) >= 0.33f) &&
-                    I.Ratio(CardType.Doubt) <= 0.30f)
-                    return CardType.Pollution;
+                // 3. [NEW] Utilize Investment: "Yield Calculation Complete."
+                // Kim Hyun-su views early uncertain investments as 'gambling' and avoids them.
+                // However, as the game progresses (R >= 5) and stacks build, he classifies it as a 'Guaranteed Asset' and retrieves it.
+                if (I.HandHas(CardType.Investment))
+                {
+                    // Invest if it's late game (Round 5+) and not an immediate emergency
+                    if (R >= 5 && !isEmergency)
+                    {
+                        // Realize investment profit safely if opponent is likely defensive (not attacking)
+                        if (I.Ratio(CardType.Doubt) > 0.3f || I.Ratio(CardType.Cooperation) > 0.3f)
+                            return CardType.Investment;
+                    }
+                }
 
-                // 5) 확실한 킬각만 배신
-                if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R && I.Ratio(CardType.Doubt) < 0.33f)
-                    return CardType.Betrayal;
+                // 4. [Cynical Check] Curse / Pollution
+                // "Emotionless attrition." Dry them out when opponent is in turtle mode
+                if (!isEmergency && !expectAttack)
+                {
+                    // Use Curse for DoT if opponent is defensive
+                    if (I.HandHas(CardType.Curse) && I.Ratio(CardType.Doubt) > 0.25f)
+                        return CardType.Curse;
+                    
+                    // Use Pollution to induce resource consumption
+                    if (I.HandHas(CardType.Pollution))
+                        return CardType.Pollution;
+                }
 
-                // 6) [신규] Sacrifice 처리
-                // 김현수는 Sacrifice를 '실수'로 간주하므로 거의 내지 않음.
-                // 하지만 손패가 막혔을 때(Chaos도 없고 등등) 어쩔 수 없이 낼 수는 있음.
-                // (별도 로직 없이 Score에서 최하점 처리)
+                // 5. [Lethal Calculation] Perfect Calculation
+                // Be bold only when opponent is gathering Sacrifice or can be finished with an attack
+                int oppSacCount = history.Count(x => x == CardType.Sacrifice);
+                if (oppSacCount >= 3 || (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R))
+                {
+                    if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;
+                }
 
-                // 7) 기본 선호도 (Score)
+                // 6. Calculate Weighted Score (Safe Access Applied)
                 float Score(CardType c)
                 {
                     float baseScore = c switch {
-                        CardType.Curse => 11,      // [상향] 성공시 고효율
-                        CardType.Cooperation => 10,
-                        CardType.Doubt => 9,
-                        CardType.Recon => 8,       // 정보 중시
-                        CardType.Pollution => 7,
-                        CardType.Interrupt => 6,
-                        CardType.Betrayal => 5,
-                        CardType.Chaos => 4,
-                        CardType.Sacrifice => -5,  // [기피] 리스크 극혐
+                        CardType.Doubt => 12,       // [Core] The Shield: Defense First
+                        CardType.Recon => 10,       // [Core] Value Information
+                        CardType.Interrupt => 9,    // Block Variables
+                        CardType.Investment => (R >= 5) ? 11 : 2, // [NEW] Tier 1 in late game, trash in early game
+                        CardType.Curse => 8,        // Cynical Attack
+                        CardType.Cooperation => 7,  // Calculated Cooperation
+                        CardType.Pollution => 6,
+                        CardType.Betrayal => 5,     // Risky attacks are not preferred
+                        CardType.Chaos => -10,      // [Trait] Hates unpredictable Chaos
+                        CardType.Sacrifice => -20,  // [Trait] Self-harm is considered a 'mistake'
                         _ => 0
                     };
-                    return baseScore * (weights.ContainsKey(c) ? weights[c] : 1f);
+                    // ★ [FIX] Safe dictionary access (Prevent KeyNotFound)
+                    return baseScore * (weights.ContainsKey(c) ? weights[c] : 1.0f);
                 }
                 
                 return I.hand.Distinct().Where(I.HandHas).OrderByDescending(Score).FirstOrDefault();
             });
 
-            // Fallback 우선순위
             A.fallback = new[] {
-                CardType.Curse, CardType.Cooperation, CardType.Doubt, CardType.Recon,
-                CardType.Pollution, CardType.Interrupt, CardType.Betrayal, CardType.Chaos, CardType.Sacrifice
+                CardType.Doubt, CardType.Recon, CardType.Interrupt, // Defense/Info Line
+                CardType.Investment, // Use if situation fits
+                CardType.Curse, CardType.Cooperation, 
+                CardType.Pollution, CardType.Betrayal, 
+                CardType.Chaos, CardType.Sacrifice
             };
 
-            // --- 선택 드로우 (Draft) ---
+            // --- Selective Draw (Draft) ---
             A.chooseFromTwo = (a, b, I) =>
             {
                 var weights = AgentManager.I.GetWeights(I.selfID);
                 int R = Math.Max(1, I.s.round);
 
-                // [신규] Sacrifice 기피: 김현수는 절대 Sacrifice를 집지 않는다.
-                // (단, Chaos 등 변수 창출이 필요할 땐 예외일 수 있으나 기본적으로 배제)
-                if (a == CardType.Sacrifice && b != CardType.Sacrifice) return 1; // a 거르고 b 선택
-                if (b == CardType.Sacrifice && a != CardType.Sacrifice) return 0; // b 거르고 a 선택
+                // [NEW] Investment: Never pick early (hand waste), value skyrockets after Round 6
+                bool highYield = R >= 6;
 
-                // [신규] Curse 선호: 효율적인 공격 수단으로 확보
-                bool preferCurse = I.Ratio(CardType.Cooperation) > 0.3f; // 상대가 순진해 보이면 저주 확보
+                // [Existing] Sacrifice: Never pick
+                if (a == CardType.Sacrifice && b != CardType.Sacrifice) return 1; 
+                if (b == CardType.Sacrifice && a != CardType.Sacrifice) return 0; 
 
                 float Score(CardType t)
                 {
                     float baseScore = t switch
                     {
-                        CardType.Curse       => preferCurse ? 105 : 88, // [신규] 상황따라 매우 높음
-                        CardType.Cooperation => 100,
-                        CardType.Doubt       => 92,
-                        CardType.Recon       => 86,  // 정보 수집
-                        CardType.Pollution   => 78,
-                        CardType.Interrupt   => 66,
-                        CardType.Betrayal    => 58,
-                        CardType.Sacrifice   => -99, // [신규] 절대 안 뽑음
+                        CardType.Doubt       => 120, // Always welcome defense cards
+                        CardType.Recon       => 110, // The more info, the better
+                        CardType.Investment  => highYield ? 115 : 10, // [NEW] Thorough valuation by timing
+                        CardType.Interrupt   => 100,
+                        CardType.Curse       => 90,
+                        CardType.Cooperation => 80,
+                        CardType.Pollution   => 70,
+                        CardType.Betrayal    => 60,
+                        CardType.Chaos       => -50, // Hate unpredictability
+                        CardType.Sacrifice   => -100,
                         _ => 0
                     };
-                    // FIX: Safe dictionary access
+                    // ★ [FIX] Safe dictionary access
                     return baseScore * (weights.ContainsKey(t) ? weights[t] : 1.0f);
                 }
 
-                // ... (기존 동점 처리 로직 유지) ...
                 float sa = Score(a), sb = Score(b);
+                
+                // If scores are similar, pick the 'safer' card (lower index = defensive card)
                 if (Math.Abs(sa - sb) < 0.1f)
                 {
-                    int Rank(CardType t) => t switch {
-                        CardType.Curse => 8, // [추가]
-                        CardType.Betrayal => 7, CardType.Pollution => 6, CardType.Doubt => 5,
-                        CardType.Interrupt => 4, CardType.Cooperation => 3, CardType.Recon => 2, _ => 1
+                    int SafetyRank(CardType t) => t switch { 
+                        CardType.Doubt => 10, CardType.Recon => 9, CardType.Interrupt => 8, _ => 0 
                     };
-                    return Rank(a) >= Rank(b) ? 0 : 1;
+                    return SafetyRank(a) >= SafetyRank(b) ? 0 : 1;
                 }
+
                 return sa > sb ? 0 : 1;
             };
 
             return A;
         }
 
-        // 이수진V2 — 모험가·즉흥형 (Sacrifice 올인 / Curse 변수 창출)
+        // Lee Su-jin v3 — High Roller: Adventurous Improviser (Jackpot Seeking & Variable Creation)
         static Agent Build_이수진(AgentList id)
         {
             var A = new Agent("이수진", id);
@@ -240,159 +223,138 @@ namespace GameCore
                 int R = Math.Max(1, I.s.round);
                 bool nf = !I.s.IsFirst;
 
-                // 상대 분포(라플라스 + 최근 반복 가중)
-                var p = new Dictionary<CardType, float>()
-                {
-                    {CardType.Cooperation, 0.06f + I.Ratio(CardType.Cooperation)},
-                    {CardType.Doubt,       0.06f + I.Ratio(CardType.Doubt)},
-                    {CardType.Betrayal,    0.06f + I.Ratio(CardType.Betrayal)},
-                    {CardType.Chaos,       0.06f + I.Ratio(CardType.Chaos)},
-                    {CardType.Pollution,   0.06f + I.Ratio(CardType.Pollution)},
-                    {CardType.Interrupt,   0.06f + I.Ratio(CardType.Interrupt)},
-                    {CardType.Recon,       0.06f + I.Ratio(CardType.Recon)},
-                    {CardType.Curse,       0.06f + I.Ratio(CardType.Curse)},     // 추가
-                    {CardType.Sacrifice,   0.06f + I.Ratio(CardType.Sacrifice)}  // 추가
-                };
-                if (nf && I.s.lastOpp != CardType.None && I.s.lastOpp == I.s.last2Opp)
-                    p[I.s.lastOpp] *= 1.35f; // 패턴 집착 읽고 베팅
+                // [High Roller] Situation Analysis
+                // She values 'gut feeling' and 'flow' over calculation.
+                bool feelingLucky = UnityEngine.Random.value < 0.4f; // 40% chance to just feel lucky
+                bool losing = I.s.selfLife < I.s.oppLife; // Becomes bolder when losing
                 
-                float S = p.Values.Sum(); foreach (var k in p.Keys.ToList()) p[k] /= S;
-
-                // [신규] Sacrifice "운명론" 로직
-                // 내가 낸 Sacrifice 수 추정 (총 4장 - 미발견 - 내 손패)
-                // *주의: 덱 구성에 따라 총량이 다를 수 있으나, 표준 4장 기준으로 계산
-                int mySacrificeInDeck = 4; 
+                // [Existing] Sacrifice "Fatalism"
+                // "I'll end this now." If she has 3 Sacrifices (estimated), she throws it without hesitation.
                 int unseenSac = I.unseen.TryGetValue(CardType.Sacrifice, out int v) ? v : 0;
                 int handSac = I.hand.Count(c => c == CardType.Sacrifice);
-                int myPlayedSacrifice = Math.Max(0, mySacrificeInDeck - unseenSac - handSac);
+                int myPlayedSacrifice = Math.Max(0, 4 - unseenSac - handSac); // (Simplified estimation)
 
-                // 1) "이것이 나의 피날레다!" (3장 냈으면 4장째는 무조건 제출)
                 if (myPlayedSacrifice >= 3 && I.HandHas(CardType.Sacrifice))
                     return CardType.Sacrifice;
 
-                // 2) "리스크는 재미의 연료" (Sacrifice가 있으면 체력이 2 이상일 때 과감히 지름)
-                if (I.HandHas(CardType.Sacrifice) && I.s.selfLife > 1)
+                // 3. [NEW] Utilize Investment: "Let's raise the stakes?"
+                // To her, investment isn't preparation for the future, it's a 'bet' on the present.
+                // Uses it when she has plenty of health (>= 6) OR when she's desperate (<= 2) and needs a "big hit".
+                if (I.HandHas(CardType.Investment))
                 {
-                    // 상대가 공격(Betrayal)할 확률이 매우 높을 때만 잠깐 참음 (즉사 방지)
-                    if (p[CardType.Betrayal] < 0.4f || I.s.selfLife > 2)
-                        return CardType.Sacrifice;
+                    bool rich = I.s.selfLife >= 6;
+                    bool desperate = I.s.selfLife <= 2;
+                    
+                    // Throw it for fun when rich, or aiming for a jackpot when desperate
+                    if (rich || desperate) return CardType.Investment;
                 }
 
-                // 3) 하이리스크 트리거: 내가 뒤지거나 손패가 빈약하면 변동성↑
-                bool losing = I.s.selfLife < I.s.oppLife;
-                bool poorAtk = !I.HandHas(CardType.Betrayal) && !I.HandHas(CardType.Pollution);
-
-                // 4) [신규] 상대가 Sacrifice를 모으는 것 같다? -> "누가 더 빠른지 해보자!" (맞공격)
-                // 상대가 최근 Sacrifice를 냈다면 방어 대신 Betrayal/Curse로 응수
-                if (nf && I.s.lastOpp == CardType.Sacrifice)
+                // [Aggressive Instinct]
+                // "Defense? What's that?" If she has an attack card, she likely uses it.
+                if (I.HandHas(CardType.Betrayal))
                 {
-                    if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;
-                    if (I.HandHas(CardType.Curse)) return CardType.Curse; // 저주로 말려 죽이기
+                    // Uses it if lethal or just feeling lucky
+                    if (I.s.oppLife <= R || feelingLucky) return CardType.Betrayal;
                 }
 
-                // 5) [신규] Curse: 지루한 흐름(Coop/Doubt)을 끊는 양념
-                if (I.HandHas(CardType.Curse))
+                // [Variable Creation] Chaos
+                // "Flip the table!" Reset if losing or hand is bad.
+                if (I.HandHas(CardType.Chaos))
                 {
-                    // 상대가 협력하거나 간만 보고 있을 때 저주 투척
-                    if (p[CardType.Cooperation] + p[CardType.Doubt] > 0.5f)
-                        return CardType.Curse;
+                    bool badHand = !I.HandHas(CardType.Betrayal) && !I.HandHas(CardType.Sacrifice);
+                    if (losing || badHand) return CardType.Chaos;
                 }
 
-                // 6) 즉사 회피 (최소한의 본능)
-                if (I.HandHas(CardType.Doubt) && I.s.selfLife <= R - 1 && p[CardType.Betrayal] >= 0.30f)
-                    return CardType.Doubt;
-
-                // 7) 킬각 혹은 초반 러시는 과감히 배신
-                if (I.HandHas(CardType.Betrayal) && (R <= 2 || I.s.oppLife <= R))
-                    if (p[CardType.Doubt] < 0.36f) return CardType.Betrayal;
-
-                // 8) 손패 리셋(가챠): 공격수단 없거나 지는 중이면 과감히
-                int atkCnt = (I.HandHas(CardType.Betrayal) ? 1 : 0) + (I.HandHas(CardType.Pollution) ? 1 : 0);
-                if (I.HandHas(CardType.Chaos) && (poorAtk || losing || (nf && I.s.lastOpp == I.s.last2Opp)))
-                    return CardType.Chaos;
-
-                // 9) 하이롤 우선 가중치 점수
+                // Calculate Weighted Score (Safe Access Applied)
                 float Score(CardType c)
                 {
                     float baseScore = c switch {
-                        CardType.Sacrifice => 12, // [신규] 최우선: 낭만 그 자체
-                        CardType.Betrayal => 8,   // 터지면 이득 최대
-                        CardType.Curse => 7.5f,   // [신규] 변수 창출 재미
-                        CardType.Pollution => 6,  // 꾸준 압박
-                        CardType.Chaos => 5,      // 가챠
-                        CardType.Interrupt => 4,  // 틈새 역전
-                        CardType.Cooperation => 3,// 숨 고르기
-                        CardType.Doubt => 1,      // 노잼 방어 (점수 하향)
-                        CardType.Recon => 0.5f,   // 계산 싫어함
+                        CardType.Sacrifice => 15,   // [Core] Loves High Risk High Return
+                        CardType.Betrayal => 12,    // [Trait] Aggressive
+                        CardType.Chaos => 10,       // [Trait] Creates variables
+                        CardType.Curse => 8,        // Fun to torment
+                        CardType.Pollution => 7,
+                        CardType.Interrupt => 6,    // Uses if she feels like it
+                        CardType.Investment => 5,   // [NEW] Boring too
+                        CardType.Cooperation => 3,  // Boring
+                        CardType.Recon => 1,        // Hates calculation
+                        CardType.Doubt => -5,       // [Trait] No shields in a man's fight (Avoids)
                         _ => 0
                     };
-                    // FIX: Safe dictionary access
+
+                    // [High Roller] Score boost for Sacrifice/Chaos when losing
+                    if (losing)
+                    {
+                        if (c == CardType.Sacrifice) baseScore += 10;
+                        if (c == CardType.Chaos) baseScore += 5;
+                    }
+
+                    // ★ [FIX] Safe dictionary access
                     return baseScore * (weights.ContainsKey(c) ? weights[c] : 1.0f);
                 }
                 return I.hand.Distinct().Where(I.HandHas).OrderByDescending(Score).FirstOrDefault();
             });
 
             A.fallback = new[] {
-                CardType.Sacrifice, CardType.Betrayal, CardType.Curse, 
-                CardType.Pollution, CardType.Chaos, CardType.Interrupt, 
-                CardType.Cooperation, CardType.Doubt, CardType.Recon
+                CardType.Sacrifice, CardType.Betrayal, CardType.Chaos, // Adventure Line
+                CardType.Curse, 
+                CardType.Pollution, CardType.Interrupt, CardType.Investment, 
+                CardType.Cooperation, CardType.Recon, CardType.Doubt
             };
             
-            // 이수진 - 선택 드로우(하이리스크/하이리턴 + 희생 탐닉)
+            // --- Selective Draw (Draft) ---
             A.chooseFromTwo = (a, b, I) =>
             {
                 var weights = AgentManager.I.GetWeights(I.selfID);
                 int R = Math.Max(1, I.s.round);
-
-                // [신규] Sacrifice 집착: "운명이야, 집어!"
-                // 손에 이미 Sacrifice가 있다면 더더욱 집으려 함 (세트 완성 욕구)
-                bool hasSac = I.HandHas(CardType.Sacrifice);
-                if (a == CardType.Sacrifice && b != CardType.Sacrifice) return 0; // a 선택
-                if (b == CardType.Sacrifice && a != CardType.Sacrifice) return 1; // b 선택
-                
-                // ... (기존 변수들) ...
                 bool losing = I.s.selfLife < I.s.oppLife;
-                bool lethal = I.s.oppLife <= R;
+
+                // [NEW] Investment: "Bury it for later."
+                // Shows interest if seen in the deck.
                 
-                float Score(CardType c)
+                // [Existing] Sacrifice: "This is MY card!"
+                // Tries to pick it up if she already has one (Desire to complete set)
+                bool hasSac = I.HandHas(CardType.Sacrifice);
+                if (a == CardType.Sacrifice && b != CardType.Sacrifice) return hasSac ? 0 : (UnityEngine.Random.value < 0.6f ? 0 : 1); 
+                if (b == CardType.Sacrifice && a != CardType.Sacrifice) return hasSac ? 1 : (UnityEngine.Random.value < 0.6f ? 1 : 0);
+
+                float Score(CardType t)
                 {
-                    float s = 0f;
-                    // [신규] Sacrifice 점수: 매우 높음 (15점)
-                    if (c == CardType.Sacrifice) s += 15.0f + (hasSac ? 5.0f : 0f);
-
-                    // [신규] Curse 점수: 공격적 변수로 선호 (Betrayal 다음급)
-                    if (c == CardType.Curse) s += 3.0f + (losing ? 1.5f : 0f);
-
-                    if (c == CardType.Betrayal)  s += (R <= 2 ? 3.5f : 2.0f) + (lethal ? 5.0f : 0f);
-                    if (c == CardType.Pollution) s += 2.2f;
-                    if (c == CardType.Chaos)     s += (losing ? 3.0f : 1.0f); // 지고 있을 때 Chaos 선호도 상승
-                    if (c == CardType.Interrupt) s += 1.5f;
-                    if (c == CardType.Doubt)     s += 0.5f; // 방어 카드는 매력 없음
-                    if (c == CardType.Cooperation) s += 0.5f;
-                    if (c == CardType.Recon)     s -= 1.0f; // 정찰은 지루함
+                    float baseScore = t switch
+                    {
+                        CardType.Sacrifice   => 120, // Obsession level
+                        CardType.Betrayal    => 100, // Attack
+                        CardType.Chaos       => 95,  // Chaos
+                        CardType.Curse       => 80,
+                        CardType.Pollution   => 70,
+                        CardType.Interrupt   => 60,
+                        CardType.Investment  => 50,  // [NEW] Moderate interest
+                        CardType.Cooperation => 40,
+                        CardType.Recon       => 20,
+                        CardType.Doubt       => 10,  // Rarely picks defense
+                        _ => 0
+                    };
                     
-                    // FIX: Safe dictionary access
-                    return s * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+                    // Prefer reversal cards if losing
+                    if (losing && (t == CardType.Sacrifice || t == CardType.Chaos))
+                        baseScore += 50;
+
+                    // ★ [FIX] Safe dictionary access
+                    return baseScore * (weights.ContainsKey(t) ? weights[t] : 1.0f);
                 }
 
                 float sa = Score(a), sb = Score(b);
 
-                if (Math.Abs(sa - sb) < 0.1f)
-                {
-                    int Rank(CardType t) => t switch
-                    {
-                        CardType.Sacrifice=>9, CardType.Betrayal=>8, CardType.Curse=>7, 
-                        CardType.Chaos=>6, CardType.Pollution=>5,
-                        CardType.Interrupt=>4, CardType.Cooperation=>3, CardType.Doubt=>2, CardType.Recon=>1
-                    };
-                    return Rank(a) >= Rank(b) ? 0 : 1;
-                }
+                // If scores are similar, choose randomly (High Roller's whim)
+                if (Math.Abs(sa - sb) < 15f)
+                    return UnityEngine.Random.value < 0.5f ? 0 : 1;
+
                 return sa > sb ? 0 : 1;
             };
             return A;
         }
 
-        // 최용호V2 — 빠른 템포·단기결전·노계산 (Sacrifice 올인 / Curse 기피)
+        // Choi Yong-ho v3 — The Rusher: Short-term Decisive Battle (Investment Aversion & All-in Attack)
         static Agent Build_최용호(AgentList id)
         {
             var A = new Agent("최용호", id);
@@ -404,65 +366,58 @@ namespace GameCore
                 int R = Math.Max(1, I.s.round);
                 bool nf = !I.s.IsFirst;
 
-                // 0) [신규] Sacrifice: "생산 라인 풀 가동! 멈추면 돈 날아간다!"
-                // 고민 없이 냅다 던짐. 체력이 1이어도 마지막 한 방(4장째)이라면 던지고,
-                // 아니라도 일단 던져서 스택을 쌓음. 뒤는 생각 안 함.
+                // 0) [Trait] Sacrifice: "Full production line!"
+                // Throw it without hesitation.
                 if (I.HandHas(CardType.Sacrifice))
                     return CardType.Sacrifice;
 
-                // 1) 확정 킬각 (가중치 무시)
+                // 1) Guaranteed Lethal (Ignore weights)
                 if (I.HandHas(CardType.Betrayal)  && I.s.oppLife <= R) return CardType.Betrayal;
 
-                // 2) 초반 러시(1~3라) – "초장에 기선 제압!"
+                // 2) Early Rush (Round 1~3) – "First strike wins!"
                 if (R <= 3)
                 {
                     if (I.HandHas(CardType.Betrayal))  return CardType.Betrayal;
                     if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
-                    // 공격 수단 없으면 Chaos로 패 섞기
+                    // If no attack means, use Chaos to shuffle
                     int atk = (I.HandHas(CardType.Betrayal)?1:0) + (I.HandHas(CardType.Pollution)?1:0);
                     if (atk==0 && I.HandHas(CardType.Chaos)) return CardType.Chaos;
                 }
                 
-                // 3) 뒤지는 중이면 공격 극대화 (Curse는 느려서 안 씀)
-                if (I.s.selfLife < I.s.oppLife)
-                {
-                    if (I.HandHas(CardType.Betrayal))  return CardType.Betrayal;
-                    if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
-                    // 배신/오염 없으면 Chaos
-                    int atk = (I.HandHas(CardType.Betrayal)?1:0) + (I.HandHas(CardType.Pollution)?1:0);
-                    if (atk==0 && I.HandHas(CardType.Chaos)) return CardType.Chaos;
-                }
+                // 3) [The Rusher] Attack Instinct
+                // High probability to attack regardless of health
+                if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;
+                if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
 
-                // 4) 간단 대응(확률 제거)
+                // 4) [NEW] Investment Handling: "No time to grow this trash."
+                // If he has Investment, he treats it as a waste of a turn.
+                // He will prioritize ANY other card over Investment, unless it's the only option.
+                // No specific logic needed to 'use' it preferentially, it naturally falls to the bottom.
+
+                // 5) Simple Counters
                 if (nf && I.s.lastOpp == CardType.Betrayal && I.HandHas(CardType.Interrupt)) return CardType.Interrupt;
                 if (nf && I.s.lastOpp == CardType.Pollution && I.HandHas(CardType.Doubt))    return CardType.Doubt;
 
-                // 5) Curse 처리: "이거 언제 터지냐? 답답하네."
-                // 손에 공격 카드가 아예 없을 때만 차선책으로 사용
-                bool hasDirectAtk = I.HandHas(CardType.Betrayal) || I.HandHas(CardType.Pollution);
-                if (I.HandHas(CardType.Curse) && !hasDirectAtk)
-                    return CardType.Curse;
+                // 6) Curse Handling: "Too slow."
+                // Not preferred as it's not immediate damage.
 
-                // 6) 읽힘/공격수단 없음일 때만 Chaos
-                int atk2 = (I.HandHas(CardType.Betrayal)?1:0) + (I.HandHas(CardType.Pollution)?1:0);
-                if (I.HandHas(CardType.Chaos) && (atk2==0 || (nf && I.s.lastOpp==I.s.last2Opp))) return CardType.Chaos;
-
-                // 7) 고정 우선순위 (Sacrifice는 최상단에서 처리됨)
+                // 7) Fixed Priority (Sacrifice handled at top)
                 float Score(CardType c)
                 {
                     float baseScore = c switch {
-                        CardType.Sacrifice => 10,  // [신규] 잡히면 무조건 낸다
-                        CardType.Betrayal => 7, 
-                        CardType.Pollution => 6, 
-                        CardType.Interrupt => 5,
-                        CardType.Curse => 4.5f,    // [신규] 즉발 데미지가 아니라서 선호도 낮음
-                        CardType.Cooperation => 4, 
-                        CardType.Doubt => 3, 
-                        CardType.Recon => 2,       // "정찰할 시간에 한 대 더 때린다"
-                        CardType.Chaos => 1,
+                        CardType.Sacrifice => 15,  // [Core] Always throw if available
+                        CardType.Betrayal => 10,   // Attack Priority 1
+                        CardType.Pollution => 9,   // Attack Priority 2
+                        CardType.Interrupt => 7,   // Counter
+                        CardType.Chaos => 6,       // Create variables
+                        CardType.Curse => 4,       // Slow attack (Meh)
+                        CardType.Cooperation => 3, // No cooperation
+                        CardType.Doubt => 2,       // No defense
+                        CardType.Recon => 1,       // No thinking
+                        CardType.Investment => -5, // [NEW] Hate: Useless right now
                         _ => 0
                     };
-                    // FIX: Safe dictionary access
+                    // ★ [FIX] Safe dictionary access
                     return baseScore * (weights.ContainsKey(c) ? weights[c] : 1.0f);
                 }
                 return I.hand.Distinct().Where(I.HandHas).OrderByDescending(Score).FirstOrDefault();
@@ -470,19 +425,25 @@ namespace GameCore
 
             A.fallback = new[] {
                 CardType.Sacrifice, CardType.Betrayal, CardType.Pollution, CardType.Chaos,
-                CardType.Curse, CardType.Interrupt, CardType.Cooperation, CardType.Doubt, CardType.Recon
+                CardType.Interrupt, CardType.Curse, CardType.Cooperation, CardType.Doubt, 
+                CardType.Recon, CardType.Investment // Lowest priority
             };
             
-            // ---------- 선택 드로우(2장 중 1장) ----------
+            // --- Selective Draw (Draft) ---
             A.chooseFromTwo = (a, b, I) =>
             {
                 var weights = AgentManager.I.GetWeights(I.selfID);
 
-                // [신규] Sacrifice 우선: "보이면 집어! 불량품 나오기 전에!"
+                // [NEW] Investment Avoidance: "Throw it away."
+                // Always skip it if possible.
+                if (a == CardType.Investment && b != CardType.Investment) return 1;
+                if (b == CardType.Investment && a != CardType.Investment) return 0;
+
+                // [Existing] Sacrifice Priority
                 if (a == CardType.Sacrifice && b != CardType.Sacrifice) return 0;
                 if (b == CardType.Sacrifice && a != CardType.Sacrifice) return 1;
 
-                // Chaos 회피
+                // Chaos Avoidance
                 if (a == CardType.Chaos && b != CardType.Chaos) return 1;
                 if (b == CardType.Chaos && a != CardType.Chaos) return 0;
 
@@ -494,55 +455,41 @@ namespace GameCore
                 {
                     float s = x switch
                     {
-                        CardType.Sacrifice   => 200, // [신규] 압도적 선호
-                        CardType.Betrayal    => 100,
-                        CardType.Pollution   => 80,
+                        CardType.Sacrifice   => 200, // Overwhelming preference
+                        CardType.Betrayal    => 100, // Attack
+                        CardType.Pollution   => 80,  // Attack
                         CardType.Interrupt   => 60,
-                        CardType.Curse       => 50,  // [신규] 애매함. Doubt보단 낫지만 공격보단 못함.
+                        CardType.Curse       => 50,
                         CardType.Doubt       => 45,
                         CardType.Cooperation => 30,
                         CardType.Recon       => 10,
+                        CardType.Investment  => -100, // [NEW] Absolute refusal
                         _ => 0
                     };
                     
-                    // 상황별 가점
+                    // Situational Bonus (Obsession with Attack)
                     if (x==CardType.Betrayal && I.s.oppLife <= R+1) s += 25;
-                    if (x==CardType.Doubt    && I.s.selfLife<= R)   s += 20;
                     
-                    // 직전 상황 반응
-                    if (nf)
-                    {
-                        if (last==CardType.Cooperation && x==CardType.Betrayal) s += 25;
-                        if (last==CardType.Pollution   && x==CardType.Doubt)    s += 18;
-                        if (last==CardType.Betrayal    && x==CardType.Interrupt)s += 22;
-                    }
-
-                    // 공격 수단 확보
+                    // Secure Attack Means
                     int atkInHand = (I.HandHas(CardType.Betrayal)?1:0)+(I.HandHas(CardType.Pollution)?1:0);
                     if (atkInHand==0 && (x==CardType.Betrayal||x==CardType.Pollution)) s += 12;
                     
-                    // FIX: Safe dictionary access
+                    // ★ [FIX] Safe dictionary access
                     return s * (weights.ContainsKey(x) ? weights[x] : 1.0f);
                 }
 
                 float sa = Score(a), sb = Score(b);
                 if (Math.Abs(sa - sb) < 0.1f)
                 {
-                    int rank(CardType x) => x switch
-                    {
-                        CardType.Sacrifice=>8, // [신규]
-                        CardType.Betrayal=>7, CardType.Pollution=>6, CardType.Interrupt=>5,
-                        CardType.Curse=>4,     // [신규]
-                        CardType.Doubt=>3, CardType.Cooperation=>2, CardType.Recon=>1, _=>0
-                    };
-                    return rank(a) >= rank(b) ? 0 : 1;
+                    // If scores are similar, pick the more aggressive one (lower index usually in enum)
+                    return sa > sb ? 0 : 1;
                 }
                 return sa>sb?0:1;
             };
             return A;
         }
 
-        // 한지혜V2 — 안정과 기회의 균형 (Sacrifice 기피 / Curse 조건부 사용)
+        // Han Ji-hye v3 — The Balancer: Balance and Harmony (Investment for Co-existence & Strict Balance)
         static Agent Build_한지혜(AgentList id)
         {
             var A = new Agent("한지혜", id);
@@ -554,7 +501,7 @@ namespace GameCore
                 bool nf = !I.s.IsFirst;
                 var history = I.HistoryOpponent();
 
-                // 상대 분포(최근 히스토리 기반, 가벼운 스무딩)
+                // Opponent Distribution (Based on recent history)
                 var p = new Dictionary<CardType, float> {
                     {CardType.Cooperation, 0.05f + I.Ratio(CardType.Cooperation)},
                     {CardType.Doubt,       0.05f + I.Ratio(CardType.Doubt)},
@@ -563,167 +510,146 @@ namespace GameCore
                     {CardType.Pollution,   0.05f + I.Ratio(CardType.Pollution)},
                     {CardType.Interrupt,   0.05f + I.Ratio(CardType.Interrupt)},
                     {CardType.Recon,       0.05f + I.Ratio(CardType.Recon)},
-                    {CardType.Curse,       0.05f + I.Ratio(CardType.Curse)},    // 추가
-                    {CardType.Sacrifice,   0.05f + I.Ratio(CardType.Sacrifice)} // 추가
+                    {CardType.Curse,       0.05f + I.Ratio(CardType.Curse)},    
+                    {CardType.Sacrifice,   0.05f + I.Ratio(CardType.Sacrifice)},
+                    {CardType.Investment,  0.05f + I.Ratio(CardType.Investment)} // [NEW]
                 };
                 float S = p.Values.Sum(); foreach (var k in p.Keys.ToList()) p[k] /= S;
 
-                // [신규] Sacrifice 대응: "이기적인 선택은 용납 못 해."
-                // 상대가 Sacrifice를 3장 이상 냈다면, 다음 턴에 게임이 터지므로 강제 저지
+                // [The Balancer] Detect Balance Disruption
+                bool isPeaceful = p[CardType.Cooperation] + p[CardType.Investment] > 0.4f;
+                bool isHostile = p[CardType.Betrayal] + p[CardType.Pollution] > 0.3f;
+                
+                // 1. [NEW] Utilize Investment: "A path to survive together."
+                // Use when opponent is peaceful (Coop/Inv) OR when situation is balanced (neither too advantageous nor disadvantageous)
+                if (I.HandHas(CardType.Investment))
+                {
+                    // If opponent shows trust, actively invest for mutual benefit
+                    if (isPeaceful) return CardType.Investment;
+                    
+                    // If mid-game (R >= 4) and opponent is not hostile, attempt investment
+                    if (R >= 4 && !isHostile) return CardType.Investment;
+                }
+
+                // 2. [Tuning] Counter Sacrifice
+                // If opponent tries to 'monopolize' victory with Sacrifice (3 cards) -> Stop to restore balance
                 int oppSacCount = history.Count(c => c == CardType.Sacrifice);
                 if (oppSacCount >= 3)
                 {
-                    // 평소엔 배신을 아끼지만, 이 상황에선 주저 없이 사용
                     if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal; 
                     if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
                 }
 
-                // 0) 생존 우선 (과도한 방어 기제)
-                // Curse 위험도가 높거나 Betrayal 확률이 높으면 방어
-                bool curseRisk = p[CardType.Curse] > 0.2f;
-                bool lethalRisk = I.s.selfLife <= R && (p[CardType.Betrayal] >= 0.27f || (nf && I.s.lastOpp == CardType.Betrayal));
-                
-                if ((lethalRisk || curseRisk) && I.HandHas(CardType.Doubt)) 
+                // 3. [Defense Mechanism] Fear of Betrayal
+                // Over-defend if opponent attack probability is high (> 30%)
+                bool lethalRisk = I.s.selfLife <= R;
+                if ((lethalRisk || isHostile) && I.HandHas(CardType.Doubt)) 
                     return CardType.Doubt;
 
-                // 1) [신규] Curse 활용: "상처에는 상처로."
-                // 그녀는 선제적으로 저주를 걸지 않음. 
-                // 단, 상대가 배신(Betrayal) 빈도가 높거나 직전에 배신했다면 보복성으로 사용.
-                if (I.HandHas(CardType.Curse))
-                {
-                    bool oppIsAggressive = p[CardType.Betrayal] > 0.3f || (nf && I.s.lastOpp == CardType.Betrayal);
-                    bool oppIsNice = p[CardType.Cooperation] > 0.4f;
-
-                    // 상대가 공격적이면 저주 사용, 착한 상대에겐 저주 절대 안 씀
-                    if (oppIsAggressive && !oppIsNice)
-                        return CardType.Curse;
-                }
-
-                // 2) 반복 패턴 카운터 (조율자)
+                // 4. [Pattern Counter]
                 if (nf && I.s.lastOpp == I.s.last2Opp && I.s.lastOpp != CardType.None)
                 {
                     var x = I.s.lastOpp;
-                    // 상대가 희생을 계속 시도하면 방어보다는 공격으로 끊음
-                    if (x == CardType.Sacrifice) 
+                    // If opponent keeps investing? -> Invest together (Coop) or Defend (Doubt)
+                    if (x == CardType.Investment)
                     {
-                        if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;
-                        if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
+                        if (I.HandHas(CardType.Investment)) return CardType.Investment;
+                        if (I.HandHas(CardType.Cooperation)) return CardType.Cooperation;
                     }
-
+                    
                     if (x == CardType.Cooperation && I.HandHas(CardType.Pollution)) return CardType.Pollution;
                     if (x == CardType.Pollution && I.HandHas(CardType.Doubt)) return CardType.Doubt;
                     if (x == CardType.Betrayal && I.HandHas(CardType.Interrupt)) return CardType.Interrupt;
-                    if (x == CardType.Doubt && I.HandHas(CardType.Cooperation)) return CardType.Cooperation;
                 }
 
-                // 3) 초중반(1~4R): 정보/포지셔닝
-                if (R <= 4)
+                // 5. [Co-existence] Cooperation
+                // Attempt to build trust if no specific threat
+                if (I.HandHas(CardType.Cooperation) && !isHostile)
+                    return CardType.Cooperation;
+
+                // 6. [Balance] Avoid cruelty even if lethal (Trait: Emotional)
+                // But retaliate if opponent betrayed first
+                if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R)
                 {
-                    bool safeInfo = I.s.selfLife >= I.s.oppLife - 1 && p[CardType.Betrayal] <= 0.26f;
-                    if (I.HandHas(CardType.Recon) && safeInfo) return CardType.Recon;
-
-                    // 협력 성향↑ & 의심 낮음 → Pollution로 견제 (균형 맞추기)
-                    if (I.HandHas(CardType.Pollution) &&
-                        p[CardType.Cooperation] >= 0.32f && p[CardType.Doubt] <= 0.28f)
-                        return CardType.Pollution;
-
-                    // 초반 안정 수급 (Cooperation 선호)
-                    if (I.HandHas(CardType.Cooperation) && p[CardType.Betrayal] <= 0.24f)
-                        return CardType.Cooperation;
+                    // Only kill if opponent betrayal rate is high
+                    if (p[CardType.Betrayal] > 0.2f) return CardType.Betrayal;
                 }
 
-                // 4) [신규] Sacrifice 처리: "이건 너무 위험해."
-                // 손에 Sacrifice가 잡혔다면?
-                if (I.HandHas(CardType.Sacrifice))
-                {
-                    // 정말 이길 수 있는 상황(3장 모음) 아니면 쓰기 싫어함
-                    // 단, 체력이 매우 많아서(균형이 내 쪽으로 기울어서) 좀 깎아도 되면 버림
-                    int mySacCount = history.Count(x => x == CardType.None); // *추적 로직 필요하나 단순화
-                    
-                    if (I.s.selfLife > I.s.oppLife + 3) // 체력 여유 있으면 냄
-                        return CardType.Sacrifice;
-                    
-                    // 그 외엔 낼 마음이 없음 (점수 최하위)
-                }
-
-                // 5) 킬각만 배신
-                if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R && p[CardType.Doubt] < 0.32f)
-                    return CardType.Betrayal;
-
-                // 6) 기본 우선순위 (가중치 적용)
+                // 7. Base Priority Score
                 float Score(CardType c)
                 {
                     float baseScore = c switch {
-                        CardType.Pollution => 7, 
-                        CardType.Cooperation => 6, // 평화 선호
-                        CardType.Doubt => 5,       // 안전 선호
-                        CardType.Betrayal => 4,  
-                        CardType.Recon => 3,       
-                        CardType.Curse => 2.5f,    // [신규] 별로 안 좋아함
-                        CardType.Chaos => 2,
-                        CardType.Interrupt => 1,
-                        CardType.Sacrifice => -10, // [신규] 극도로 기피
+                        CardType.Investment => 8,  // [NEW] Tool for co-existence (Preferred)
+                        CardType.Cooperation => 7, // Peace preference
+                        CardType.Doubt => 6,       // Defense (Safe)
+                        CardType.Pollution => 5,   // Moderate check
+                        CardType.Recon => 4,       // Check info
+                        CardType.Betrayal => 3,    // Reluctant to betray first
+                        CardType.Curse => 2,       // Hates harming others
+                        CardType.Interrupt => 2,
+                        CardType.Chaos => 1,       // Hates chaos
+                        CardType.Sacrifice => -10, // [Trait] Never self-harm
                         _ => 0
                     };
-                    return baseScore * (weights.ContainsKey(c) ? weights[c] : 1f);
+                    // ★ [FIX] Safe dictionary access
+                    return baseScore * (weights.ContainsKey(c) ? weights[c] : 1.0f);
                 }
                 return I.hand.Distinct().Where(I.HandHas).OrderByDescending(Score).FirstOrDefault();
             });
 
-            // 균형형 예비 우선순위
             A.fallback = new[] {
-                CardType.Pollution, CardType.Cooperation, CardType.Doubt,
-                CardType.Betrayal,  CardType.Recon,       CardType.Chaos,
-                CardType.Curse,     CardType.Interrupt,   CardType.Sacrifice
+                CardType.Investment, CardType.Cooperation, CardType.Doubt,
+                CardType.Pollution, CardType.Recon,        CardType.Interrupt,
+                CardType.Betrayal,  CardType.Curse,        CardType.Chaos,
+                CardType.Sacrifice
             };
 
-            // [선택 드로우]
+            // [Selective Draw]
             A.chooseFromTwo = (CardType a, CardType b, DecisionInput I) =>
             {
                 var weights = AgentManager.I.GetWeights(I.selfID);
                 int R = Math.Max(1, I.s.round);
 
-                // [신규] Sacrifice 혐오: "나를 해치는 건 싫어."
-                // 덱에서 보이면 무조건 거름.
+                // [NEW] Investment: "Let's live together."
+                // Actively pick if opponent is friendly
+                bool isFriendly = I.Ratio(CardType.Cooperation) + I.Ratio(CardType.Investment) > 0.4f;
+
+                // [Existing] Hate Sacrifice: "I don't want to hurt myself."
                 if (a == CardType.Sacrifice && b != CardType.Sacrifice) return 1; 
                 if (b == CardType.Sacrifice && a != CardType.Sacrifice) return 0;
-
-                // [신규] Curse 기피: "너무 잔인해."
-                // Pollution(단발성)보다 Curse(지속성)를 더 꺼림 (점수 낮게 책정)
 
                 float Score(CardType c)
                 {
                     float baseScore = 0;
-                    if (c == CardType.Chaos) baseScore = -3;
-                    if (c == CardType.Cooperation) baseScore = (R <= 6 ? 3 : 2);     // 초중반 선호
-                    if (c == CardType.Doubt) baseScore = 2;                           // 안정감
-                    if (c == CardType.Pollution) baseScore = 1.5f;                    // 적당한 견제
-                    if (c == CardType.Curse) baseScore = 0.5f;                        // [신규] 찝찝함
-                    if (c == CardType.Interrupt) baseScore = 1;
-                    if (c == CardType.Betrayal) baseScore = (I.s.oppLife <= R ? 3 : 0);
-                    if (c == CardType.Recon) baseScore = (R <= 5 ? 1 : 0);
-                    if (c == CardType.Sacrifice) baseScore = -99;                     // [신규] 절대 안 집음
+                    if (c == CardType.Investment)  baseScore = isFriendly ? 4.5f : 2.5f; // [NEW]
+                    if (c == CardType.Cooperation) baseScore = 4.0f;
+                    if (c == CardType.Doubt)       baseScore = 3.5f; // Secure defense
+                    if (c == CardType.Pollution)   baseScore = 2.0f;
+                    if (c == CardType.Interrupt)   baseScore = 1.5f;
+                    if (c == CardType.Recon)       baseScore = 1.0f;
+                    if (c == CardType.Betrayal)    baseScore = (I.s.oppLife <= R ? 3 : 0.5f); // Only pick if lethal
+                    if (c == CardType.Curse)       baseScore = 0.2f; // Hate curse
+                    if (c == CardType.Chaos)       baseScore = -5f;  // Hate chaos
+                    if (c == CardType.Sacrifice)   baseScore = -100f;
                     
-                    return baseScore * (weights.ContainsKey(c) ? weights[c] : 1f);
+                    // ★ [FIX] Safe dictionary access
+                    return baseScore * (weights.ContainsKey(c) ? weights[c] : 1.0f);
                 }
-
-                // ... (손패 균형 보정 로직 동일) ...
-                bool needAtk = !(I.HandHas(CardType.Betrayal) || I.HandHas(CardType.Pollution));
-                bool needDef = !(I.HandHas(CardType.Doubt) || I.HandHas(CardType.Interrupt));
 
                 float sa = Score(a);
                 float sb = Score(b);
 
+                // Balance hand (Attack/Defense Ratio)
+                bool needAtk = !(I.HandHas(CardType.Betrayal) || I.HandHas(CardType.Pollution));
+                bool needDef = !(I.HandHas(CardType.Doubt) || I.HandHas(CardType.Interrupt));
+
                 if (Math.Abs(sa - sb) < 0.1f)
                 {
-                    // 공격/방어 균형 맞추기
-                    if (needAtk && ((a == CardType.Betrayal || a == CardType.Pollution) ||
-                                    (b == CardType.Betrayal || b == CardType.Pollution)))
-                        return (a == CardType.Betrayal || a == CardType.Pollution) ? 0 : 1;
-
-                    if (needDef && ((a == CardType.Doubt || a == CardType.Interrupt) ||
-                                    (b == CardType.Doubt || b == CardType.Interrupt)))
+                    if (needDef && ((a == CardType.Doubt || a == CardType.Interrupt) || (b == CardType.Doubt || b == CardType.Interrupt)))
                         return (a == CardType.Doubt || a == CardType.Interrupt) ? 0 : 1;
+                        
+                    if (needAtk && ((a == CardType.Betrayal || a == CardType.Pollution) || (b == CardType.Betrayal || b == CardType.Pollution)))
+                        return (a == CardType.Betrayal || a == CardType.Pollution) ? 0 : 1;
                 }
 
                 return sa >= sb ? 0 : 1;
@@ -731,7 +657,7 @@ namespace GameCore
             return A;
         }
 
-        // 박민재v3 — 계산된 냉정함 (Sacrifice 배제 / Curse 확률 계산)
+        // 박민재v4 — 계산된 냉정함 (Sacrifice 배제 / Curse 확률 계산)
         static Agent Build_박민재(AgentList id)
         {
             var A = new Agent("박민재", id);
@@ -759,6 +685,12 @@ namespace GameCore
                 if (canKill) return CardType.Betrayal;
                 if (mustDefend) return CardType.Doubt;
 
+                // 3. [NEW] Investment EV Calculation
+                // "Has the current stack crossed the break-even point?"
+                // Min-jae acknowledges value when Investment stack is likely >= 2 (Heal +1).
+                // *Note: Since globalCount is unknown to Agent, estimate using Round(R).
+                bool investmentProfitable = R >= 4; 
+
                 // 3. 기대값(EV) 기반 카드 선택
                 float Eval(CardType c)
                 {
@@ -780,6 +712,11 @@ namespace GameCore
                             // 상대가 방어적(Doubt/Interrupt 선호)이라면 가치 하락
                             float defRatio = I.Ratio(CardType.Doubt) + I.Ratio(CardType.Interrupt);
                             score = (defRatio > 0.4f) ? 0.5f : 4.0f; // 방어 안 하면 Betrayal급 효율
+                            break;
+
+                        case CardType.Investment:
+                            // [NEW] High-yield asset if profitable, otherwise trash
+                            score = investmentProfitable ? 4.5f : -5f;
                             break;
 
                         case CardType.Cooperation: 
@@ -806,7 +743,7 @@ namespace GameCore
                             break;
                     }
                     
-                    // FIX: Safe dictionary access
+                    // ★ [FIX] Safe dictionary access
                     return score * (weights.ContainsKey(c) ? weights[c] : 1.0f);
                 }
 
@@ -820,7 +757,7 @@ namespace GameCore
             A.fallback = new[]
             {
                 CardType.Betrayal, CardType.Pollution, CardType.Curse,
-                CardType.Cooperation, CardType.Doubt, CardType.Interrupt, CardType.Recon
+                CardType.Investment, CardType.Cooperation, CardType.Doubt, CardType.Interrupt, CardType.Recon
             };
 
             // --- 선택 드로우 (Draft) ---
@@ -829,6 +766,10 @@ namespace GameCore
                 var weights = AgentManager.I.GetWeights(I.selfID);
                 int R = Math.Max(1, I.s.round);
                 bool losing = I.s.selfLife < I.s.oppLife;
+
+                // [NEW] Investment: "Calculating late-game potential."
+                // Actively pick if Round >= 5 (Break-even likely passed).
+                bool lateGame = R >= 5;
 
                 // [신규] Sacrifice 철저 배제: "통계적 승리 플랜에 부합하지 않음."
                 if (a == CardType.Sacrifice && b != CardType.Sacrifice) return 1;
@@ -845,13 +786,15 @@ namespace GameCore
                         case CardType.Curse:       score = 3.2f; break; // [신규] 준수한 공격 수단
                         case CardType.Doubt:       score = (I.s.selfLife <= R + 1 ? 6f : 1.5f); break;
                         case CardType.Interrupt:   score = 2.8f; break;
+                        case CardType.Investment:  score = lateGame ? 3.0f : 2.5f; break; // [NEW] Value shifts by time
                         case CardType.Cooperation: score = 2.0f; break;
                         case CardType.Recon:       score = 1.0f; break;
                         case CardType.Chaos:       score = -3.0f; break; // "변수 혐오"
                         case CardType.Sacrifice:   score = -10.0f; break; // [신규]
                     }
-                    // FIX: Safe dictionary access
+                    // ★ [FIX] Safe dictionary access
                     return score * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+
                 }
 
                 float va = V(a), vb = V(b);
@@ -861,11 +804,12 @@ namespace GameCore
                 {
                     int Rank(CardType t) => t switch
                     {
-                        CardType.Pollution => 8, // 가장 선호 (안정적 공격)
-                        CardType.Betrayal => 7,
-                        CardType.Curse => 6,
-                        CardType.Doubt => 5,
-                        CardType.Interrupt => 4,
+                        CardType.Pollution => 9, // 가장 선호 (안정적 공격)
+                        CardType.Betrayal => 8,
+                        CardType.Curse => 7,
+                        CardType.Doubt => 6,
+                        CardType.Interrupt => 5,
+                        CardType.Investment => 4,
                         CardType.Cooperation => 3,
                         CardType.Recon => 2,
                         _ => 0
@@ -878,19 +822,19 @@ namespace GameCore
             return A;
         }
 
-        // 정다은V2 — 심리 조작·가학적 분석가 (Curse 선호 / Sacrifice 경멸)
+        // Jeon Da-eun v3 — The Analyst: Psychological Manipulation & Sadistic Analysis (Investment as Bait)
         static Agent Build_정다은(AgentList id)
         {
             var A = new Agent("정다은", id);
 
-            // ① 라운드 카드 선택
+            // ① Round Card Selection
             A.rules.Add(I =>
             {
                 var weights = AgentManager.I.GetWeights(I.selfID);
                 int R = Math.Max(1, I.s.round);
                 var history = I.HistoryOpponent();
 
-                // 1. 상대 행동 분포 추정 (심리 분석)
+                // 1. Estimate Opponent Behavior Distribution (Psychological Analysis)
                 var p = new Dictionary<CardType, float>
                 {
                     { CardType.Cooperation, I.Ratio(CardType.Cooperation) },
@@ -900,94 +844,97 @@ namespace GameCore
                     { CardType.Pollution,   I.Ratio(CardType.Pollution)   },
                     { CardType.Interrupt,   I.Ratio(CardType.Interrupt)   },
                     { CardType.Recon,       I.Ratio(CardType.Recon)       },
-                    { CardType.Curse,       I.Ratio(CardType.Curse)       }, // 추가
-                    { CardType.Sacrifice,   I.Ratio(CardType.Sacrifice)   }  // 추가
+                    { CardType.Curse,       I.Ratio(CardType.Curse)       }, 
+                    { CardType.Sacrifice,   I.Ratio(CardType.Sacrifice)   },
+                    { CardType.Investment,  I.Ratio(CardType.Investment)  } // [NEW]
                 };
 
-                // 최근 행동에 대한 가중치 (단기 패턴 분석)
+                // [Pattern Analysis] Short-term memory weight
                 var recent = new[] { I.s.lastOpp, I.s.last2Opp }.Where(t => t != CardType.None).ToArray();
                 if (recent.Length > 0)
                 {
                     var mode = recent.GroupBy(t => t).OrderByDescending(g => g.Count()).First().Key;
-                    p[mode] *= 1.4f; // "또 그 수를 쓰겠지."
+                    if (p.ContainsKey(mode)) p[mode] *= 1.5f; // "They'll use that move again."
                 }
                 
-                // 정규화
                 float sum = p.Values.Sum(); if (sum <= 0) sum = 1f;
                 foreach (var k in p.Keys.ToList()) p[k] /= sum;
 
-                // [신규] Sacrifice 대응: "헛된 희망을 품었구나."
-                // 상대가 Sacrifice 3장 이상 -> 즉시 처단
-                int oppSacCount = history.Count(x => x == CardType.Sacrifice);
-                if (oppSacCount >= 3)
+                // 2. [Psychological Manipulation] Utilize Investment
+                // "This is bait." If opponent is not defensive (Doubt), throw Investment to profit 
+                // or build trust for a future betrayal.
+                if (I.HandHas(CardType.Investment))
                 {
-                    if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;
-                    if (I.HandHas(CardType.Curse)) return CardType.Curse; // 저주로 말려 죽임
-                    if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
+                    // If opponent seems cooperative (Coop/Inv) or scouting (Recon) -> Invest safely
+                    bool isSafe = p[CardType.Cooperation] + p[CardType.Investment] + p[CardType.Recon] > 0.4f;
+                    if (isSafe) return CardType.Investment;
                 }
 
-                // 2. 즉사 / 생존 각 (기본 본능)
-                // 상대가 방심(Doubt 확률 낮음)했고 킬각이면 배신
-                if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R && p[CardType.Doubt] < 0.30f)
-                    return CardType.Betrayal;
-                
-                // 내가 죽을 것 같고 상대가 공격할 것 같으면 방어
-                bool danger = I.s.selfLife <= R && (p[CardType.Betrayal] + p[CardType.Pollution] > 0.4f);
-                if (danger && I.HandHas(CardType.Doubt))
-                    return CardType.Doubt;
-
-                // 3. [신규] Curse 활용: "천천히 괴로워해라."
-                // 상대가 방어(Doubt, Interrupt)할 확률이 낮다면 저주를 걸어 지속 피해
-                // 그녀는 Curse를 Betrayal보다 '우아한' 공격 수단으로 여김
+                // 3. [Sadistic Control] Curse / Interrupt
+                // If opponent shows a gap (not defending), torment with Curse. If attacking, cut off with Interrupt.
                 if (I.HandHas(CardType.Curse))
                 {
                     float defensiveProb = p[CardType.Doubt] + p[CardType.Interrupt];
-                    // 상대가 방어적이지 않다면(0.4 미만), 저주 투척
-                    if (defensiveProb < 0.4f) 
+                    // Opponent let guard down (low def prob) -> Curse
+                    if (defensiveProb < 0.35f) 
                         return CardType.Curse;
                 }
 
-                // 4. Matrix Delta 계산 (상대 패 예측 기반 최적수 도출)
+                // If opponent attack prob is high, counter with Interrupt
+                float attackProb = p[CardType.Betrayal] + p[CardType.Pollution];
+                if (attackProb > 0.4f && I.HandHas(CardType.Interrupt))
+                    return CardType.Interrupt;
+
+                // 4. [Execution] Lethal & Sacrifice Suppression
+                int oppSacCount = history.Count(x => x == CardType.Sacrifice);
+                if (oppSacCount >= 3) // Opponent has false hope (Sacrifice)
+                {
+                    if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal; // Execute
+                    if (I.HandHas(CardType.Curse)) return CardType.Curse; // Dry out
+                    if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
+                }
+
+                // Normal Lethal: Betray when opponent guard is down
+                if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R && p[CardType.Doubt] < 0.30f)
+                    return CardType.Betrayal;
+                
+                // 5. Crisis Management (Defense)
+                bool danger = I.s.selfLife <= R && (attackProb > 0.4f);
+                if (danger && I.HandHas(CardType.Doubt))
+                    return CardType.Doubt;
+
+                // 6. EV Simulation (Matrix Delta)
                 int Delta(CardType a, CardType b) 
                 { 
                     int r = R;
-                    // --- 기존 로직 (생략된 부분 유지) ---
-                    // ... (Cooperation ~ Recon 간 상성) ...
-
-                    // [신규] Curse 상성 (정다은의 가학적 계산)
-                    // a가 내가 낼 카드, b가 상대 카드
+                    
+                    if (a == CardType.Investment)
+                    {
+                        // Investment is profit (+2~+R) if uninterrupted (considered bait value too)
+                        if (b == CardType.Doubt || b == CardType.Interrupt) return 0;
+                        if (b == CardType.Betrayal || b == CardType.Pollution) return -1;
+                        return 2; 
+                    }
                     if (a == CardType.Curse)
                     {
-                        // 방어 카드엔 막힘(0), 나머진 성공(+2 이득 간주)
                         if (b == CardType.Doubt || b == CardType.Interrupt) return 0; 
-                        if (b == CardType.Betrayal) return -1; // 맞으면 아픔
-                        return +2; // 2턴간 괴롭힘 = +2점 가치
+                        if (b == CardType.Betrayal) return -1; 
+                        return +2; // Psychological advantage (+2) on success
                     }
+                    if (a == CardType.Sacrifice) return -10; // She never sacrifices
+                    
+                    // When opponent uses Curse
                     if (b == CardType.Curse)
                     {
-                        // 상대가 저주를 걸 때
-                        if (a == CardType.Doubt || a == CardType.Interrupt) return +1; // 방어 성공
-                        if (a == CardType.Cooperation || a == CardType.Recon) return -2; // 저주 걸림
-                        return 0;
+                        if (a == CardType.Doubt || a == CardType.Interrupt) return +1; // Defense success
+                        return -1;
                     }
 
-                    // [신규] Sacrifice 상성 (정다은의 냉소적 계산)
-                    if (a == CardType.Sacrifice) return -10; // "나는 희생하지 않는다."
-                    if (b == CardType.Sacrifice)
-                    {
-                        // 상대가 희생할 때 나는?
-                        if (a == CardType.Betrayal) return +r + 2; // 아주 큰 이득 (상대 -2, 나 승리)
-                        if (a == CardType.Curse) return +2;        // 저주 걸기 성공
-                        if (a == CardType.Pollution) return +2;
-                        return 0;
-                    }
-                    
-                    // (기존 Delta 로직 Fallback)
-                    // ... 기존 코드의 Delta 함수 내용 ...
-                    // (약식 구현: 실제로는 CardSystem.BuildEffects와 일치해야 함)
+                    // Existing Delta Logic (Simplified)
                     if (a == CardType.Betrayal && b == CardType.Cooperation) return r + 1;
                     if (a == CardType.Cooperation && b == CardType.Betrayal) return -(r + 1);
-                    // ...
+                    if (a == CardType.Interrupt && (b == CardType.Betrayal || b == CardType.Pollution)) return +2;
+                    
                     return 0; 
                 }
 
@@ -997,61 +944,55 @@ namespace GameCore
 
                 foreach (var a in cand)
                 {
-                    // Sacrifice는 3장 모은 막타 아니면 절대 안 냄
-                    if (a == CardType.Sacrifice)
-                    {
-                        // 내 승리 스택 확인 (약식: handCount 제외)
-                        int mySacPlayed = 0; // *실제 구현시엔 변수 추적 필요
-                        if (mySacPlayed < 3) continue; // 계산 제외
-                    }
+                    // Never play Sacrifice
+                    if (a == CardType.Sacrifice) continue;
 
                     float ev = 0f; 
                     foreach (var b in p.Keys) ev += p[b] * Delta(a, b);
 
-                    // 읽힘 회피: 직전 내가 낸 카드 반복 페널티 ("똑같은 수는 지루해.")
-                    if (I.s.lastSelf == a) ev -= 0.5f;
+                    // [Pattern Hiding] Avoid playing the same card twice (anti-read)
+                    if (I.s.lastSelf == a) ev -= 0.8f;
 
-                    // FIX: Safe dictionary access
-                    ev *= weights.ContainsKey(a) ? weights[a] : 1.0f;
+                    // ★ [FIX] Safe dictionary access
+                    ev *= (weights.ContainsKey(a) ? weights[a] : 1.0f);
 
                     if (ev > bestEV) { bestEV = ev; best = a; }
                 }
                 return best;
             });
 
-            // ② 선택 드로우(Draft)
+            // ② Selective Draw (Draft)
             A.chooseFromTwo = (CardType a, CardType b, DecisionInput I) =>
             {
                 var weights = AgentManager.I.GetWeights(I.selfID);
                 int R = Math.Max(1, I.s.round);
 
-                // [신규] Sacrifice 경멸: "약자들이나 쓰는 것."
+                // [Existing] Disdain Sacrifice: "For the weak."
                 if (a == CardType.Sacrifice && b != CardType.Sacrifice) return 1;
                 if (b == CardType.Sacrifice && a != CardType.Sacrifice) return 0;
 
-                // [신규] Curse 선호: "재밌는 장난감이네."
-                // Curse는 Betrayal 다음으로 높은 우선순위를 둠
+                // [NEW] Investment: "Nice bait."
+                // Grab it if seen (After Betrayal, Curse)
 
-                // 점수 함수 V(x, y) - 정다은의 가치판단
+                // Score Function V(x, y) - Jeon Da-eun's valuation
                 float Score(CardType card)
                 {
-                    float s = 0;
-                    // 기본 점수 배점
-                    switch (card)
+                    float s = card switch
                     {
-                        case CardType.Curse:       s = 85; break; // [신규] 매우 선호
-                        case CardType.Betrayal:    s = 80; break;
-                        case CardType.Interrupt:   s = 70; break; // 조작/방해
-                        case CardType.Recon:       s = 60; break; // 정보 파악
-                        case CardType.Pollution:   s = 50; break;
-                        case CardType.Doubt:       s = 40; break;
-                        case CardType.Cooperation: s = 20; break;
-                        case CardType.Chaos:       s = 10; break;
-                        case CardType.Sacrifice:   s = -99; break; // [신규]
-                    }
+                        CardType.Curse       => 90, // [Core] Sadistic preference
+                        CardType.Interrupt   => 85, // [Core] Control
+                        CardType.Betrayal    => 80,
+                        CardType.Recon       => 75, // Information
+                        CardType.Pollution   => 60,
+                        CardType.Doubt       => 40,
+                        CardType.Investment  => 35, // [NEW] Bait
+                        CardType.Cooperation => 30,
+                        CardType.Chaos       => 10,
+                        CardType.Sacrifice   => -99, // Hate
+                        _ => 0
+                    };
 
-                    // 상황 보정
-                    // 상대가 방어를 잘 안하면 공격 카드(Curse, Betrayal) 가치 상승
+                    // Context Adjustment: Increase aggressive card value if opponent defends poorly
                     float defensiveRatio = I.Ratio(CardType.Doubt) + I.Ratio(CardType.Interrupt);
                     if (defensiveRatio < 0.3f)
                     {
@@ -1059,42 +1000,43 @@ namespace GameCore
                         if (card == CardType.Betrayal) s += 10;
                     }
 
-                    // FIX: Safe dictionary access
+                    // ★ [FIX] Safe dictionary access
                     return s * (weights.ContainsKey(card) ? weights[card] : 1.0f);
                 }
 
                 float sa = Score(a), sb = Score(b);
                 
+                // If tied, prefer the more 'devious' card (Curse, Interrupt)
                 if (Math.Abs(sa - sb) < 0.1f)
                 {
-                    // 동점 시 가학적 우선순위: Curse > Interrupt > Betrayal
                     int Rank(CardType t) => t switch
                     {
-                        CardType.Curse => 8, CardType.Interrupt => 7, CardType.Betrayal => 6,
-                        CardType.Recon => 5, CardType.Pollution => 4, CardType.Doubt => 3, _ => 1
+                        CardType.Curse => 10, CardType.Interrupt => 9, CardType.Recon => 8, 
+                        CardType.Betrayal => 7, CardType.Investment => 6, _ => 0
                     };
                     return Rank(a) >= Rank(b) ? 0 : 1;
                 }
                 return sa >= sb ? 0 : 1;
             };
 
-            // ③ 기본 우선순위 (Fallback)
+            // ③ Fallback Priority
             A.fallback = new[]
             {
-                CardType.Curse,     // [신규] 1순위: 고통 주기
-                CardType.Interrupt, // 2순위: 방해하기
-                CardType.Recon,     // 3순위: 훔쳐보기
+                CardType.Curse,     // 1st: Torment
+                CardType.Interrupt, // 2nd: Disrupt
+                CardType.Recon,     // 3rd: Peek
                 CardType.Betrayal,
                 CardType.Pollution,
                 CardType.Doubt,
+                CardType.Investment,// [NEW] Bait
                 CardType.Cooperation,
                 CardType.Chaos,
-                CardType.Sacrifice  // 최하위
+                CardType.Sacrifice  // Lowest
             };
             return A;
         }
         
-        // 오태훈V2 — 미숙한 천재 (패턴 분석 + 자만/폭주)
+        // Oh Tae-hoon v3 — Berserker: Immature Genius (Pattern Analysis + Hubris/Rage + Investment Snowballing)
         static Agent Build_오태훈(AgentList id)
         {
             var A = new Agent("오태훈", id);
@@ -1106,88 +1048,103 @@ namespace GameCore
                 bool nf = !I.s.IsFirst;
                 var history = I.HistoryOpponent();
 
-                // 1. [천재의 직감] 상대 Sacrifice 카운팅 -> 폭주 대응
-                // "잠깐, 저 녀석 지금 뭐 하는 거지? 3장째? 죽어!!"
+                // [Emotional State Analysis]
+                bool winning = I.s.selfLife > I.s.oppLife; // Leading (Arrogance)
+                bool losing = I.s.selfLife < I.s.oppLife;  // Trailing (Rage)
+                bool angry = losing && (I.s.selfLife <= 5); // Berserk Mode
+
+                // 1. [Genius Intuition] Counter Opponent Sacrifice -> Rage Response
+                // "You think you can end me? No chance!"
                 int oppSacCount = history.Count(c => c == CardType.Sacrifice);
                 if (oppSacCount >= 3)
                 {
-                    // 방어따윈 안 한다. 내가 죽기 전에 죽인다.
+                    // No defense. Kill before killed.
                     if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;
                     if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
-                    // 공격 카드가 없으면 Chaos로 판 엎기
+                    // If no attack card, flip the table with Chaos
                     if (I.HandHas(CardType.Chaos)) return CardType.Chaos;
                 }
 
-                // 2. [자만심] 유리할 때 Sacrifice 시도 (스타일리시 승리 욕구)
-                // "이 정도 핸디캡은 줘도 이겨. 보여줄게, 격의 차이를."
-                // 체력이 상대보다 많거나 여유로울 때(6 이상) 과감하게 희생
-                if (I.HandHas(CardType.Sacrifice))
+                // 2. [Hubris] Attempt Sacrifice / Investment when winning (Widen the gap)
+                if (winning)
                 {
-                    bool winning = I.s.selfLife > I.s.oppLife;
-                    bool safe = I.s.selfLife >= 6;
-                    
-                    // 이미 3장을 냈다면(막타) 무조건 시전
-                    // (변수 추적은 약식으로 처리, 실제론 history 분석 필요)
-                    // 여기선 단순히 '자만심' 조건 충족 시 시도
-                    if (winning || safe)
+                    // [NEW] Investment: "I already own this game."
+                    // When winning, use Investment to widen the HP gap and cause despair.
+                    if (I.HandHas(CardType.Investment))
+                    {
+                        // If opponent is defensive (scared), invest even more boldly
+                        if (I.Ratio(CardType.Doubt) > 0.3f || I.s.lastOpp == CardType.Doubt)
+                            return CardType.Investment;
+                    }
+
+                    // Sacrifice: Used for a stylish victory
+                    if (I.HandHas(CardType.Sacrifice) && I.s.selfLife >= 6)
                         return CardType.Sacrifice;
                 }
 
-                // 3. [패턴 학습] 상대가 뻔한 수(2연속 동일)를 뒀을 때의 대응
-                // 오태훈의 가장 강력한 무기: 루틴 읽기
+                // 3. [Pattern Learning] Read Opponent Routine
+                // "That again? Obvious." Perfect counter if opponent plays same card twice
                 if (nf && I.s.lastOpp == I.s.last2Opp && I.s.lastOpp != CardType.None)
                 {
                     var pattern = I.s.lastOpp;
-                    // 상대가 뻔한 방어(Coop/Doubt) 중이면 -> 저주(Curse)나 배신(Betrayal)으로 참교육
-                    if (pattern == CardType.Cooperation || pattern == CardType.Doubt)
+                    
+                    // If opponent only Defends/Cooperates -> Punish with Curse or Betrayal
+                    if (pattern == CardType.Cooperation || pattern == CardType.Doubt || pattern == CardType.Investment)
                     {
-                        if (I.HandHas(CardType.Curse)) return CardType.Curse; // "방어? 뚫어주지."
+                        if (I.HandHas(CardType.Curse)) return CardType.Curse; 
                         if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;
                     }
-                    // 상대가 계속 공격하면 -> Interrupt로 카운터
-                    if (pattern == CardType.Betrayal && I.HandHas(CardType.Interrupt))
+                    // If opponent keeps Attacking -> Reflect with Interrupt
+                    if ((pattern == CardType.Betrayal || pattern == CardType.Pollution) && I.HandHas(CardType.Interrupt))
                         return CardType.Interrupt;
                 }
 
-                // 4. [감정 폭주] 불리할 때 Chaos 난사
-                // "아, 짜증 나! 다 엎어버려!"
-                bool losing = I.s.selfLife < I.s.oppLife;
+                // 4. [Emotional Explosion] Spam Chaos when losing
+                // "Ah, annoying! Flip it all!"
                 if (losing && I.HandHas(CardType.Chaos))
                 {
-                    // 리스크 계산 안 하고 지르고 봄
+                    // Ignore risk, just do it
                     return CardType.Chaos;
                 }
 
-                // 5. 킬각 본능 (천재적 계산)
+                // 5. Lethal Instinct (Genius Calculation)
                 if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R) return CardType.Betrayal;
                 if (I.HandHas(CardType.Pollution) && I.s.oppLife <= R - 1) return CardType.Pollution;
 
-                // 6. [Curse 활용] 애매한 상황에서의 압박
-                // 상대가 방어적이지 않다고 판단되면(패턴상) 저주 투척
+                // 6. [Utilize Curse] Pressure in ambiguous situations
                 if (I.HandHas(CardType.Curse))
                 {
-                    // 직전 상대가 공격카드였거나(Betrayal/Pollution), Chaos였으면 
-                    // 이번 턴에 방어 확률 낮다고 판단 -> 저주
+                    // If opponent was aggressive or used Chaos, assume low defense chance -> Curse
                     if (nf && (I.s.lastOpp == CardType.Betrayal || I.s.lastOpp == CardType.Chaos))
                         return CardType.Curse;
                 }
 
-                // 7. 기본 우선순위 (가중치 반영)
+                // 7. Calculate Weighted Score
                 float Score(CardType c)
                 {
                     float baseScore = c switch {
-                        CardType.Betrayal => 8,    // 공격성 높음
-                        CardType.Chaos => 7,       // [특성] Chaos 애호가
-                        CardType.Curse => 6.5f,    // [신규] 재밌는 장난감
-                        CardType.Pollution => 6,
-                        CardType.Sacrifice => losing ? -5 : 5, // 이길 땐 5점(자만), 질 땐 -5점(짜증)
-                        CardType.Interrupt => 4,
-                        CardType.Recon => 3,       // "봐도 뻔해."
-                        CardType.Cooperation => 2,
-                        CardType.Doubt => 1,
+                        CardType.Betrayal => 10,   // [Trait] High Aggression
+                        CardType.Chaos => 9,       // [Favorite] Loves Chaos
+                        CardType.Curse => 8,       // Fun toy
+                        CardType.Pollution => 7,
+                        // Sacrifice: 6 pts when winning (Hubris), -10 pts when losing (Dislike)
+                        CardType.Sacrifice => winning ? 6 : -10, 
+                        CardType.Interrupt => 5,
+                        CardType.Recon => 4,       // "I already know everything, why bother?"
+                        CardType.Investment => winning ? 3 : -5, // [NEW] Snowballing tool
+                        CardType.Cooperation => 2, // Boring
+                        CardType.Doubt => 1,       // For cowards
                         _ => 0
                     };
-                    // FIX: Safe dictionary access
+
+                    // [Berserker] Attack card scores explode when angry
+                    if (angry)
+                    {
+                        if (c == CardType.Betrayal || c == CardType.Pollution) baseScore += 5;
+                        if (c == CardType.Chaos) baseScore += 10; // Desperation
+                    }
+
+                    // ★ [FIX] Safe dictionary access
                     return baseScore * (weights.ContainsKey(c) ? weights[c] : 1.0f);
                 }
 
@@ -1196,31 +1153,35 @@ namespace GameCore
 
             A.fallback = new[] {
                 CardType.Betrayal, CardType.Chaos, CardType.Curse,
-                CardType.Pollution, CardType.Interrupt, CardType.Cooperation,
-                CardType.Doubt, CardType.Recon, CardType.Sacrifice
+                CardType.Pollution, CardType.Interrupt, CardType.Investment,
+                CardType.Cooperation, CardType.Doubt, CardType.Recon, CardType.Sacrifice
             };
             
-            // 오태훈 — 선택 드로우 (공격적, 변칙적, 자만심)
-            A.chooseFromTwo = (CardType a, CardType b, DecisionInput I) =>
+            // Oh Tae-hoon — Selective Draw (Aggressive, Erratic, Hubris)
+            A.chooseFromTwo = (a, b, I) =>
             {
                 var weights = AgentManager.I.GetWeights(I.selfID);
                 int R = Math.Max(1, I.s.round);
                 bool winning = I.s.selfLife > I.s.oppLife;
 
-                // [신규] Sacrifice: 이기고 있으면 "멋지게 끝내기 위해" 집음
+                // [NEW] Investment / Sacrifice: Pick only when winning (Snowballing)
                 if (winning)
                 {
-                    if (a == CardType.Sacrifice && b != CardType.Sacrifice) return 0;
-                    if (b == CardType.Sacrifice && a != CardType.Sacrifice) return 1;
+                    // Pick "Show off" cards when winning
+                    if (a == CardType.Investment || a == CardType.Sacrifice) 
+                        if (b != CardType.Investment && b != CardType.Sacrifice) return 0;
+                    
+                    if (b == CardType.Investment || b == CardType.Sacrifice)
+                        if (a != CardType.Investment && a != CardType.Sacrifice) return 1;
                 }
                 else
                 {
-                    // 지고 있으면 쓸모없으니 버림
-                    if (a == CardType.Sacrifice) return 1;
-                    if (b == CardType.Sacrifice) return 0;
+                    // Discard cards that don't help immediately when losing
+                    if (a == CardType.Investment || a == CardType.Sacrifice) return 1;
+                    if (b == CardType.Investment || b == CardType.Sacrifice) return 0;
                 }
 
-                // [Chaos 사랑]: 덱에 Chaos 보이면 일단 집고 봄 (오태훈 특성)
+                // [Chaos Love]: Pick Chaos if seen
                 if (a == CardType.Chaos && b != CardType.Chaos) return 0;
                 if (b == CardType.Chaos && a != CardType.Chaos) return 1;
 
@@ -1229,35 +1190,35 @@ namespace GameCore
                     float s = x switch
                     {
                         CardType.Betrayal    => 100,
-                        CardType.Chaos       => 95,  // [특성] 매우 선호
-                        CardType.Curse       => 85,  // [신규] 공격 수단 선호
+                        CardType.Chaos       => 95,  // [Favorite]
+                        CardType.Curse       => 85,  
                         CardType.Pollution   => 80,
+                        CardType.Sacrifice   => winning ? 88 : -50,
                         CardType.Recon       => 35,
                         CardType.Interrupt   => 30,
+                        // [NEW] Value fluctuation based on state
+                        CardType.Investment  => winning ? 25 : -50, 
                         CardType.Cooperation => 20,
                         CardType.Doubt       => 10,
-                        CardType.Sacrifice   => winning ? 90 : -50, // [신규] 상황따라 극과 극
                         _ => 0
                     };
 
-                    // 상황 보정
-                    if (x == CardType.Betrayal && I.s.oppLife <= R + 2) s += 30; // 킬각 냄새 잘 맡음
+                    if (x == CardType.Betrayal && I.s.oppLife <= R + 2) s += 30; 
                     
-                    // 저주는 상대가 방심할 때 좋음 (단순 확률 계산 아님)
-                    if (x == CardType.Curse && !I.s.IsFirst && I.s.lastOpp == CardType.Cooperation) s += 20;
-
-                    // FIX: Safe dictionary access
+                    // ★ [FIX] Safe dictionary access
                     return s * (weights.ContainsKey(x) ? weights[x] : 1.0f);
                 }
 
                 float sa = Score(a), sb = Score(b);
-                if (Math.Abs(sa - sb) < 0.1f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                
+                // Whimsical: 50% chance to pick randomly if scores are close
+                if (Math.Abs(sa - sb) < 10f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
                 return sa > sb ? 0 : 1;
             };
             return A;
         }
 
-        // 유민정V2 — 순응의 미학 (Sacrifice 기피 / Curse를 통한 조용한 잠식)
+        // Yoo Min-jung v3 — Iron Wall: Aesthetics of Compliance (Defensive Mirroring & Investment Bandwagoning)
         static Agent Build_유민정(AgentList id)
         {
             var A = new Agent("유민정", id);
@@ -1269,7 +1230,21 @@ namespace GameCore
                 bool nf = !I.s.IsFirst;
                 var history = I.HistoryOpponent();
 
-                // 1. [신규] Sacrifice 대응
+                // [Compliance] Read opponent's flow
+                bool opponentIsAggressive = I.Ratio(CardType.Betrayal) + I.Ratio(CardType.Pollution) > 0.3f;
+                bool opponentIsInvesting = I.Ratio(CardType.Investment) > 0.2f;
+
+                // 1. [Defensive] Iron Wall Defense
+                // Priority defense if opponent is aggressive or health is low
+                if (opponentIsAggressive || I.s.selfLife <= R)
+                {
+                    if (I.HandHas(CardType.Doubt)) return CardType.Doubt;
+                    // Counter with Interrupt when opponent attacks (Using others' force)
+                    if (nf && (I.s.lastOpp == CardType.Betrayal || I.s.lastOpp == CardType.Pollution))
+                        if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt;
+                }
+
+                // 2. [Existing] Counter Sacrifice: "Don't make me a scapegoat."
                 int oppSacCount = history.Count(c => c == CardType.Sacrifice);
                 if (oppSacCount >= 3)
                 {
@@ -1277,35 +1252,35 @@ namespace GameCore
                     if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
                 }
 
-                // 2. [신규] 본인의 Sacrifice 사용
-                if (I.HandHas(CardType.Sacrifice))
+                // 3. [NEW] Investment Bandwagon: "You invest? Then I will too."
+                // She doesn't lead investment. Only follows.
+                if (I.HandHas(CardType.Investment))
                 {
-                    int mySacPlayed = 0; 
-                    if (mySacPlayed >= 3) return CardType.Sacrifice; 
+                    // If opponent invested last round, or general investment ratio is high
+                    if (nf && I.s.lastOpp == CardType.Investment)
+                        return CardType.Investment;
+                    
+                    if (opponentIsInvesting) 
+                        return CardType.Investment;
                 }
 
-                // 3. 생존 최우선
-                if (I.HandHas(CardType.Doubt) &&
-                    (I.s.selfLife <= R || I.s.selfLife + 1 < I.s.oppLife))
-                    return CardType.Doubt;
-
-                // 4. [신규] Curse 활용
+                // 4. [Existing] Utilize Curse: "Silent Encroachment"
+                // Use when opponent is peaceful/distracted
                 if (nf && I.HandHas(CardType.Curse))
                 {
-                    if (I.s.lastOpp == CardType.Cooperation || I.s.lastOpp == CardType.Recon)
+                    if (I.s.lastOpp == CardType.Cooperation || I.s.lastOpp == CardType.Recon || I.s.lastOpp == CardType.Investment)
                     {
+                        // Only use if low chance of defense (dislikes attention)
                         if (I.Ratio(CardType.Doubt) < 0.4f)
                             return CardType.Curse;
                     }
                 }
 
-                // 5. 직전 대응 (Mirroring & Counter)
+                // 5. Immediate Response (Mirroring & Counter)
                 if (nf)
                 {
                     if (I.s.lastOpp == CardType.Pollution && I.HandHas(CardType.Doubt))
                         return CardType.Doubt;
-                    if (I.s.lastOpp == CardType.Betrayal && I.HandHas(CardType.Interrupt))
-                        return CardType.Interrupt;
                     
                     if (I.s.lastOpp == CardType.Curse)
                     {
@@ -1313,32 +1288,34 @@ namespace GameCore
                         if (I.HandHas(CardType.Doubt)) return CardType.Doubt;
                     }
 
+                    // Mirroring (Copy opponent unless it's aggressive)
+                    // [NEW] Include Investment in mirroring logic if not caught above
                     if (I.HandHas(I.s.lastOpp) && 
                         I.s.lastOpp != CardType.Betrayal && 
                         I.s.lastOpp != CardType.Pollution && 
-                        I.s.lastOpp != CardType.Curse)
+                        I.s.lastOpp != CardType.Curse &&
+                        I.s.lastOpp != CardType.Sacrifice) 
                         return I.s.lastOpp;
                 }
 
-                // 6. 기본 점수 계산 (가중치 적용)
+                // 6. Base Priority Score
                 float Score(CardType c)
                 {
                     float baseScore = c switch {
-                        CardType.Doubt => 10,       
-                        CardType.Cooperation => 8,  
-                        CardType.Interrupt => 7,
-                        CardType.Pollution => 5,
-                        CardType.Curse => 4.5f,     
+                        CardType.Doubt => 12,       // [Core] Iron Wall: Defense First
+                        CardType.Investment => 10,   // [NEW] Use if context fits (Bandwagon)
+                        CardType.Cooperation => 9,  // [Trait] Compliance
+                        CardType.Interrupt => 8,    // Use opponent's force
+                        CardType.Pollution => 6,
+                        CardType.Curse => 5,        // Silent attack
                         CardType.Recon => 4,
                         CardType.Chaos => 2,
-                        CardType.Betrayal => 1,     
-                        CardType.Sacrifice => -20,  
+                        CardType.Betrayal => 1,     // Dislikes attention-grabbing attacks
+                        CardType.Sacrifice => -20,  // [Trait] Avoids completely
                         _ => 0
                     };
-                    
-                    // ▼▼▼ [수정됨] 안전한 가중치 접근 (KeyNotFoundException 방지) ▼▼▼
-                    float w = weights.ContainsKey(c) ? weights[c] : 1.0f;
-                    return baseScore * w;
+                    // ★ [FIX] Safe dictionary access
+                    return baseScore * (weights.ContainsKey(c) ? weights[c] : 1.0f);
                 }
                 return I.hand.Distinct().Where(I.HandHas).OrderByDescending(Score).FirstOrDefault();
             });
@@ -1346,59 +1323,66 @@ namespace GameCore
             A.fallback = new[]
             {
                 CardType.Doubt, CardType.Cooperation, CardType.Interrupt,
-                CardType.Pollution, CardType.Curse, CardType.Recon, 
-                CardType.Chaos, CardType.Betrayal, CardType.Sacrifice
+                CardType.Investment, CardType.Pollution, CardType.Curse, 
+                CardType.Recon, CardType.Chaos, CardType.Betrayal, CardType.Sacrifice
             };
             
-            // 선택 드로우 (Draft)
-            A.chooseFromTwo = (c0, c1, I) =>
+            // Selective Draw (Draft)
+            A.chooseFromTwo = (a, b, I) =>
             {
                 var weights = AgentManager.I.GetWeights(I.selfID);
-                int R = Math.Max(1, I.s.round);
 
-                if (c0 == CardType.Sacrifice && c1 != CardType.Sacrifice) return 1;
-                if (c1 == CardType.Sacrifice && c0 != CardType.Sacrifice) return 0;
+                // [Existing] Hate Sacrifice: "It's dangerous."
+                if (a == CardType.Sacrifice && b != CardType.Sacrifice) return 1;
+                if (b == CardType.Sacrifice && a != CardType.Sacrifice) return 0;
+
+                // [NEW] Investment: "Should I follow the flow?"
+                // Pick if opponent invests often
+                bool opponentInvests = I.Ratio(CardType.Investment) > 0.2f;
 
                 float Score(CardType t)
                 {
                     float s = t switch
                     {
-                        CardType.Doubt        => 50,
-                        CardType.Cooperation  => 45,
-                        CardType.Interrupt    => 30,
-                        CardType.Recon        => 25,
-                        CardType.Curse        => 20,
-                        CardType.Pollution    => 15,
-                        CardType.Betrayal     => 8,
-                        CardType.Sacrifice    => -50,
-                        CardType.Chaos        => 0,
+                        CardType.Doubt        => 100, // Defense essential
+                        CardType.Investment   => opponentInvests ? 85 : 40, // [NEW] Follow opponent
+                        CardType.Cooperation  => 80,  // Compliance
+                        CardType.Interrupt    => 70,
+                        CardType.Recon        => 50,
+                        CardType.Curse        => 45,
+                        CardType.Pollution    => 30,
+                        CardType.Betrayal     => 20,
+                        CardType.Chaos        => 10,
+                        CardType.Sacrifice    => -100,
                         _ => 0
                     };
 
-                    if (I.s.selfLife < I.s.oppLife && t == CardType.Doubt) s += 15; 
-                    if (I.Ratio(CardType.Curse) > 0.2f && t == CardType.Cooperation) s += 10;
+                    // Context Adjustment
+                    if (I.s.selfLife < I.s.oppLife && t == CardType.Doubt) s += 30; // Withdraw further
+                    
+                    if (I.Ratio(CardType.Curse) > 0.2f && t == CardType.Cooperation) s += 20;
 
-                    // ▼▼▼ [수정됨] 안전한 가중치 접근 ▼▼▼
-                    float w = weights.ContainsKey(t) ? weights[t] : 1.0f;
-                    return s * w;
+                    // ★ [FIX] Safe dictionary access
+                    return s * (weights.ContainsKey(t) ? weights[t] : 1.0f);
                 }
 
-                float s0 = Score(c0), s1 = Score(c1);
-                if (Math.Abs(s0 - s1) < 0.1f)
+                float sa = Score(a), sb = Score(b);
+                if (Math.Abs(sa - sb) < 0.1f)
                 {
+                    // Pick safer card on tie
                     int safe(CardType t) => t switch
                     {
                         CardType.Doubt => 5, CardType.Cooperation => 4, 
-                        CardType.Interrupt => 3, CardType.Curse => 2, _ => 0
+                        CardType.Interrupt => 3, CardType.Investment => 2, _ => 0
                     };
-                    return safe(c0) >= safe(c1) ? 0 : 1;
+                    return safe(a) >= safe(b) ? 0 : 1;
                 }
-                return s0 > s1 ? 0 : 1;
+                return sa > sb ? 0 : 1;
             };
             return A;
         }
 
-        // 김태양V2 — 무작위·교란형 (Sacrifice 도박 / Curse 장난)
+        // Kim Tae-yang v3 — The Joker: Erratic & Random (Investment Prank & Chaos Lover)
         static Agent Build_김태양(AgentList id)
         {
             var A = new Agent("김태양", id);
@@ -1409,76 +1393,90 @@ namespace GameCore
                 bool nf = !I.s.IsFirst;
                 var history = I.HistoryOpponent();
 
-                // 0. [천재적 감각] "이거 내면 끝나는 거 아냐?" (Sacrifice 킬각)
-                // 평소엔 막 하다가도, 결정적인 순간(4번째 희생)엔 손이 먼저 반응함
-                // (자신의 희생 카운트 추적 - 약식 로직)
-                int mySacPlayed = 0; // *실제 구현 시 AgentManager 등에서 추적 필요하지만, 김태양은 '느낌'으로 냄
+                // [The Joker] Mood Mode
+                // Mood changes every turn (0: Aggro, 1: Chaos, 2: Random)
+                int mood = UnityEngine.Random.Range(0, 3); 
+
+                // 0. [Genius Sense] Sacrifice Lethal (Can't resist)
                 if (I.HandHas(CardType.Sacrifice))
                 {
-                    // 4번째 장이라 느껴지거나(확률), 그냥 체력이 많아서 심심하면(6 이상) 던짐
-                    if (UnityEngine.Random.value < 0.3f || I.s.selfLife > 6) 
+                    // Randomly throw it, or show off if health is high
+                    if (UnityEngine.Random.value < 0.4f || I.s.selfLife > 6) 
                         return CardType.Sacrifice;
                 }
 
-                // 1. [방해 공작] 상대가 Sacrifice로 '노잼 승리'를 하려 한다?
-                // "설계하지 마! 판 엎어!" -> Chaos 우선, 없으면 Betrayal
+                // 1. [Disruption] Opponent trying 'Boring Win' with Sacrifice?
+                // "Don't plan! Flip the table!" -> Chaos first, then Betrayal
                 int oppSacCount = history.Count(c => c == CardType.Sacrifice);
                 if (oppSacCount >= 3)
                 {
-                    if (I.HandHas(CardType.Chaos)) return CardType.Chaos; // 리셋이 제일 재밌음
+                    if (I.HandHas(CardType.Chaos)) return CardType.Chaos; // Reset is most fun
                     if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;
                 }
 
-                // 2. [Curse 장난] "너무 조용하네? 저주나 받아라."
-                // 상대가 평화(Coop)롭거나 방어(Doubt)만 하면 심심해서 저주 투척
+                // 2. [NEW] Utilize Investment: "Investing now? Lol"
+                // He uses Investment as an unpredictable move.
+                // Plays it when opponent expects an attack (Doubt timing) to confuse them,
+                // or throws it on Round 1 for no reason.
+                if (I.HandHas(CardType.Investment))
+                {
+                    // 30% chance to just throw it (No reason)
+                    if (UnityEngine.Random.value < 0.3f) return CardType.Investment;
+                    
+                    // Reverse psychology: Invest when opponent is likely to Doubt (Mockery)
+                    if (I.Ratio(CardType.Doubt) > 0.4f) return CardType.Investment;
+                }
+
+                // 3. [Curse Prank]
+                // If opponent is quiet, throw a curse out of boredom
                 if (nf && (I.s.lastOpp == CardType.Cooperation || I.s.lastOpp == CardType.Doubt))
                 {
-                    if (I.HandHas(CardType.Curse) && UnityEngine.Random.value < 0.4f)
+                    if (I.HandHas(CardType.Curse) && UnityEngine.Random.value < 0.5f)
                         return CardType.Curse;
                 }
 
-                // 3. [초반 러시] 아무거나 공격 (기존 로직 유지 + Curse 추가)
-                if (R <= 3 && UnityEngine.Random.value < 0.70f)
+                // 4. [Chaos Pursuit] Chaos (Active when Mood 1)
+                if (mood == 1 && I.HandHas(CardType.Chaos))
+                    return CardType.Chaos;
+
+                // 5. [Early Rush] Random Attack (Active when Mood 0)
+                if (mood == 0 && (R <= 4 || UnityEngine.Random.value < 0.6f))
                 {
                     var pool = new List<CardType>();
                     if (I.HandHas(CardType.Chaos)) pool.Add(CardType.Chaos);
                     if (I.HandHas(CardType.Pollution)) pool.Add(CardType.Pollution);
                     if (I.HandHas(CardType.Betrayal)) pool.Add(CardType.Betrayal);
-                    if (I.HandHas(CardType.Curse)) pool.Add(CardType.Curse); // 풀에 추가
-                    if (I.HandHas(CardType.Sacrifice)) pool.Add(CardType.Sacrifice); // 미친 척 희생
+                    if (I.HandHas(CardType.Curse)) pool.Add(CardType.Curse); 
+                    if (I.HandHas(CardType.Sacrifice)) pool.Add(CardType.Sacrifice); 
                     
                     if (pool.Count > 0) return pool[UnityEngine.Random.Range(0, pool.Count)];
                 }
 
-                // 4. [혼돈 추구] 주기적 Chaos (기존 유지)
-                if (I.HandHas(CardType.Chaos) && (R % 3 == 0 || UnityEngine.Random.value < 0.25f))
-                    return CardType.Chaos;
-
-                // 5. [단순 킬각] (기존 유지)
-                if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R) return CardType.Betrayal;
-
-                // 6. [무작위 뽑기] 가중치 기반 랜덤 (Curse, Sacrifice 추가)
+                // 6. [Random Pick] Weighted Random
+                // He hates calculation, picks randomly based on weights
                 {
                     var bag = new List<CardType>();
                     void Push(CardType t, int w)
                     {
                         if (!I.HandHas(t)) return;
-                        // FIX: Safe dictionary access in Push function
+                        // ★ [FIX] Safe dictionary access
                         float weightVal = weights.ContainsKey(t) ? weights[t] : 1.0f;
                         int finalWeight = Mathf.RoundToInt(w * weightVal);
                         for (int k = 0; k < finalWeight; ++k) bag.Add(t);
                     }
-                    Push(CardType.Betrayal, 4);
-                    Push(CardType.Pollution, 4);
-                    Push(CardType.Chaos, 3);
-                    Push(CardType.Curse, 3);      // [신규] 꽤 자주 냄
-                    Push(CardType.Sacrifice, 2);  // [신규] 가끔 미친 척 냄
-                    Push(CardType.Interrupt, 2);
-                    Push(CardType.Cooperation, 1);
-                    Push(CardType.Doubt, 1);
-                    Push(CardType.Recon, 1);
+                    // More fun = Higher weight
+                    Push(CardType.Betrayal, 5);
+                    Push(CardType.Chaos, 5);
+                    Push(CardType.Sacrifice, 4);  
+                    Push(CardType.Curse, 4);      
+                    Push(CardType.Pollution, 3);
+                    Push(CardType.Interrupt, 3);
+                    Push(CardType.Investment, 2); // [NEW] Moderate fun
+                    Push(CardType.Cooperation, 1); // Boring
+                    Push(CardType.Doubt, 1);       // Boring
+                    Push(CardType.Recon, 0);       // Hate
 
-                    if (bag.Count > 0 && UnityEngine.Random.value < 0.85f)
+                    if (bag.Count > 0)
                         return bag[UnityEngine.Random.Range(0, bag.Count)];
                 }
 
@@ -1489,55 +1487,56 @@ namespace GameCore
             A.fallback = new[]
             {
                 CardType.Chaos, CardType.Betrayal, CardType.Sacrifice, 
-                CardType.Curse, CardType.Pollution, CardType.Interrupt, 
-                CardType.Doubt, CardType.Cooperation, CardType.Recon
+                CardType.Curse, CardType.Pollution, 
+                CardType.Interrupt, CardType.Doubt, CardType.Investment, CardType.Cooperation, CardType.Recon
             };
             
-            // 선택 드로우(2장 중 1장): "뭐가 더 재밌을까?"
+            // Selective Draw (2 cards): "Which one is more fun?"
             A.chooseFromTwo = (CardType a, CardType b, DecisionInput I) =>
             {
                 var weights = AgentManager.I.GetWeights(I.selfID);
                 bool losing = I.s.selfLife < I.s.oppLife;
 
-                // [Chaos 사랑]
-                if (a == CardType.Chaos && b != CardType.Chaos) return UnityEngine.Random.value < 0.6f ? 0 : 1;
-                if (b == CardType.Chaos && a != CardType.Chaos) return UnityEngine.Random.value < 0.6f ? 1 : 0;
+                // [Chaos Love]
+                if (a == CardType.Chaos && b != CardType.Chaos) return UnityEngine.Random.value < 0.7f ? 0 : 1;
+                if (b == CardType.Chaos && a != CardType.Chaos) return UnityEngine.Random.value < 0.7f ? 1 : 0;
 
-                // [Sacrifice 도박] "빨간약 먹어볼까?"
-                // 지고 있으면 에라 모르겠다 하고 집음 (40% 확률)
+                // [Sacrifice Gamble]
                 if (losing)
                 {
-                    if (a == CardType.Sacrifice) if (UnityEngine.Random.value < 0.4f) return 0;
-                    if (b == CardType.Sacrifice) if (UnityEngine.Random.value < 0.4f) return 1;
+                    // 50% chance to pick 'Red Pill' (Sacrifice) when losing
+                    if (a == CardType.Sacrifice) if (UnityEngine.Random.value < 0.5f) return 0;
+                    if (b == CardType.Sacrifice) if (UnityEngine.Random.value < 0.5f) return 1;
                 }
 
                 float Score(CardType x)
                 {
                     int s = x switch
                     {
-                        CardType.Chaos       => 80,
-                        CardType.Betrayal    => 70,
-                        CardType.Sacrifice   => 60, // [신규] 고위험군 선호
-                        CardType.Curse       => 58, // [신규] 장난감
-                        CardType.Pollution   => 55,
-                        CardType.Cooperation => 30, // 노잼
-                        CardType.Doubt       => 20, // 노잼
-                        CardType.Interrupt   => 22,
-                        CardType.Recon       => 15,
+                        CardType.Chaos       => 100, // [Favorite]
+                        CardType.Betrayal    => 90,
+                        CardType.Sacrifice   => 85, 
+                        CardType.Curse       => 80, 
+                        CardType.Pollution   => 60,
+                        CardType.Interrupt   => 40,
+                        CardType.Investment  => 30, // [NEW] Moderate fun
+                        CardType.Cooperation => 20, // Boring
+                        CardType.Doubt       => 10, // Boring
+                        CardType.Recon       => 0,  // Hate
                         _ => 0
                     };
                     
-                    // 변덕스러운 가산점 (매 판 달라짐)
-                    s += UnityEngine.Random.Range(-10, 15);
+                    // Whimsical bonus (Changes every match) -> Erratic trait
+                    s += UnityEngine.Random.Range(-20, 20);
 
-                    // FIX: Safe dictionary access
+                    // ★ [FIX] Safe dictionary access
                     return s * (weights.ContainsKey(x) ? weights[x] : 1.0f);
                 }
 
                 float sa = Score(a), sb = Score(b);
 
-                // 완전 랜덤성 (15% 확률로 점수 무시하고 아무거나 집음)
-                if (UnityEngine.Random.value < 0.15f)
+                // Total Randomness (20% chance to pick anything regardless of score)
+                if (UnityEngine.Random.value < 0.2f)
                     return UnityEngine.Random.Range(0, 2);
 
                 return sa > sb ? 0 : 1;
@@ -1545,98 +1544,120 @@ namespace GameCore
             return A;
         }
 
-        // 이하린V2 — 유치원생·순수 모방 (Sacrifice 기피 / Curse 무서워함)
+        // Lee Ha-rin v3 — The Innocent: Pure Mimic (Visual Preference & Emotional Sync)
         static Agent Build_이하린(AgentList id)
         {
             var A = new Agent("이하린", id);
 
-            // 유치원생이 좋아하는 카드 순서 (시각적/감정적 선호도)
-            // 반짝임(Coop) > 재밌음(Chaos) > 신기함(Recon) > 파란색(Doubt) > ... > 무서움(Curse/Sacrifice/Betrayal)
+            // Kindergarten preference order (Visual/Emotional)
+            // Sparkly(Coop) > Treasure(Inv) > Toy(Chaos) > Scope(Recon) > Shield(Doubt) > ... > Scary(Curse/Sacrifice/Betrayal)
             CardType[] cuteOrder = {
-                CardType.Cooperation, // 반짝반짝 예쁨
-                CardType.Chaos,       // 알록달록 재밌음 (상향)
-                CardType.Recon,       // 망원경 장난감
-                CardType.Doubt,       // 파란색 방패
-                CardType.Interrupt,   // 하이파이브(손바닥)
-                CardType.Pollution,   // 초록색 슬라임
-                CardType.Curse,       // [신규] 유령 (무서움)
-                CardType.Sacrifice,   // [신규] 아픔 (싫음)
-                CardType.Betrayal     // [최악] 칼 (제일 무서움)
+                CardType.Cooperation, // Sparkly & Pretty (Favorite)
+                CardType.Investment,  // [NEW] Treasure Chest / Piggy Bank (Loves it)
+                CardType.Chaos,       // Colorful & Fun
+                CardType.Recon,       // Telescope Toy
+                CardType.Doubt,       // Blue Shield (Looks safe)
+                CardType.Interrupt,   // High-five
+                CardType.Pollution,   // Green Slime (Eww)
+                CardType.Curse,       // Ghost (Scary)
+                CardType.Sacrifice,   // Hurt (Dislike)
+                CardType.Betrayal     // Knife (Scariest)
             };
 
             A.rules.Add(I =>
             {
-                // 0. [감정 동기화] Chaos는 너무 재밌어!
-                // 손패에 Chaos가 있으면 50% 확률로 그냥 냄 (승패 상관없음)
+                var weights = AgentManager.I.GetWeights(I.selfID);
+
+                // 0. [Emotional Sync] Chaos is fun!
                 if (I.HandHas(CardType.Chaos) && UnityEngine.Random.value < 0.5f)
                     return CardType.Chaos;
 
-                // 1. [순수 모방] "언니/오빠가 한 거 나도 할래!"
-                // 직전 상대 카드를 30% 확률로 따라함
+                // 1. [Pure Mimicry] "I want to do what unnie/oppa did!"
+                // Mimic previous opponent card with 40% chance
                 if (!I.s.IsFirst && I.HandHas(I.s.lastOpp))
                 {
-                    // 단, 너무 무서운 카드(Betrayal, Sacrifice)는 따라하기 싫어함
-                    // Curse는 "유령 놀이"라고 생각해서 가끔 따라함
-                    if (I.s.lastOpp == CardType.Sacrifice || I.s.lastOpp == CardType.Betrayal)
+                    // She hates mimicking scary cards
+                    if (I.s.lastOpp == CardType.Sacrifice || I.s.lastOpp == CardType.Betrayal || I.s.lastOpp == CardType.Curse)
                     {
-                        // 따라할 확률 매우 낮음 (5%)
+                        // Very low chance to mimic scary things
                         if (UnityEngine.Random.value < 0.05f) return I.s.lastOpp;
                     }
                     else
                     {
-                        // 나머지는 30% 확률로 모방
-                        if (UnityEngine.Random.value < 0.30f) return I.s.lastOpp;
+                        // Mimic others (including Investment) with 40% chance
+                        if (UnityEngine.Random.value < 0.40f) return I.s.lastOpp;
                     }
                 }
 
-                // 2. [신규] Sacrifice 반응: "아픈 건 싫어..."
-                // Sacrifice는 우선순위 목록(cuteOrder)에서도 뒤쪽이지만,
-                // 만약 손패에 Sacrifice만 남았다면 어쩔 수 없이 냄.
-                // (별도 로직 필요 없음, fallback 순서로 처리됨)
+                // 2. [NEW] Utilize Investment: "I'm saving up!"
+                // She plays it because she likes the picture, no calculation involved.
+                // But if opponent is "scary" (attacking), she might cry and defend/run away.
+                if (I.HandHas(CardType.Investment))
+                {
+                    // If opponent didn't attack last turn (peaceful), she happily invests.
+                    bool safe = I.s.lastOpp != CardType.Betrayal && I.s.lastOpp != CardType.Pollution;
+                    if (safe && UnityEngine.Random.value < 0.3f)
+                        return CardType.Investment;
+                }
 
-                // 3. [시각적 선호] 예쁜 카드 순서대로 냄
+                // 3. [Visual Preference] Play cards in order of "cuteness"
                 foreach (var c in cuteOrder)
-                    if (I.HandHas(c)) return c;
+                {
+                    if (I.HandHas(c))
+                    {
+                        // ★ [FIX] Safe dictionary access
+                        float w = weights.ContainsKey(c) ? weights[c] : 1.0f;
+                        if (w < 0.5f) continue; 
+                        
+                        return c;
+                    }
+                }
 
-                // 4. 그래도 없으면 아무거나
+                // 4. Fallback
                 return I.FirstOrNone();
             });
 
-            // Fallback도 선호도 순서
             A.fallback = cuteOrder;
 
-            // 선택 드로우 (Draft): "이게 더 예뻐!"
-            A.chooseFromTwo = (CardType a, CardType b, DecisionInput I) =>
+            // --- Selective Draw (Draft): "This one is prettier!" ---
+            A.chooseFromTwo = (a, b, I) =>
             {
-                // [신규] Sacrifice 절대 기피 ("이거 아픈 카드잖아!")
-                if (a == CardType.Sacrifice && b != CardType.Sacrifice) return 1;
-                if (b == CardType.Sacrifice && a != CardType.Sacrifice) return 0;
+                var weights = AgentManager.I.GetWeights(I.selfID);
 
-                // [신규] Curse 기피 ("유령 무서워...")
-                // 단, Betrayal보다는 덜 무서워함
-                if (a == CardType.Curse && b != CardType.Curse && b != CardType.Betrayal) return 1;
-                if (b == CardType.Curse && a != CardType.Curse && a != CardType.Betrayal) return 0;
+                // [Existing] Absolute avoidance of Scary cards
+                bool aIsScary = a == CardType.Sacrifice || a == CardType.Betrayal;
+                bool bIsScary = b == CardType.Sacrifice || b == CardType.Betrayal;
 
-                // 유치원생의 점수표
+                if (aIsScary && !bIsScary) return 1;
+                if (bIsScary && !aIsScary) return 0;
+
+                // [NEW] Investment Preference ("Look, a treasure chest!")
+                if (a == CardType.Investment && b != CardType.Investment) return 0;
+                if (b == CardType.Investment && a != CardType.Investment) return 1;
+
+                // Kindergartner's Scoreboard
                 float Score(CardType c)
                 {
-                    return c switch
+                    float baseScore = c switch
                     {
-                        CardType.Cooperation => 100f, // 제일 좋아
-                        CardType.Chaos       => 90f,  // 재밌어
-                        CardType.Recon       => 70f,  // 장난감
-                        CardType.Doubt       => 60f,  // 안전해
+                        CardType.Cooperation => 100f, // Best
+                        CardType.Investment  => 95f,  // [NEW] Treasure is good
+                        CardType.Chaos       => 90f,  // Fun
+                        CardType.Recon       => 70f,  // Toy
+                        CardType.Doubt       => 60f,  // Safe
                         CardType.Interrupt   => 50f,
-                        CardType.Pollution   => 40f,  // 으 지지
-                        CardType.Curse       => 10f,  // [신규] 무서워
-                        CardType.Sacrifice   => -50f, // [신규] 아파
-                        CardType.Betrayal    => -100f,// 너무 무서워
+                        CardType.Pollution   => 40f,  // Yucky
+                        CardType.Curse       => 10f,  // Scary
+                        CardType.Sacrifice   => -50f, // Ouch
+                        CardType.Betrayal    => -100f,// Very Scary
                         _ => 0f
                     };
+                    // ★ [FIX] Safe dictionary access
+                    return baseScore * (weights.ContainsKey(c) ? weights[c] : 1.0f);
                 }
 
-                float sa = Score(a) + UnityEngine.Random.Range(-5f, 5f); // 아이의 변덕
-                float sb = Score(b) + UnityEngine.Random.Range(-5f, 5f);
+                float sa = Score(a) + UnityEngine.Random.Range(-10f, 10f); // Child's whim
+                float sb = Score(b) + UnityEngine.Random.Range(-10f, 10f);
 
                 return sa >= sb ? 0 : 1;
             };
@@ -1674,8 +1695,11 @@ namespace GameCore
                         if (oppCard == CardType.Cooperation) return 0; // 서로 +1
                         if (oppCard == CardType.Doubt) return +1;      // 나+1, 상0 (상대는 비용지불) -> 이득
                         if (oppCard == CardType.Betrayal) return -(r + 2); // 나 배신당함(-1), 상대 성공(+r) -> 큰 손해
-                        if (oppCard == CardType.Curse) return -1;      // 나 저주걸림(-2), 협력보상(+1) -> 손해
+                        if (oppCard == CardType.Curse) return -2;      // 나 저주걸림(-2), 협력보상(+1) -> 손해
                         if (oppCard == CardType.Sacrifice) return +2;  // 상대 자해(-1), 나 협력(+1) -> 이득
+                        if (oppCard == CardType.Pollution) return -1;  // 상대 자해(-1), 나 협력(+1) -> 이득
+                        if (oppCard == CardType.Investment) return 0;
+                        if (oppCard == CardType.Interrupt) return +2; // 방어 성공
                         return +1;
                     
                     case CardType.Doubt:
@@ -1708,8 +1732,12 @@ namespace GameCore
 
                     case CardType.Pollution:
                         if (oppCard == CardType.Cooperation) return +2;
+                        if (oppCard == CardType.Investment) return +2;
                         if (oppCard == CardType.Doubt) return -1;
                         if (oppCard == CardType.Sacrifice) return +1;
+                        if (oppCard == CardType.Betrayal) return -r + 2;
+                        if (oppCard == CardType.Curse) return -1; // 저주걸림
+                        if (oppCard == CardType.Interrupt) return -2; // 방어당함
                         return 0;
 
                     case CardType.Interrupt:
@@ -1720,9 +1748,28 @@ namespace GameCore
 
                     case CardType.Recon:
                         if (oppCard == CardType.Betrayal) return -(r + 1);
+                        if (oppCard == CardType.Pollution) return - 1;
+                        if (oppCard == CardType.Curse) return -2;
                         return 0;
-                        
+
+                    case CardType.Chaos:
+                        if (oppCard == CardType.Betrayal) return -(r + 1);
+                        if (oppCard == CardType.Pollution) return - 1;
+                        if (oppCard == CardType.Curse) return -2;
+                        return 0;
+            
+                    case CardType.Investment:
+                        if (oppCard == CardType.Cooperation) return 0; // 서로 +1
+                        if (oppCard == CardType.Doubt) return +1;      // 나+1, 상0 (상대는 비용지불) -> 이득
+                        if (oppCard == CardType.Betrayal) return -(r + 2); // 나 배신당함(-1), 상대 성공(+r) -> 큰 손해
+                        if (oppCard == CardType.Curse) return -2;      // 나 저주걸림(-2), 협력보상(+1) -> 손해
+                        if (oppCard == CardType.Sacrifice) return +2;  // 상대 자해(-1), 나 협력(+1) -> 이득
+                        if (oppCard == CardType.Pollution) return -1;  // 상대 자해(-1), 나 협력(+1) -> 이득
+                        if (oppCard == CardType.Investment) return 0;
+                        if (oppCard == CardType.Interrupt) return +2; // 방어 성공
+                        return +1;
                     default: return 0;
+
                 }
             }
 
@@ -1867,7 +1914,7 @@ namespace GameCore
             return A;
         }
 
-        // 류성우V2 — 데이터 분석가 (Sacrifice 철저 계산 / Curse 확률 기반 사용)
+        // Ryu Sung-woo v3 — Risk Manager: Data Analyst (Risk Hedging & Info Monopoly)
         static Agent Build_류성우(AgentList id)
         {
             var A = new Agent("류성우", id);
@@ -1879,8 +1926,8 @@ namespace GameCore
                 bool losing = I.s.selfLife < I.s.oppLife;
                 var history = I.HistoryOpponent();
 
-                // 1. [이상치 제어] 상대방 Sacrifice 감지
-                // "시스템 경고: 상대 승리 확률 임계점 돌파. 강제 종료 시퀀스 가동."
+                // 1. [Anomaly Control] Detect Opponent Sacrifice
+                // "System Alert: Win probability threshold breached. Initiate forced termination."
                 int oppSacCount = history.Count(c => c == CardType.Sacrifice);
                 if (oppSacCount >= 3)
                 {
@@ -1888,7 +1935,7 @@ namespace GameCore
                     if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
                 }
 
-                // 2. 확률 데이터 수집 & 정규화
+                // 2. Collect & Normalize Probability Data
                 var p = new Dictionary<CardType, float>
                 {
                     { CardType.Cooperation, I.Ratio(CardType.Cooperation) },
@@ -1898,36 +1945,53 @@ namespace GameCore
                     { CardType.Pollution,   I.Ratio(CardType.Pollution)   },
                     { CardType.Interrupt,   I.Ratio(CardType.Interrupt)   },
                     { CardType.Recon,       I.Ratio(CardType.Recon)       },
-                    { CardType.Curse,       I.Ratio(CardType.Curse)       }, // 신규
-                    { CardType.Sacrifice,   I.Ratio(CardType.Sacrifice)   }  // 신규
+                    { CardType.Curse,       I.Ratio(CardType.Curse)       }, 
+                    { CardType.Sacrifice,   I.Ratio(CardType.Sacrifice)   },
+                    { CardType.Investment,  I.Ratio(CardType.Investment)  } // [NEW]
                 };
                 float sum = p.Values.Sum(); 
                 if (sum <= 0) sum = 1f; 
                 foreach (var k in p.Keys.ToList()) p[k] /= sum;
 
-                // 3. 교전 시뮬레이션 (Delta: 나의 이득 - 상대 이득)
+                // 3. Combat Simulation (Delta: My Gain - Opp Gain)
                 int Delta(CardType a, CardType b)
                 {
                     int r = R;
-                    // [기존 상성 로직 (주요 상성만 요약 반영)]
+                    
+                    // [NEW] Investment Calculation: "Risk Hedging"
+                    // Investment is successful if not attacked.
+                    // *Note: Actual stack is unknown, assume value rises with round (r/2)
+                    int investVal = Math.Max(1, r / 2); 
+
+                    if (a == CardType.Investment)
+                    {
+                        if (b == CardType.Betrayal) return -r - 2; // Critical Loss
+                        if (b == CardType.Pollution) return -2;
+                        if (b == CardType.Doubt || b == CardType.Interrupt) return 0;
+                        return investVal; // Success
+                    }
+
+                    // [Existing Logic]
                     if (a == CardType.Cooperation) {
                         if (b == CardType.Betrayal) return -(r + 1);
                         if (b == CardType.Doubt) return +1;
-                        if (b == CardType.Curse) return -1; // 저주 걸림(-2), 협력(+1) -> -1
-                        if (b == CardType.Sacrifice) return +2; // 상대 자해
+                        if (b == CardType.Curse) return -1; 
+                        if (b == CardType.Sacrifice) return +2; 
+                        if (b == CardType.Investment) return -1; // Opponent gains only
                         return 0; 
                     }
+                    // ... (Omitted for brevity, assume standard logic for others) ...
                     if (a == CardType.Doubt) {
                         if (b == CardType.Betrayal) return r + 1;
-                        if (b == CardType.Curse) return +1; // 방어 성공
+                        if (b == CardType.Curse) return +1; 
                         if (b == CardType.Sacrifice) return +1;
                         return 0;
                     }
                     if (a == CardType.Betrayal) {
                         if (b == CardType.Cooperation) return r + 1;
                         if (b == CardType.Doubt) return -(r + 1);
-                        if (b == CardType.Betrayal) return -2 * r; // 쌍방 배신은 큰 손해
-                        if (b == CardType.Curse) return r + 2; // 공격 성공(+r), 상대 저주검(나-2) -> 감수할만함
+                        if (b == CardType.Betrayal) return -2 * r; 
+                        if (b == CardType.Curse) return r + 2; 
                         if (b == CardType.Sacrifice) return r + 2;
                         return 0;
                     }
@@ -1937,119 +2001,131 @@ namespace GameCore
                         if (b == CardType.Sacrifice) return +1;
                         return 0;
                     }
-                    // [신규] Curse 계산: "지연된 데이터값"
                     if (a == CardType.Curse) {
-                        if (b == CardType.Doubt || b == CardType.Interrupt) return 0; // 막힘
-                        if (b == CardType.Betrayal) return -1; // 맞음
-                        return +2; // 성공 (2턴간 총 2데미지 이득)
+                        if (b == CardType.Doubt || b == CardType.Interrupt) return 0; 
+                        if (b == CardType.Betrayal) return -1; 
+                        return +2; 
                     }
-                    // [신규] Sacrifice 계산
-                    if (a == CardType.Sacrifice) return -1; // 기본적으로 -1 손해
+                    if (a == CardType.Sacrifice) return -1; 
 
-                    return 0; // 나머지(Recon, Interrupt, Chaos)는 중립적
+                    if (a == CardType.Recon) return 0.5f > 0 ? 1 : 0; // Info value
+
+                    return 0; 
                 }
 
-                // 4. EV 기반 선택
-                // *류성우는 자신의 Sacrifice 스택을 추적하여 4장째면 필승 코드로 인식해야 함
-                // (여기서는 외부 변수 접근이 어려우므로, 손패에 Sacrifice가 있고 게임 후반부면 시도하는 약식 로직 사용 가능하나,
-                //  기본적으로는 Draft에서 집지 않으므로 손에 있을 확률이 낮음)
-                
+                // 4. EV-based Selection
                 var cand = I.hand.Distinct().Where(I.HandHas).ToList();
                 CardType best = CardType.None; 
                 float bestEV = float.NegativeInfinity;
 
                 foreach (var a in cand)
                 {
-                    // Sacrifice는 막타 상황(가정) 아니면 EV 계산에서 극도로 불리하게 작용
+                    // Sacrifice is an outlier variable -> Exclude
                     if (a == CardType.Sacrifice) 
                     {
-                        // 내 승리 스택 확인 로직이 없다면 보수적으로 -99 처리
-                         if (I.s.selfLife > 8) { /* 아주 여유로우면 예외 허용 */ }
+                         if (I.s.selfLife > 8) { }
                          else { continue; }
                     }
 
                     float ev = 0f;
                     foreach (var b in p.Keys) ev += p[b] * Delta(a, b);
 
-                    // 상황 보정
-                    if (losing && (a == CardType.Betrayal || a == CardType.Pollution)) ev += 0.6f;
-                    if (!losing && (a == CardType.Doubt || a == CardType.Interrupt)) ev += 0.5f;
+                    // [Risk Manager] Context Adjustment
+                    if (losing && (a == CardType.Betrayal || a == CardType.Pollution)) ev += 0.8f; // Aggression
+                    if (!losing && (a == CardType.Doubt || a == CardType.Interrupt)) ev += 0.5f;   // Stability
                     
-                    // [Recon 선호] "데이터 독점"
-                    if (a == CardType.Recon) ev += 0.5f;
+                    // [Recon Preference] "Data Monopoly"
+                    if (a == CardType.Recon && R <= 5) ev += 1.5f;
 
-                    // [Curse 평가] "방어율이 낮으면 효율적"
-                    if (a == CardType.Curse)
+                    // [Investment Correction]
+                    // Invest boldly if attack probability is low (< 0.3)
+                    if (a == CardType.Investment)
                     {
-                        float defProb = p[CardType.Doubt] + p[CardType.Interrupt];
-                        if (defProb < 0.35f) ev += 1.2f; 
+                        float attackProb = p[CardType.Betrayal] + p[CardType.Pollution];
+                        if (attackProb < 0.3f) ev += 2.0f; 
+                        else ev -= 10.0f; // High risk -> Discard
                     }
 
-                    // FIX: Safe dictionary access
-                    ev *= weights.ContainsKey(a) ? weights[a] : 1.0f;
+                    // ★ [FIX] Safe dictionary access
+                    ev *= (weights.ContainsKey(a) ? weights[a] : 1.0f);
+                    
                     if (ev > bestEV) { bestEV = ev; best = a; }
                 }
                 
                 return best != CardType.None ? best : I.FirstOrNone();
             });
 
-            // 선택 드로우: "데이터 수집(Recon)과 안정성(Doubt) 우선"
+            // Selective Draw: "Data Collection (Recon) and Stability (Doubt) First"
             A.chooseFromTwo = (a, b, I) => {
                 var weights = AgentManager.I.GetWeights(I.selfID);
+                int R = Math.Max(1, I.s.round);
                 
-                // Sacrifice 배제: "데이터에 없는 요행수."
+                // [NEW] Investment: Pick for late game potential (only if safe)
+                bool lateGame = R >= 6;
+
                 if (a == CardType.Sacrifice && b != CardType.Sacrifice) return 1;
                 if (b == CardType.Sacrifice && a != CardType.Sacrifice) return 0;
 
                 float Score(CardType c) => (c switch {
-                    CardType.Recon       => 95, // [특성] 정보 독점
-                    CardType.Doubt       => 85, // [특성] 리스크 차단
-                    CardType.Pollution   => 75, // 효율적 누적 딜
-                    CardType.Curse       => 70, // [신규] 계산된 도트 딜
-                    CardType.Interrupt   => 65,
+                    CardType.Recon       => 95, // [Trait] Info Monopoly (Top)
+                    CardType.Doubt       => 85, // [Trait] Risk Block
+                    CardType.Pollution   => 80, // Efficient Dmg
+                    CardType.Curse       => 75,
+                    CardType.Interrupt   => 70,
+                    CardType.Investment  => lateGame ? 65 : 20, // [NEW] Value shifts by time
                     CardType.Betrayal    => 60,
                     CardType.Cooperation => 40,
-                    CardType.Chaos       => 10, // "데이터 오염원"
-                    CardType.Sacrifice   => -99,// [신규] 비효율
+                    CardType.Chaos       => 10, // "Data Contamination" (Hate)
+                    CardType.Sacrifice   => -99,
                     _ => 0
-                // FIX: Safe dictionary access
+                // ★ [FIX] Safe dictionary access
                 }) * (weights.ContainsKey(c) ? weights[c] : 1.0f);
 
                 return Score(a) >= Score(b) ? 0 : 1;
             };
 
-            A.fallback = new[] { CardType.Recon, CardType.Doubt, CardType.Pollution, CardType.Curse, CardType.Interrupt, CardType.Betrayal, CardType.Cooperation };
+            A.fallback = new[] { 
+                CardType.Recon, CardType.Doubt, 
+                CardType.Pollution, CardType.Curse, CardType.Interrupt, 
+                CardType.Betrayal, CardType.Investment, CardType.Cooperation 
+            };
             return A;
         }
 
-        // 서유리V2 — 패턴 연구가·반복 혐오 (Sacrifice 루프 파괴 / Interrupt 활용)
+        // Seo Yu-ri v3 — Pattern Breaker: Anti-Repetition & Predictive Counter (Anomaly Creation with Investment)
         static Agent Build_서유리(AgentList id)
         {
             var A = new Agent("서유리", id);
 
-            // [내부 함수] 카운터 카드 계산 로직
+            // [Internal Function] Counter Logic (Pattern Breaking)
             CardType GetCounter(CardType enemyCard, bool aggressive, DecisionInput I)
             {
-                // 1. [신규] Sacrifice Counter: "반복은 용서 안 해."
-                // 상대가 Sacrifice를 낸다면?
+                // 1. Counter Sacrifice: "Repetitive self-harm is boring."
                 if (enemyCard == CardType.Sacrifice)
                 {
-                    // Interrupt: 상대 비용(-1)만 나가고 스택 방해 가능(상황따라) 혹은 이득 챙김
-                    if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt;
-                    // Betrayal: 희생하느라 아픈 상대에게 치명타
-                    if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;
+                    if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt; // Break flow
+                    if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;   // Punish
                     return CardType.Pollution;
                 }
 
-                // 2. [신규] Curse Counter: "지루한 저주는 반사."
-                if (enemyCard == CardType.Curse)
+                // 2. [NEW] Counter Investment: "Money games are a pattern too."
+                if (enemyCard == CardType.Investment)
                 {
-                    // Interrupt로 막거나(효과 표 참조), Chaos로 상태 리셋
-                    if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt; 
-                    if (I.HandHas(CardType.Chaos)) return CardType.Chaos;
+                    // Interrupt to ruin stack efficiency
+                    if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt;
+                    // Betrayal to make investment fail
+                    if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal; 
+                    return CardType.Pollution; // Pollute
                 }
 
-                // 3. 기존 카운터 로직
+                // 3. Counter Curse
+                if (enemyCard == CardType.Curse)
+                {
+                    if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt; 
+                    if (I.HandHas(CardType.Chaos)) return CardType.Chaos; // Flip table
+                }
+
+                // 4. Existing Counters
                 if (enemyCard == CardType.Cooperation)
                 {
                     if (aggressive && I.HandHas(CardType.Betrayal)) return CardType.Betrayal;
@@ -2057,17 +2133,16 @@ namespace GameCore
                 }
                 if (enemyCard == CardType.Doubt)
                 {
-                    if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt;
-                    return CardType.Cooperation;
+                    if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt; // Break shield
+                    return CardType.Cooperation; // Induce waste
                 }
                 if (enemyCard == CardType.Betrayal)
                 {
                     if (I.HandHas(CardType.Doubt)) return CardType.Doubt;
-                    return CardType.Interrupt;
+                    return CardType.Interrupt; // Nullify attack
                 }
                 if (enemyCard == CardType.Chaos)
                 {
-                    // 혼란에는 정보(Recon)나 더 큰 혼란(Pollution)으로 대응
                     return aggressive ? CardType.Pollution : CardType.Recon;
                 }
                 if (enemyCard == CardType.Pollution)
@@ -2077,8 +2152,7 @@ namespace GameCore
                 }
                 if (enemyCard == CardType.Interrupt)
                 {
-                    // Interrupt를 뚫는 건, 공격이 아닌 Cooperation이나 정보
-                    return CardType.Cooperation;
+                    return CardType.Cooperation; // Flexibility
                 }
                 
                 return CardType.None;
@@ -2090,134 +2164,129 @@ namespace GameCore
                 int R = Math.Max(1, I.s.round);
                 var history = I.HistoryOpponent();
 
-                // 0. [절대 원칙] 자기 반복 금지
-                // "어제와 같은 오늘은 죽음이다."
-                // 직전에 낸 카드는 웬만하면 내지 않음 (점수에서 대폭 깎임)
+                // 0. [Absolute Rule] No Self-Repetition (Pattern Breaker)
                 CardType lastSelf = I.s.lastSelf;
 
-                // 1. [Loop Breaker] 상대의 Sacrifice 루프 감지
+                // 1. [Loop Breaker] Detect Sacrifice Loop
                 int oppSacCount = history.Count(c => c == CardType.Sacrifice);
                 if (oppSacCount >= 3)
                 {
-                    // "그 지루한 짓을 4번이나 하겠다고? 어림없지."
-                    // 즉시 흐름을 끊거나(Chaos, Interrupt) 죽임(Betrayal)
-                    if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt; //
+                    if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt; 
                     if (I.HandHas(CardType.Chaos)) return CardType.Chaos;
                     if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;
                 }
 
-                // 2. [Pattern Breaker] 예측 기반 역공
+                // 2. [Pattern Breaker] Predictive Counter (Core Ability)
                 var targetOpp = I.opponentID;
                 if (targetOpp != (AgentList)0)
                 {
-                    // LearningData를 통해 상대의 다음 수 예측
+                    // Predict next move using Learning Data
                     var predicted = AgentManager.I.PredictNextCard(I.selfID, targetOpp, I.s);
+                    
                     if (predicted.HasValue)
                     {
                         bool aggressive = I.s.selfLife >= I.s.oppLife;
                         var counter = GetCounter(predicted.Value, aggressive, I);
                         
-                        // 예측된 카드에 대한 카운터가 있고, 그 카드가 '직전에 낸 카드'가 아니라면 실행
                         if (counter != CardType.None && counter != lastSelf)
                             return counter;
                     }
                 }
 
-                // 3. 상대의 단순 반복(Loop) 응징
+                // 3. [Loop Punishment] Punish Simple Repetition
                 if (!I.s.IsFirst && I.s.lastOpp == I.s.last2Opp && I.s.lastOpp != CardType.None)
                 {
-                    // 상대가 같은 걸 또 냈다 -> 카운터 펀치
                     var counter = GetCounter(I.s.lastOpp, true, I);
                     if (counter != CardType.None) return counter;
                 }
 
-                // 4. [신규] Curse 활용: "정체된 판 흔들기"
-                // 상대가 방어적(Doubt)이거나 평화적(Coop)인 흐름이 반복되면 저주 사용
-                if (I.HandHas(CardType.Curse))
+                // 4. [NEW] Utilize Investment: "Anomaly Creation"
+                // Use Investment not for healing, but to disrupt tempo when flow is boring (Defensive/Peaceful).
+                if (I.HandHas(CardType.Investment))
                 {
                     bool boringFlow = (I.s.lastOpp == CardType.Doubt || I.s.lastOpp == CardType.Cooperation);
-                    if (boringFlow && lastSelf != CardType.Curse)
-                        return CardType.Curse;
+                    // Avoid self-repetition, use if flow is stagnant
+                    if (boringFlow && lastSelf != CardType.Investment)
+                        return CardType.Investment;
                 }
 
-                // 5. 점수 계산 (변칙성 중시)
-                var p = new Dictionary<CardType, float>();
-                // (확률 분포 계산 생략 - 약식)
-
+                // 5. Calculate Weighted Score
                 float Score(CardType c)
                 {
                     float baseScore = c switch {
-                        CardType.Interrupt => 10,  // [선호] 흐름 끊기
-                        CardType.Chaos => 9,       // [선호] 변수 창출
-                        CardType.Curse => 8,       // [신규] 새로운 자극
+                        CardType.Interrupt => 12,  // [Favorite] Break flow
+                        CardType.Chaos => 10,      // [Favorite] Flip table
+                        CardType.Curse => 9,       // New stimulus
                         CardType.Pollution => 7,
                         CardType.Betrayal => 6,
-                        CardType.Recon => 5,       // 패턴 분석용
+                        CardType.Recon => 5,       // For analysis
+                        CardType.Investment => 4,  // [NEW] Anomaly tool
                         CardType.Cooperation => 3,
-                        CardType.Doubt => 2,
-                        CardType.Sacrifice => -10, // [신규] 반복적인 카드는 싫음
+                        CardType.Doubt => 2,       // Hates passive defense
+                        CardType.Sacrifice => -10, // Hates repetition
                         _ => 0
                     };
 
-                    // [자기 반복 페널티] 직전 카드면 점수 대폭 삭감
+                    // [Self-Repetition Penalty]
                     if (c == lastSelf) baseScore -= 50;
 
-                    // [상대 반복 응징] 상대가 낸 카드를 미러링하는 건 싫어함 (독창성 부족)
+                    // [Mirroring Penalty] Hates unoriginal moves
                     if (c == I.s.lastOpp) baseScore -= 5;
 
-                    // FIX: Safe dictionary access
+                    // ★ [FIX] Safe dictionary access
                     return baseScore * (weights.ContainsKey(c) ? weights[c] : 1.0f);
                 }
 
                 return I.hand.Distinct().Where(I.HandHas).OrderByDescending(Score).FirstOrDefault();
             });
 
-            // 선택 드로우 (Draft)
+            // --- Selective Draw (Draft) ---
             A.chooseFromTwo = (a, b, I) =>
             {
                 var weights = AgentManager.I.GetWeights(I.selfID);
 
-                // [신규] Sacrifice 기피: "지루해."
+                // [Existing] Avoid Sacrifice
                 if (a == CardType.Sacrifice && b != CardType.Sacrifice) return 1;
                 if (b == CardType.Sacrifice && a != CardType.Sacrifice) return 0;
 
-                // [직전 카드 기피] 드로우 단계에서도 직전에 낸 카드는 피함
+                // [Self-Repetition Avoidance] Even in draft, avoid last played card
                 if (a == I.s.lastSelf && b != I.s.lastSelf) return 1;
                 if (b == I.s.lastSelf && a != I.s.lastSelf) return 0;
 
                 float Score(CardType c)
                 {
                     float s = c switch {
-                        CardType.Interrupt => 95,
-                        CardType.Chaos => 90,
-                        CardType.Curse => 85,
+                        CardType.Interrupt => 100, // [Core]
+                        CardType.Chaos => 95,      // [Core]
+                        CardType.Curse => 90,
                         CardType.Pollution => 70,
                         CardType.Recon => 60,
                         CardType.Betrayal => 50,
                         CardType.Doubt => 30,
+                        CardType.Investment => 25, // [NEW] Variable tool
                         CardType.Cooperation => 20,
-                        CardType.Sacrifice => -100, // 절대 안 집음
+                        CardType.Sacrifice => -100, 
                         _ => 0
                     };
-                    // FIX: Safe dictionary access
+                    // ★ [FIX] Safe dictionary access
                     return s * (weights.ContainsKey(c) ? weights[c] : 1.0f);
                 }
 
                 float sa = Score(a), sb = Score(b);
-                // 동점이면 랜덤(변칙)
+                // Random on tie (Erratic)
                 if (Math.Abs(sa - sb) < 0.1f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
                 return sa > sb ? 0 : 1;
             };
 
             A.fallback = new[] { 
                 CardType.Interrupt, CardType.Chaos, CardType.Curse, 
-                CardType.Pollution, CardType.Recon, CardType.Betrayal, 
-                CardType.Doubt, CardType.Cooperation, CardType.Sacrifice 
+                CardType.Pollution, CardType.Recon, 
+                CardType.Betrayal, CardType.Doubt, CardType.Investment, CardType.Cooperation, CardType.Sacrifice 
             };
             return A;
         }
 
-        // 강은호V2 — 통제의 회계사 (Sacrifice 손실 회피 / Curse 확정 이득 선호)
+        // Kang Eun-ho v3 — The Actuary: Controller Accountant (Variable Blocking & Safe Asset Management)
         static Agent Build_강은호(AgentList id)
         {
             var A = new Agent("강은호", id);
@@ -2228,17 +2297,17 @@ namespace GameCore
                 int R = Math.Max(1, I.s.round);
                 var history = I.HistoryOpponent();
 
-                // 0. [리스크 관리] 상대방 Sacrifice 감지 -> 파산 방지
-                // "경고: 상대방 승리 자산 축적. 긴급 청산 절차 가동."
+                // 0. [Risk Management] Detect Sacrifice -> Prevent Bankruptcy
+                // "Warning: Asset loss threshold reached. Emergency liquidation."
                 int oppSacCount = history.Count(c => c == CardType.Sacrifice);
                 if (oppSacCount >= 3)
                 {
-                    if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt; // 흐름 끊기
-                    if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;   // 강제 청산
+                    if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt; // Cut flow
+                    if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;   // Forced liquidation
                     if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
                 }
 
-                // 1. [손익 계산] Q 함수 (상대 패 예측 확률)
+                // 1. [P&L Calculation] Q Function
                 float P(CardType t) => I.Ratio(t);
                 float Z = 0f;
                 var types = (CardType[])Enum.GetValues(typeof(CardType));
@@ -2246,78 +2315,84 @@ namespace GameCore
                 if (Z <= 0) Z = 1f;
                 float Q(CardType t) => P(t) / Z;
 
-                // 2. [스트레스 반응] Chaos 혐오
-                // "변수는 질색이야." (Chaos는 점수 계산에서 대폭 감점)
+                // 2. [Stress Response] Hate Chaos (Handled in Score)
 
-                // 3. [안전 자산 선호] 초반 탐색
+                // 3. [Safe Asset Preference] Early Game Scouting
                 bool poorHand = !I.HandHas(CardType.Betrayal) && !I.HandHas(CardType.Pollution) && !I.HandHas(CardType.Curse);
                 if ((R <= 3 || poorHand) && I.HandHas(CardType.Recon))
                     return CardType.Recon;
 
-                // 4. [확정 킬각] 대차대조표 마감
+                // 4. [Guaranteed Lethal] Closing the Balance Sheet
                 if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R && Q(CardType.Doubt) < 0.3f)
                     return CardType.Betrayal;
 
-                // 5. [위기 관리] 방어
+                // 5. [Crisis Management] Defense
                 if (I.s.selfLife <= R && Q(CardType.Betrayal) >= 0.25f && I.HandHas(CardType.Doubt))
                     return CardType.Doubt;
 
-                // 6. [신규] Curse 활용: "장기 부채 발행."
-                // 상대의 방어 확률이 낮을 때, 저주는 가장 안정적인 투자처
+                // 6. [NEW] Utilize Investment: "Secure Safe Margin."
+                // Only invest if expected return > risk.
+                if (I.HandHas(CardType.Investment))
+                {
+                    // Calculate Risk: Opponent Attack + Interrupt probability
+                    float riskProb = Q(CardType.Betrayal) + Q(CardType.Pollution) + Q(CardType.Interrupt);
+                    
+                    // Invest only if risk is very low (< 20%)
+                    if (riskProb < 0.2f)
+                        return CardType.Investment;
+                }
+                
+                // 7. Utilize Curse: "Issue Long-term Debt."
                 if (I.HandHas(CardType.Curse))
                 {
                     float defProb = Q(CardType.Doubt) + Q(CardType.Interrupt);
                     if (defProb < 0.35f)
                         return CardType.Curse;
                 }
-                
-                // 7. [신규] Sacrifice 처리
-                // "손실 자산 처리." 3장 모았을 때만 이득, 그 외엔 무조건 기피
-                if (I.HandHas(CardType.Sacrifice))
-                {
-                    // (약식) 본인이 3장 냈다고 가정할 수 있는 경우에만 냄
-                    // 여기서는 기본적으로 안 냄 (점수 최하)
-                }
 
-                // 8. 가치 평가 함수 V
+                // 8. Valuation Function V
                 float V(CardType c)
                 {
                     float score = 0;
                     switch (c)
                     {
-                        case CardType.Doubt:       score = 6.0f; break; // [특성] 방어 중시
-                        case CardType.Interrupt:   score = 5.5f; break; // [특성] 통제
-                        case CardType.Pollution:   score = 5.0f; break;
-                        case CardType.Curse:       score = 4.8f; break; // [신규] 안정적 공격
-                        case CardType.Recon:       score = 4.0f; break;
-                        case CardType.Cooperation: score = 3.0f; break;
-                        case CardType.Betrayal:    score = (I.s.oppLife <= R ? 8f : 2.5f); break;
-                        case CardType.Chaos:       score = -10f; break; // [특성] 혐오
-                        case CardType.Sacrifice:   score = -20f; break; // [신규] 손실
+                        case CardType.Doubt:       score = 12.0f; break; // [Core] Defense First
+                        case CardType.Interrupt:   score = 10.0f; break; // [Core] Control
+                        case CardType.Pollution:   score = 7.0f; break;  // Stable Damage
+                        case CardType.Recon:       score = 6.0f; break;  // Audit
+                        case CardType.Curse:       score = 5.0f; break;  // Debt
+                        case CardType.Investment:  score = 4.5f; break;  // [NEW] Safe Asset (Conditional)
+                        case CardType.Cooperation: score = 4.0f; break;  // Low Variable
+                        case CardType.Betrayal:    score = (I.s.oppLife <= R ? 15f : 3.0f); break; // Risky
+                        case CardType.Chaos:       score = -20f; break; // [Hate] Unpredictable
+                        case CardType.Sacrifice:   score = -30f; break; // [Hate] Loss
                     }
                     
-                    // 상대 예측 보정
-                    if (c == CardType.Betrayal) score -= 3.0f * Q(CardType.Doubt); // 막힐 위험 -> 감점
-                    if (c == CardType.Curse)    score -= 3.0f * (Q(CardType.Doubt) + Q(CardType.Interrupt));
+                    // Risk Adjustment
+                    if (c == CardType.Betrayal) score -= 5.0f * Q(CardType.Doubt); 
+                    if (c == CardType.Curse)    score -= 4.0f * (Q(CardType.Doubt) + Q(CardType.Interrupt));
+                    
+                    // [NEW] Investment Risk Adjustment
+                    if (c == CardType.Investment) score -= 10.0f * (Q(CardType.Betrayal) + Q(CardType.Pollution)); 
 
-                    // FIX: Safe dictionary access
+                    // ★ [FIX] Safe dictionary access
                     return score * (weights.ContainsKey(c) ? weights[c] : 1.0f);
                 }
 
                 return I.hand.Distinct().Where(I.HandHas).OrderByDescending(V).FirstOrDefault();
             });
 
-            // 선택 드로우 (Draft)
+            // Selective Draw (Draft)
             A.chooseFromTwo = (a, b, I) =>
             {
                 var weights = AgentManager.I.GetWeights(I.selfID);
                 int R = Math.Max(1, I.s.round);
 
-                // [신규] Sacrifice 기피: "장부에 구멍 낼 일 있나."
+                // [Existing] Avoid Sacrifice
                 if (a == CardType.Sacrifice && b != CardType.Sacrifice) return 1;
                 if (b == CardType.Sacrifice && a != CardType.Sacrifice) return 0;
 
-                // [특성] Chaos 혐오: "예측 불가능한 자산은 폐기한다."
+                // [Existing] Avoid Chaos
                 if (a == CardType.Chaos && b != CardType.Chaos) return 1;
                 if (b == CardType.Chaos && a != CardType.Chaos) return 0;
 
@@ -2325,27 +2400,30 @@ namespace GameCore
                 {
                     float baseScore = c switch
                     {
-                        CardType.Interrupt   => 90f,
-                        CardType.Doubt       => 85f,
+                        CardType.Doubt       => 100f, // Safety First
+                        CardType.Interrupt   => 90f,  // Control
                         CardType.Pollution   => 70f,
-                        CardType.Curse       => 65f, // [신규]
-                        CardType.Betrayal    => 60f,
-                        CardType.Recon       => 50f,
+                        CardType.Recon       => 60f,
+                        CardType.Curse       => 50f,
+                        CardType.Investment  => 45f,  // [NEW] Safe Asset
                         CardType.Cooperation => 40f,
+                        CardType.Betrayal    => 30f,  // Risky
                         CardType.Chaos       => -100f,
-                        CardType.Sacrifice   => -200f, // [신규]
+                        CardType.Sacrifice   => -200f,
                         _ => 0f
                     };
-                    // FIX: Safe dictionary access
+                    // ★ [FIX] Safe dictionary access
                     return baseScore * (weights.ContainsKey(c) ? weights[c] : 1.0f);
                 }
                 
                 float va = V(a), vb = V(b);
-                // 동점이면 랜덤보단 안정적인 카드(인덱스 낮은 것) 선호
+                
+                // Tie-breaker: Pick Safer Card
                 if (Math.Abs(va - vb) < 0.1f)
                 {
                      int Safety(CardType t) => t switch { 
-                         CardType.Doubt=>5, CardType.Interrupt=>4, CardType.Recon=>3, _=>0 
+                         CardType.Doubt=>5, CardType.Interrupt=>4, CardType.Investment=>3, 
+                         CardType.Recon=>2, _=>0 
                      };
                      return Safety(a) >= Safety(b) ? 0 : 1;
                 }
@@ -2353,14 +2431,16 @@ namespace GameCore
             };
 
             A.fallback = new[] { 
-                CardType.Interrupt, CardType.Doubt, CardType.Pollution, 
-                CardType.Curse, CardType.Recon, CardType.Betrayal, 
-                CardType.Cooperation, CardType.Chaos, CardType.Sacrifice 
+                CardType.Doubt, CardType.Interrupt, 
+                CardType.Pollution, CardType.Recon, CardType.Curse, 
+                CardType.Investment,
+                CardType.Cooperation, CardType.Betrayal, 
+                CardType.Chaos, CardType.Sacrifice 
             };
             return A;
         }
 
-        // 전아람V2 — 정보 포식자 (Recon 연계 Curse / Sacrifice 테러 진압)
+        // Jeon A-ram v3 — Info Hunter: Information Predator (Recon Combo & Confirmed Kill with Investment)
         static Agent Build_전아람(AgentList id)
         {
             var A = new Agent("전아람", id);
@@ -2372,24 +2452,23 @@ namespace GameCore
                 bool nf = !I.s.IsFirst;
                 var history = I.HistoryOpponent();
 
-                // 1. [테러 진압] 상대 Sacrifice 감지
-                // "첩보 입수: 상대가 자폭 테러(Sacrifice Win)를 준비 중이다. 즉시 제압하라."
+                // 1. [Terror Suppression] Detect Opponent Sacrifice
+                // "Intel received: Opponent preparing suicide attack (Sacrifice). Neutralize immediately."
                 int oppSacCount = history.Count(c => c == CardType.Sacrifice);
                 if (oppSacCount >= 3)
                 {
-                    // 가장 확실한 제거 수단 우선
                     if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;
-                    if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt; // 스택 쌓기 방해
+                    if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt; // Disrupt stack
                     if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
                 }
 
-                // 2. [정보 수집] 초반 정찰 우선
-                // 공격 수단이 빈약하거나 초반이면 정보 수집에 집중
+                // 2. [Intel Gathering] Priority on Early Recon
+                // If weak attack or early game, focus on intel
                 bool poorHand = !I.HandHas(CardType.Betrayal) && !I.HandHas(CardType.Pollution);
                 if ((R <= 4 || poorHand) && I.HandHas(CardType.Recon))
                     return CardType.Recon;
 
-                // 3. 상대 패 예측 (정보 분석)
+                // 3. Predict Opponent Hand (Intel Analysis)
                 var p = new Dictionary<CardType, float>
                 {
                     { CardType.Cooperation, I.Ratio(CardType.Cooperation) },
@@ -2400,40 +2479,54 @@ namespace GameCore
                     { CardType.Interrupt,   I.Ratio(CardType.Interrupt)   },
                     { CardType.Recon,       I.Ratio(CardType.Recon)       },
                     { CardType.Curse,       I.Ratio(CardType.Curse)       },
-                    { CardType.Sacrifice,   I.Ratio(CardType.Sacrifice)   }
+                    { CardType.Sacrifice,   I.Ratio(CardType.Sacrifice)   },
+                    { CardType.Investment,  I.Ratio(CardType.Investment)  } // [NEW]
                 };
                 float sum = p.Values.Sum(); if (sum <= 0) sum = 1f;
                 foreach (var k in p.Keys.ToList()) p[k] /= sum;
 
-                // 4. [신규] Curse 활용: "확인 사살 (Confirmed Kill)"
-                // Recon 등으로 상대 정보를 파악했는데 방어 수단이 없다? -> 저주 투척
+                // 4. [NEW] Utilize Investment: "Building Intelligence Network"
+                // Jeon A-ram does not make uncertain investments.
+                // Invest only if she knows the opponent's hand (via Recon) or attack probability is very low.
+                if (I.HandHas(CardType.Investment))
+                {
+                    // If I used Recon last turn (I know their hand) OR attack risk is low
+                    // (Simplified check using lastSelf == Recon)
+                    if (nf && I.s.lastSelf == CardType.Recon)
+                    {
+                        // If opponent's estimated hand has low attack probability
+                        float risk = p[CardType.Betrayal] + p[CardType.Pollution];
+                        if (risk < 0.2f) return CardType.Investment;
+                    }
+                }
+
+                // 5. [Sadistic Control] Utilize Curse: "Confirmed Kill"
                 if (I.HandHas(CardType.Curse))
                 {
-                    // 상대 방어 확률 계산
                     float defProb = p[CardType.Doubt] + p[CardType.Interrupt];
                     
-                    // 직전에 정찰했거나(Recon), 상대 방어 확률이 매우 낮으면(20% 미만) 가학적으로 저주 사용
+                    // If I used Recon or opponent defense chance is very low (< 20%) -> Curse
                     bool informationSuperiority = (nf && I.s.lastSelf == CardType.Recon) || defProb < 0.2f;
                     
                     if (informationSuperiority)
                         return CardType.Curse;
                 }
 
-                // 5. 킬각 / 위기 관리
+                // 6. Lethal / Crisis Management
                 if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R && p[CardType.Doubt] < 0.35f)
                     return CardType.Betrayal;
                 
                 if (I.s.selfLife <= R && p[CardType.Betrayal] >= 0.28f && I.HandHas(CardType.Doubt))
                     return CardType.Doubt;
 
-                // 6. [전략적 평가] Score 함수
-                CardType avoid = I.s.lastSelf; // 같은 행동 반복은 정보 노출이므로 지양
+                // 7. [Strategic Assessment] Score Function
+                CardType avoid = I.s.lastSelf; // Avoid repeating patterns to hide info
                 int r = R;
 
                 float Score(CardType a)
                 {
                     float e = 0;
-                    // Sacrifice는 4장 완성이 아니면 절대 내지 않음 (기피)
+                    // Sacrifice is taboo (Trait: Avoid self-harm)
                     if (a == CardType.Sacrifice) return -99f; 
 
                     foreach (var kv in p)
@@ -2442,66 +2535,77 @@ namespace GameCore
                         float q = kv.Value; 
                         float d = 0;
 
-                        // 기존 상성 로직
+                        // Existing Interactions
                         if (a == CardType.Betrayal && b == CardType.Cooperation) d = r + 1;
                         else if (a == CardType.Pollution && b == CardType.Cooperation) d = +2;
                         else if (a == CardType.Doubt && b == CardType.Betrayal) d = r + 1;
                         else if (a == CardType.Interrupt && (b == CardType.Betrayal || b == CardType.Pollution)) d = +2;
                         else if (a == CardType.Cooperation && b == CardType.Betrayal) d = -(r + 1);
                         
-                        // [신규] Curse 상성 계산
+                        // Curse Interaction
                         else if (a == CardType.Curse)
                         {
-                            if (b == CardType.Doubt || b == CardType.Interrupt) d = -1; // 막힘
-                            else if (b == CardType.Betrayal) d = -1; // 맞음
-                            else d = +2; // 성공
+                            if (b == CardType.Doubt || b == CardType.Interrupt) d = -1; 
+                            else if (b == CardType.Betrayal) d = -1; 
+                            else d = +2; 
+                        }
+                        // [NEW] Investment Interaction (Simplified)
+                        else if (a == CardType.Investment)
+                        {
+                            if (b == CardType.Betrayal || b == CardType.Pollution) d = -r; // Fail if attacked
+                            else if (b == CardType.Doubt) d = 0; // Blocked
+                            else d = 2; // Assume gain on success
                         }
                         
                         e += q * d;
                     }
                     
-                    // 정보 은폐 가산점
+                    // Bonus for hiding info (changing cards)
                     if (a != avoid) e += 0.2f;
 
-                    // 특성 가중치 적용
-                    // ★ [수정됨] 안전한 가중치 접근
-                    e *= weights.ContainsKey(a) ? weights[a] : 1.0f;
+                    // ★ [FIX] Safe dictionary access
+                    e *= (weights.ContainsKey(a) ? weights[a] : 1.0f);
                     return e;
                 }
 
                 return I.hand.Distinct().Where(I.HandHas).OrderByDescending(Score).FirstOrDefault();
             });
 
-            // 선택 드로우 (Draft)
+            // Selective Draw (Draft)
             A.chooseFromTwo = (a, b, I) =>
             {
                 var weights = AgentManager.I.GetWeights(I.selfID);
                 int R = Math.Max(1, I.s.round);
                 bool losing = I.s.selfLife < I.s.oppLife;
 
-                // [신규] Sacrifice 철저 배제: "자폭은 멍청이들이나 하는 짓."
+                // [Existing] Absolute Avoidance of Sacrifice
                 if (a == CardType.Sacrifice && b != CardType.Sacrifice) return 1;
                 if (b == CardType.Sacrifice && a != CardType.Sacrifice) return 0;
+
+                // [NEW] Investment: "Take it only when certain."
+                // Low priority, but taken if situation allows.
 
                 float V(CardType c)
                 {
                     float baseScore = 0;
                     switch (c)
                     {
-                        case CardType.Recon:       baseScore = 2.0f; break; // [특성] 정보 최우선
-                        case CardType.Curse:       baseScore = 1.5f; break; // [신규] 가학적 선호
+                        case CardType.Recon:       baseScore = 2.0f; break; // [Core] Info Priority
+                        case CardType.Curse:       baseScore = 1.5f; break; // Sadistic Preference
                         case CardType.Pollution:   baseScore = 1.4f; break;
                         case CardType.Betrayal:    baseScore = (I.s.oppLife <= R ? 3.0f : 1.2f); break;
                         case CardType.Doubt:       baseScore = 1.2f; break;
                         case CardType.Interrupt:   baseScore = 1.1f; break;
-                        case CardType.Cooperation: baseScore = 0.7f; break;
-                        case CardType.Chaos:       baseScore = 0.1f; break; // 정보 오염 싫어함
-                        case CardType.Sacrifice:   baseScore = -99f; break; // [신규]
+                        case CardType.Investment:  baseScore = 0.9f; break; // [NEW] Cautious approach
+                        case CardType.Cooperation: baseScore = 0.5f; break; // Distrust
+                        case CardType.Chaos:       baseScore = 0.1f; break; // Hates info contamination
+                        case CardType.Sacrifice:   baseScore = -99f; break; // Never
                     }
+                    // ★ [FIX] Safe dictionary access
                     return baseScore * (weights.ContainsKey(c) ? weights[c] : 1f);
                 }
                 
-                float va = V(a) + (I.s.lastSelf != a ? 0.2f : 0f); // 직전 카드 기피
+                float va = V(a) + (I.s.lastSelf != a ? 0.2f : 0f); // Avoid last card
                 float vb = V(b) + (I.s.lastSelf != b ? 0.2f : 0f);
                 
                 if (Math.Abs(va - vb) < 0.01f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
@@ -2511,7 +2615,7 @@ namespace GameCore
             A.fallback = new[] { 
                 CardType.Recon, CardType.Curse, CardType.Pollution, 
                 CardType.Doubt, CardType.Betrayal, CardType.Interrupt, 
-                CardType.Cooperation, CardType.Chaos, CardType.Sacrifice 
+                CardType.Investment, CardType.Cooperation, CardType.Chaos, CardType.Sacrifice 
             };
             return A;
         }

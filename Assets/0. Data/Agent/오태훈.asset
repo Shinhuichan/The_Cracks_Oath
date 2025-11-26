@@ -31,12 +31,12 @@ MonoBehaviour:
     \uBBF8\uC219\uD568\uC758 \uACF5\uC874\uCCB4."
   threatLevel: 4
   stats:
-    Lethality: 88
-    Survivability: 55
-    Calculation: 50
-    Adaptability: 50
-    Insight: 40
-    Unpredictability: 65
+    Lethality: 80
+    Survivability: 20
+    Calculation: 60
+    Adaptability: 20
+    Insight: 75
+    Unpredictability: 80
   personality: 2
   elo: 1621.6268613722925
   records:

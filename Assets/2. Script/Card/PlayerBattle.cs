@@ -29,6 +29,10 @@ public class PlayerBattle : MonoBehaviour
     [Header("UI - 라벨")]
     public TMP_Text roundText, opponentNameText, playerHpText, opponentHpText;
 
+    // ▼ [신규] 양초 아이콘 스프라이트 (4단계)
+    [Header("UI - 양초 아이콘 (순서: 100%, 75%, 50%, 25%)")]
+    [SerializeField] private Sprite[] candleSprites;
+
     [Header("UI - 전 라운드 결과")]
     public TMP_Text resultText, playerCurrentHpText, agentCurrentHpText;
 
@@ -546,10 +550,47 @@ public class PlayerBattle : MonoBehaviour
 
     void UpdateHpTexts()
     {
+        // 1. 텍스트 갱신 (기존 코드)
         if (playerHpText)   playerHpText.text   = $"{sys.playerILife}";
         if (opponentHpText) opponentHpText.text = $"{sys.playerIILife}";
-        if (playerCurrentHpText) playerCurrentHpText.text = $"{sys.playerILife}";   // playerCurrentHpText
-        if (agentCurrentHpText)  agentCurrentHpText.text  = $"{sys.playerIILife}"; // agentCurrentHpText
+        if (playerCurrentHpText) playerCurrentHpText.text = $"{sys.playerILife}";
+        if (agentCurrentHpText)  agentCurrentHpText.text  = $"{sys.playerIILife}";
+
+        // 2. [신규] 양초 아이콘 갱신 (UIManager 연동)
+        if (UIManager.I != null && candleSprites != null && candleSprites.Length > 0)
+        {
+            int maxHp = sys.startLife;
+
+            // Player I (플레이어) 아이콘 갱신
+            Sprite p1Sprite = GetCandleSprite(sys.playerILife, maxHp);
+            if (p1Sprite != null)
+                UIManager.I.TrySetSprite("Icon", "PlayerI_Candle_Icon", p1Sprite);
+
+            // Player II (상대) 아이콘 갱신
+            Sprite p2Sprite = GetCandleSprite(sys.playerIILife, maxHp);
+            if (p2Sprite != null)
+                UIManager.I.TrySetSprite("Icon", "PlayerII_Candle_Icon", p2Sprite);
+        }
+    }
+
+    // ▼ [신규] 현재 체력 비율에 따른 스프라이트 반환 헬퍼
+    Sprite GetCandleSprite(int currentHp, int maxHp)
+    {
+        if (maxHp <= 0) return candleSprites.Length > 0 ? candleSprites[0] : null;
+
+        float ratio = (float)currentHp / maxHp;
+        int index = 0;
+
+        // 4단계 분류 (요청사항: 30/40(75%)이하 2번째, 20/40(50%)이하 3번째, 10/40(25%)이하 4번째)
+        if (ratio <= 0.25f)      index = 3; // 25% 이하 (마지막)
+        else if (ratio <= 0.50f) index = 2; // 50% 이하
+        else if (ratio <= 0.75f) index = 1; // 75% 이하
+        else                     index = 0; // 75% 초과 (첫번째)
+
+        // 배열 범위 안전 장치
+        index = Mathf.Clamp(index, 0, candleSprites.Length - 1);
+
+        return candleSprites[index];
     }
 
     void UpdateButtonsAndSprites()
@@ -609,9 +650,10 @@ public class PlayerBattle : MonoBehaviour
         if (opponentChosenImage) opponentChosenImage.gameObject.SetActive(false);
     }
 
-    // ---------- AI 라운드 1회 진행 ----------
+    // ---------- AI 라운드 1회 진행 (수정됨: 5판 승부) ----------
     IEnumerator SimulateAIRoundCoroutine()
     {
+        // 모든 라운드가 소모되었으면 종료
         if (rr12Consumed.Count >= rr12Rounds.Count) yield break;
 
         string oppName = agent.name;
@@ -629,17 +671,91 @@ public class PlayerBattle : MonoBehaviour
 
         foreach (var (A, B) in rr12Rounds[idx])
         {
-            if (A == PLAYER || B == PLAYER) continue;
+            if (A == PLAYER || B == PLAYER) continue; // 플레이어 매치는 이미 진행함
             if (Enum.TryParse<AgentList>(A, out var a1) &&
                 Enum.TryParse<AgentList>(B, out var a2))
             {
-                yield return SimulateAIVsAI(a1, a2); // 이미 구현됨
+                // ▼ [수정] 5판 승부 시뮬레이션
+                yield return SimulateAIVsAI_BestOf5(a1, a2);
             }
         }
 
         rr12Consumed.Add(idx);
         UpdateBothRankUI();
-        // 최종 순위 호출 경로는 기존 그대로 유지
+    }
+
+    // ▼ [신규] AI vs AI 5판 승부 함수
+    IEnumerator SimulateAIVsAI_BestOf5(AgentList A1, AgentList A2)
+    {
+        int winsA = 0;
+        int winsB = 0;
+        int draws = 0;
+
+        // 5판 반복
+        for (int i = 0; i < 15; i++)
+        {
+            // 한 판 시뮬레이션 (기존 로직 재사용, 결과만 받음)
+            // 결과를 기다리기 위해 Coroutine을 호출하고 대기해야 함
+            // 하지만 SimulateAIVsAI는 내부적으로 GameObject를 만들고 파괴하므로 무거울 수 있음
+            // 여기서는 로직을 분리하여 경량화된 시뮬레이션을 5번 돌립니다.
+            
+            var go = new GameObject($"Sim_{A1}_vs_{A2}_Round_{i}");
+            var sim = go.AddComponent<CardSystem>();
+            sim.ResetForNewMatch();
+            yield return null; // 초기화 대기
+
+            var ag1 = AgentFactory.Create(A1.ToString());
+            var ag2 = AgentFactory.Create(A2.ToString());
+
+            var c1 = new RoundCtx { round = 1, selfLife = sim.startLife, oppLife = sim.startLife };
+            var c2 = c1;
+
+            int r = 1;
+            while (r <= sim.maxRounds && !sim.playerILost && !sim.playerIILost)
+            {
+                var t1 = ag1.Choose(new DecisionInput(sim.playerIHands, c1, sim.BuildUnseen(true), ag1.id, ag2.id));
+                var t2 = ag2.Choose(new DecisionInput(sim.playerIIHands, c2, sim.BuildUnseen(false), ag2.id, ag1.id));
+
+                int i1 = IndexOfType(sim.playerIHands, t1); if (i1 < 0) i1 = 0;
+                int i2 = IndexOfType(sim.playerIIHands, t2); if (i2 < 0) i2 = 0;
+
+                sim.ResolveRoundByIndex(i1, i2);
+
+                c1.last3Opp = c1.last2Opp; c2.last3Opp = c2.last2Opp;
+                c1.last2Opp = c1.lastOpp; c2.last2Opp = c2.lastOpp;
+                c1.lastOpp = t2; c2.lastOpp = t1;
+                c1.lastSelf = t1; c2.lastSelf = t2;
+
+                c1.selfLife = sim.playerILife; c1.oppLife = sim.playerIILife;
+                c2.selfLife = sim.playerIILife; c2.oppLife = sim.playerILife;
+
+                r++; c1.round = r; c2.round = r;
+            }
+
+            // 한 판 결과 집계
+            if ((sim.playerILost && sim.playerIILost) || (sim.playerILife == sim.playerIILife)) draws++;
+            else if (sim.playerIILost || sim.playerILife > sim.playerIILife) winsA++;
+            else winsB++;
+
+            UnityEngine.Object.Destroy(go);
+        }
+
+        // 5판 종료 후 최종 승자 결정
+        int finalScoreA = 0;
+        int finalScoreB = 0;
+
+        if (winsA > winsB) { finalScoreA = 3; finalScoreB = 0; } // A 승리
+        else if (winsB > winsA) { finalScoreA = 0; finalScoreB = 3; } // B 승리
+        else { finalScoreA = 1; finalScoreB = 1; } // 무승부
+
+        // 리그 기록에 추가
+        leagueMatches.Add(new MatchRec(A1.ToString(), A2.ToString(), finalScoreA, finalScoreB));
+
+        if (!suppressOtherMatchOutput)
+        {
+            string resultStr = winsA > winsB ? $"{A1} 승" : (winsB > winsA ? $"{A2} 승" : "무승부");
+            LogLine($"[{A1} vs {A2}] → {resultStr}  | 판수 {winsA}:{winsB} (무승부 {draws})");
+        }
     }
 
     int FindRoundIndexWithPair(string n1, string n2)

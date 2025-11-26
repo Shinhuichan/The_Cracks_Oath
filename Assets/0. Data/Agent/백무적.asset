@@ -34,9 +34,9 @@ MonoBehaviour:
     Lethality: 90
     Survivability: 99
     Calculation: 99
-    Adaptability: 99
-    Insight: 95
-    Unpredictability: 5
+    Adaptability: 98
+    Insight: 99
+    Unpredictability: 50
   personality: 0
   elo: 1542.0950593771556
   records:

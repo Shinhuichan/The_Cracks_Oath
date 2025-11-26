@@ -183,67 +183,65 @@ public class AgentManager : SingletonBehaviour<AgentManager>
     // ============================================================
     public void LearnFromRound(AgentList agentId, CardType playedCard, int hpDelta, int currentHp, int oppHp)
     {
-        if (playedCard == CardType.None) return;
+        // if (playedCard == CardType.None) return;
 
-        // 1) 에이전트의 성향(AgentData) 가져오기
-        AgentData data = GetAgentData(agentId);
-        Personality personality = (data != null) ? data.personality : Personality.Static;
+        // // 1) 에이전트의 성향(AgentData) 가져오기
+        // AgentData data = GetAgentData(agentId);
+        // Personality personality = (data != null) ? data.personality : Personality.Static;
 
-        if (personality == Personality.Static) return; // 학습 안 하는 성격
+        // if (personality == Personality.Static) return;
 
-        // 2) 현재 가중치 가져오기
-        var weights = GetWeights(agentId);
-        float currentW = weights.ContainsKey(playedCard) ? weights[playedCard] : 1.0f;
-
-        // 3) 학습률(Learning Rate) 및 보상(Reward) 결정
-        float changeRate = 1.0f;
+        // // 2) 현재 가중치 가져오기
+        // var weights = GetWeights(agentId);
         
-        // 기본 규칙: 이득(>0)이면 강화, 손해(<0)면 약화
-        bool success = hpDelta > 0;
-        bool fail = hpDelta < 0;
+        // // [안전 접근] 키가 없으면 1.0f
+        // float currentW = weights.ContainsKey(playedCard) ? weights[playedCard] : 1.0f;
+
+        // // 3) 학습률(Learning Rate) 및 보상(Reward) 결정
+        // float changeRate = 1.0f;
         
-        // 성격별 학습 로직 적용
-        switch (personality)
-        {
-            case Personality.Pragmatic: // 실리주의: 천천히 꾸준히 학습
-                if (success) changeRate = 1.02f;      // +2%
-                else if (fail) changeRate = 0.98f;    // -2%
-                break;
+        // bool success = hpDelta > 0;
+        // bool fail = hpDelta < 0;
+        
+        // switch (personality)
+        // {
+        //     case Personality.Pragmatic: 
+        //         if (success) changeRate = 1.02f;      
+        //         else if (fail) changeRate = 0.98f;    
+        //         break;
 
-            case Personality.Aggressive: // 공격적: 공격 카드로 이득 볼 때 크게 학습
-                bool isAtk = (playedCard == CardType.Betrayal || playedCard == CardType.Pollution);
-                if (isAtk && success) changeRate = 1.10f;      // +10% (강화)
-                else if (isAtk && fail) changeRate = 0.90f;    // -10% (약화)
-                else if (fail) changeRate = 0.99f;             // 일반 패배는 미미하게
-                break;
+        //     case Personality.Aggressive: 
+        //         bool isAtk = (playedCard == CardType.Betrayal || playedCard == CardType.Pollution);
+        //         if (isAtk && success) changeRate = 1.10f;      
+        //         else if (isAtk && fail) changeRate = 0.90f;    
+        //         else if (fail) changeRate = 0.99f;             
+        //         break;
 
-            case Personality.Defensive: // 방어적: 방어 실패 시 크게 페널티
-                bool isDef = (playedCard == CardType.Doubt || playedCard == CardType.Interrupt);
-                if (isDef && fail) changeRate = 0.85f;         // -15% (방어 뚫리면 신뢰 급감)
-                else if (success) changeRate = 1.03f;          // +3%
-                break;
+        //     case Personality.Defensive: 
+        //         bool isDef = (playedCard == CardType.Doubt || playedCard == CardType.Interrupt);
+        //         if (isDef && fail) changeRate = 0.85f;         
+        //         else if (success) changeRate = 1.03f;          
+        //         break;
             
-            case Personality.Emotional: // 감정적: 지고 있을 때 과민반응
-                bool losing = currentHp < oppHp;
-                float strength = losing ? 0.15f : 0.05f; // 지면 15%, 이기면 5% 변동
-                if (success) changeRate = 1.0f + strength;
-                else if (fail) changeRate = 1.0f - strength;
-                break;
+        //     case Personality.Emotional: 
+        //         bool losing = currentHp < oppHp;
+        //         float strength = losing ? 0.15f : 0.05f; 
+        //         if (success) changeRate = 1.0f + strength;
+        //         else if (fail) changeRate = 1.0f - strength;
+        //         break;
 
-             case Personality.Erratic: // 변덕: 랜덤
-                changeRate = UnityEngine.Random.Range(0.9f, 1.1f);
-                break;
+        //      case Personality.Erratic: 
+        //         changeRate = UnityEngine.Random.Range(0.9f, 1.1f);
+        //         break;
                 
-             case Personality.Specialist: // 특정 카드 선호 (기존 로직 유지)
-                 changeRate = success ? 1.05f : 0.95f;
-                 break;
-        }
+        //      case Personality.Specialist: 
+        //          changeRate = success ? 1.05f : 0.95f;
+        //          break;
+        // }
 
-        // 4) 가중치 적용 (최소 0.1 ~ 최대 3.0 제한)
-        float finalW = Mathf.Clamp(currentW * changeRate, 0.1f, 3.0f);
-        weights[playedCard] = finalW;
-
-        // Debug.Log($"[Learning] {agentId} played {playedCard} (Delta:{hpDelta}). W: {currentW:F2} -> {finalW:F2}");
+        // // 4) 가중치 적용 (changeRate가 1.0f이므로 변화 없음)
+        // float finalW = Mathf.Clamp(currentW * changeRate, 0.1f, 3.0f);
+        // weights[playedCard] = finalW;
     }
 
     public void ApplyMatchResult(AgentList a, AgentList b, MatchOutcome outcomeA, double k = 24.0)

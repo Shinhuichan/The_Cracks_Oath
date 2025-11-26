@@ -17,8 +17,8 @@ public struct PlayMode
 
 namespace GameCore
 {
-    // 1. Enum에 Sacrifice 추가
-    public enum CardType { None = 0, Cooperation, Doubt, Betrayal, Chaos, Pollution, Interrupt, Recon, Curse, Sacrifice }
+    // 1. Enum에 Investment 추가
+    public enum CardType { None = 0, Cooperation, Doubt, Betrayal, Chaos, Pollution, Interrupt, Recon, Curse, Sacrifice, Investment }
 
     // ===== 라운드 컨텍스트 =====
     [Serializable]
@@ -87,6 +87,7 @@ namespace GameCore
         public readonly int unseenTotal;
 
         // ▼ [수정됨] 생성자에 opponentID 추가
+        // ▼ [수정됨] 생성자에 opponentID 추가
         public DecisionInput(List<CardType> hand, RoundCtx s,
                              IReadOnlyDictionary<CardType, int> unseen,
                              AgentList selfID, AgentList opponentID) 
@@ -98,14 +99,13 @@ namespace GameCore
             this.selfID = selfID;
             this.opponentID = opponentID; // ▼ [추가됨]
         }
-
         static readonly IReadOnlyDictionary<CardType, int> EmptyCounts =
             new Dictionary<CardType, int>
             {
                 {CardType.Cooperation,0},{CardType.Doubt,0},{CardType.Betrayal,0},
                 {CardType.Chaos,0},{CardType.Pollution,0},{CardType.Interrupt,0},
-                {CardType.Recon,0}, {CardType.Curse,0},
-                {CardType.Sacrifice, 0} // ▼ 추가
+                {CardType.Recon,0}, {CardType.Curse,0}, {CardType.Sacrifice, 0},
+                {CardType.Investment, 0} // ▼ 추가
             };
 
         public bool HandHas(CardType t, int n = 1) => hand.Count(x => x == t) >= n;
@@ -135,7 +135,7 @@ namespace GameCore
 
         [Header("덱 구성")]
         public int cooperationCount = 20; 
-        public int doubtCount = 20, betrayalCount = 3, chaosCount = 7, pollutionCount = 10, interruptCount = 4, reconCount = 6, curseCount = 0, sacrificeCount = 0;
+        public int doubtCount = 20, betrayalCount = 3, chaosCount = 7, pollutionCount = 10, interruptCount = 4, reconCount = 6, curseCount = 0, sacrificeCount = 0, investmentCount = 0; // ▼ 추가: 투자 카드 개수
 
         [Header("게임 설정")]
         [ReadOnly] public int startingHand = 3;
@@ -162,13 +162,17 @@ namespace GameCore
             public bool selfUseRound, oppUseRound;
             public bool reconSelf, reconOpp;
             public bool curseSelf, curseOpp; // ▼ 추가: 저주 부여 여부
+            public bool invSelf, invOpp; // ▼ 추가: Investment 회복 적용 여부
 
             // 생성자 업데이트
-            public Effect(int s, int o, bool rs=false, bool ro=false, bool sr=false, bool ornd=false, bool rSelf=false, bool rOpp=false, bool cSelf=false, bool cOpp=false)
+            public Effect(int s, int o, bool rs=false, bool ro=false, bool sr=false, bool ornd=false, 
+                          bool rSelf=false, bool rOpp=false, bool cSelf=false, bool cOpp=false,
+                          bool iSelf=false, bool iOpp=false) // 생성자 파라미터 추가
             { 
                 self = s; opp = o; repSelf = rs; repOpp = ro; selfUseRound = sr; oppUseRound = ornd; 
                 reconSelf = rSelf; reconOpp = rOpp;
-                curseSelf = cSelf; curseOpp = cOpp; // ▼ 초기화
+                curseSelf = cSelf; curseOpp = cOpp;
+                invSelf = iSelf; invOpp = iOpp; // 초기화
             }
         }
         Dictionary<string, Effect> E;
@@ -191,6 +195,9 @@ namespace GameCore
         // ▼ 추가: Sacrifice 누적 제출 횟수 추적
         private int sacrificePlayedP1 = 0;
         private int sacrificePlayedP2 = 0;
+
+        // ▼ 추가: Investment 누적 카운트 (나 + 상대)
+        private int globalInvestmentCount = 0;
 
         // 한파 제어 플래그
         bool coldWaveJustStartedP1, coldWaveJustStartedP2;   // 한파가 ‘시작한’ 그 라운드에서만 드로우 스킵
@@ -372,6 +379,15 @@ namespace GameCore
             // 이미 Lost 상태이므로 결과에 반영됩니다.
             // ▲▲▲ [신규 구현 종료] ▲▲▲
 
+            // ▼▼▼ [신규] Investment 카운트 ▼▼▼
+            // 이번 라운드에 Investment가 제출되었다면 전체 카운트 증가
+            if (a == CardType.Investment) globalInvestmentCount++;
+            if (b == CardType.Investment) globalInvestmentCount++;
+
+            // 회복량 계산: (누적 사용 수 - 1), 최소 0
+            int investHealAmount = Mathf.Max(0, globalInvestmentCount - 1);
+            // ▲▲▲ [신규 구현] ▲▲▲
+
             var ef = E[$"{a}-{b}"];
 
             int hpP_beforeCards = playerILife;
@@ -380,6 +396,11 @@ namespace GameCore
             // (B) 일반 카드 효과 → Chaos
             int dSelf = ef.selfUseRound ? (ef.self >= 0 ? +roundCounter : -roundCounter) : ef.self;
             int dOpp = ef.oppUseRound ? (ef.opp >= 0 ? +roundCounter : -roundCounter) : ef.opp;
+
+            // ▼ [신규] Investment 회복 로직 적용
+            // 상성상 회복이 가능한 상황(invSelf/Opp == true)이라면 계산된 회복량 적용
+            if (ef.invSelf) dSelf = investHealAmount;
+            if (ef.invOpp)  dOpp  = investHealAmount;
             
             // 월식: 일반 카드 수치 2배(Recon 제외, 수치만 배수. 리셋/정찰 같은 플래그는 그대로)
             if (currentDisaster == NaturalDisaster.Eclipse)
@@ -565,7 +586,8 @@ namespace GameCore
             {
                 {CardType.Cooperation,0},{CardType.Doubt,0},{CardType.Betrayal,0},
                 {CardType.Chaos,0},{CardType.Pollution,0},{CardType.Interrupt,0},{CardType.Recon,0},
-                {CardType.Curse, 0}, {CardType.Sacrifice, 0} // ▼ 추가
+                {CardType.Curse, 0}, {CardType.Sacrifice, 0},
+                {CardType.Investment, 0} // ▼ 추가
             };
             void Acc(IEnumerable<CardType> src)
             {
@@ -598,6 +620,7 @@ namespace GameCore
             // ▼ 추가: 카운트 초기화
             sacrificePlayedP1 = 0;
             sacrificePlayedP2 = 0;
+            globalInvestmentCount = 0; // ▼ 추가: 초기화
 
             // 선택 모드 재적용 후 초기화
             ApplyModeIfAvailable();
@@ -612,6 +635,7 @@ namespace GameCore
             Add(publicDeck, CardType.Recon, reconCount);
             Add(publicDeck, CardType.Curse, curseCount);
             Add(publicDeck, CardType.Sacrifice, sacrificeCount); // ▼ 추가
+            Add(publicDeck, CardType.Investment, investmentCount); // ▼ 추가: 덱에 넣기
 
             publicDeck.Shuffle();
             Draw(publicDeck, playerIHands, startingHand);  // fix
@@ -977,9 +1001,12 @@ namespace GameCore
             bool recover = isP1 ? coldWaveRecoverThisRoundP1 : coldWaveRecoverThisRoundP2;
             if (recover && currentDisaster != NaturalDisaster.ColdWave)
             {
-                // 복구 시에는 그냥 랜덤 드로우 (Draft까지 하면 너무 복잡해지므로 유지)
+                // ▼ [수정] 복구 시에도 덱 고갈 체크 (선택 사항이나, 안전을 위해 추가 권장)
                 while (hand.Count < 3)
                 {
+                    // 일반 드로우 시에도 카드가 아예 없으면 멈춰야 함 (1장 드로우는 DrawOne 내부에서 처리되지만, 2장 드로우 시 체크)
+                    if (publicDeck.Count + discardCards.Count == 0) break; 
+                    
                     var c = DrawOne(publicDeck);
                     if (c == CardType.None) break;
                     hand.Add(c);
@@ -989,26 +1016,29 @@ namespace GameCore
                 return;
             }
 
+            // ▼▼▼ [핵심 수정 구간] ▼▼▼
             while (hand.Count < limit)
             {
+                // 1. 덱 고갈 체크 및 페널티/회수 처리
+                // 선택 드로우(2장 필요)를 시도하기 전에 확인
+                if (HandleDeckExhaustion(isP1)) 
+                {
+                    return; // 카드가 부족하여 페널티를 받고 카드를 회수했으므로 드로우 중단
+                }
+
                 if (isP1)
                 {
-                    // P1: 사람(UI)인가?
                     if (enableChoiceDrawForPlayer)
                     {
-                        // ▼ [수정됨] ExecuteAgentDraft 대신 UI 전용 함수 호출
                         StartChoiceDrawForPlayer(); 
-                        return; // UI가 열리면 대기해야 하므로 리턴
+                        return; 
                     }
-                    // P1: AI(H2H)인가?
                     else if (currentP1 != null) 
                     {
-                        // P1 AI는 즉시 계산하여 선택 (시뮬레이션용)
                         ExecuteAgentDraft(currentP1, playerIHands, true);
                     }
                     else
                     {
-                        // Agent 정보도 없고 UI도 아니면 그냥 Random (Fallback)
                         var c = DrawOne(publicDeck);
                         if (c == CardType.None) return;
                         hand.Add(c);
@@ -1016,7 +1046,6 @@ namespace GameCore
                 }
                 else
                 {
-                    // P2: 에이전트 드로우가 켜져있으면 Draft (기본값 true)
                     if (enableChoiceDrawForAgent)
                     {
                         ExecuteAgentDraft(currentP2, playerIIHands, false);
@@ -1030,6 +1059,48 @@ namespace GameCore
                 }
             }
         }
+
+        // ▼ [신규] 덱 고갈 시 페널티 및 카드 회수 로직
+        bool HandleDeckExhaustion(bool isP1)
+        {
+            // 선택 드로우를 하려면 최소 2장이 필요함 (공유 덱 + 버린 카드 더미)
+            int totalAvailable = publicDeck.Count + discardCards.Count;
+
+            if (totalAvailable < 2)
+            {
+                // 1. 양초 1개 끄기 (0 미만으로는 안 내려감)
+                if (isP1) playerILife = Mathf.Max(0, playerILife - 1);
+                else      playerIILife = Mathf.Max(0, playerIILife - 1);
+
+                // 2. 제출했던 카드 회수 (버리지 않고 되돌리기)
+                // 이번 라운드에 냈던 카드는 이미 UseCard()를 통해 discardCards에 들어가 있는 상태입니다.
+                // 따라서 discardCards에서 찾아서 다시 Hand로 옮겨줍니다.
+                CardType lastCard = isP1 ? lastSubmittedP1 : lastSubmittedP2;
+                List<CardType> hand = isP1 ? playerIHands : playerIIHands;
+
+                if (lastCard != CardType.None)
+                {
+                    // 버린 카드 더미에서 해당 카드를 찾아 제거하고
+                    if (discardCards.Remove(lastCard)) 
+                    {
+                        // 다시 손패로 가져옴
+                        hand.Add(lastCard);
+                        
+                        // P1이면 UI 갱신 알림
+                        if (isP1) OnPlayerHandChanged?.Invoke(new List<CardType>(hand));
+                    }
+                }
+
+                // 3. 패배 조건 체크 (양초가 꺼졌을 수 있으므로)
+                playerILost |= playerILife <= 0;
+                playerIILost |= playerIILife <= 0;
+
+                return true; // 고갈 처리됨 (드로우 중단)
+            }
+
+            return false; // 카드 충분함 (드로우 진행)
+        }
+
         void GrantColdWaveCarryIfNeeded()
         {
             if (currentDisaster == NaturalDisaster.ColdWave) return;
@@ -1126,7 +1197,7 @@ namespace GameCore
         void BuildEffects_WithRecon()
         {
             E = new Dictionary<string, Effect>();
-            var C=CardType.Cooperation; var D=CardType.Doubt; var B=CardType.Betrayal; var X=CardType.Chaos; var P=CardType.Pollution; var I=CardType.Interrupt; var Rn=CardType.Recon; var Cu=CardType.Curse; var S=CardType.Sacrifice; // 단축어
+            var C=CardType.Cooperation; var D=CardType.Doubt; var B=CardType.Betrayal; var X=CardType.Chaos; var P=CardType.Pollution; var I=CardType.Interrupt; var Rn=CardType.Recon; var Cu=CardType.Curse; var S=CardType.Sacrifice; var Inv=CardType.Investment;// 단축어
 
             E[$"{C}-{C}"]=new(+1,+1);
             E[$"{C}-{D}"]=new(+1,0);
@@ -1137,6 +1208,7 @@ namespace GameCore
             E[$"{C}-{Rn}"]=new(+1,0, false,false,false,false, false, true);
             E[$"{C}-{Cu}"] = new(0, 0, cSelf: true);
             E[$"{C}-{S}"] = new(+1, -1);
+            E[$"{C}-{Inv}"] = new(+1, 0, iOpp: true);
 
             E[$"{D}-{C}"]=new(0,+1);
             E[$"{D}-{D}"]=new(0,0);
@@ -1147,6 +1219,7 @@ namespace GameCore
             E[$"{D}-{Rn}"]=new(0,0, false,false,false,false, false, true);
             E[$"{D}-{Cu}"]=new(0, 0, cOpp: true);
             E[$"{D}-{S}"] = new(0, -1);
+            E[$"{D}-{Inv}"] = new(0, 0, iOpp: true);
 
             E[$"{B}-{C}"]=new(+1,-1, false,false, false,true);
             E[$"{B}-{D}"]=new(-1,+1, false,false, true,false);
@@ -1157,6 +1230,7 @@ namespace GameCore
             E[$"{B}-{Rn}"]=new(+1,-1, false,false, false,true);
             E[$"{B}-{Cu}"]=new(+1, -1, false, false, false, true, cSelf: true);
             E[$"{B}-{S}"]=new(+1,-2, false,false, false,true);
+            E[$"{B}-{Inv}"] = new(+1, -1, false, false, false, true, iOpp: false);
 
             E[$"{X}-{C}"]=new(0,+1,  true,false);
             E[$"{X}-{D}"]=new(0,0,   true,false);
@@ -1166,17 +1240,19 @@ namespace GameCore
             E[$"{X}-{I}"]=new(0,-1,  true,false);
             E[$"{X}-{Rn}"]=new(0,0,  true, false, false, false, false, true);
             E[$"{X}-{Cu}"] = new(0, 0, true, false, cSelf: true);
-            E[$"{X}-{S}"] = new(0, -1, true,false);
+            E[$"{X}-{S}"] = new(0, -1, true, false);
+            E[$"{X}-{Inv}"] = new(0, 0, true, false, iOpp: true);
 
-            E[$"{P}-{C}"]=new(+1,-1);
-            E[$"{P}-{D}"]=new(-1,0);
-            E[$"{P}-{B}"]=new(-1,+1, false, false, true,false);
-            E[$"{P}-{X}"]=new(0,-1,  false, true);
-            E[$"{P}-{P}"]=new(-1,-1);
-            E[$"{P}-{I}"]=new(-1,+1);
-            E[$"{P}-{Rn}"]=new(0,-1, false, false, false, false, false, true);
+            E[$"{P}-{C}"]=new(+1, -1);
+            E[$"{P}-{D}"]=new(-1, 0);
+            E[$"{P}-{B}"]=new(-1, +1, false, false, true,false);
+            E[$"{P}-{X}"]=new(0, -1,  false, true);
+            E[$"{P}-{P}"]=new(-1, -1);
+            E[$"{P}-{I}"]=new(-1, +1);
+            E[$"{P}-{Rn}"]=new(0, -1, false, false, false, false, false, true);
             E[$"{P}-{Cu}"] = new(0, -1, cSelf: true);
             E[$"{P}-{S}"] = new(-1, -2);
+            E[$"{P}-{Inv}"] = new(+1, -1, iOpp: false);
 
             E[$"{I}-{C}"]=new(-1,+1);
             E[$"{I}-{D}"]=new(+1,-1);
@@ -1187,6 +1263,7 @@ namespace GameCore
             E[$"{I}-{Rn}"]=new(-1,0);
             E[$"{I}-{Cu}"] = new(+1, -1, cSelf: false);
             E[$"{I}-{S}"] = new(+1, -2);
+            E[$"{I}-{Inv}"] = new(-1, +1, iOpp: true);
 
             E[$"{Rn}-{C}"]=new(0,+1,  false,false,false,false, true,false);
             E[$"{Rn}-{D}"]=new(0,0,   false,false,false,false, true,false);
@@ -1197,6 +1274,7 @@ namespace GameCore
             E[$"{Rn}-{Rn}"]=new(0,0,  false,false,false,false,  true,true);
             E[$"{Rn}-{Cu}"] = new(0, 0, false,false,false,false, true,false, cSelf: true);
             E[$"{Rn}-{S}"] = new(0, -1, false,false,false,false, true,false);
+            E[$"{Rn}-{Inv}"] = new(0, 0, false, false, false, false, true, false, iOpp: true);
 
             E[$"{Cu}-{C}"] = new(+1, +1, cOpp: true);
             E[$"{Cu}-{D}"] = new(0, 0, cSelf: true);
@@ -1207,6 +1285,7 @@ namespace GameCore
             E[$"{Cu}-{Rn}"] = new(0, 0, false, false, false, false, false, true, cOpp: true);
             E[$"{Cu}-{Cu}"] = new(0, 0, cSelf: true, cOpp: true);
             E[$"{Cu}-{S}"] = new(0, -1, cOpp: true);
+            E[$"{Cu}-{Inv}"] = new(0, 0, cOpp: true, iOpp: false);
 
             E[$"{S}-{C}"] = new(-1, +1);
             E[$"{S}-{D}"] = new(-1, 0);
@@ -1217,7 +1296,19 @@ namespace GameCore
             E[$"{S}-{Rn}"] = new(-1, 0, false, false, false, false, false, true);
             E[$"{S}-{Cu}"] = new(0, -1, cSelf: true);
             E[$"{S}-{S}"] = new(-1, -1);
+            E[$"{S}-{Inv}"] = new(-1, 0, iOpp: true);
 
+            E[$"{Inv}-{C}"] = new(0, +1, iSelf: true);
+            E[$"{Inv}-{D}"] = new(0, -1, iSelf: true); // 회복 실패
+            E[$"{Inv}-{B}"] = new(-1, +1, false, false, true, false, iSelf: false); // Inv: -1, B: +Round]
+            E[$"{Inv}-{X}"] = new(0, 0, false, true, iSelf: true);
+            E[$"{Inv}-{P}"] = new(-1, +1, iSelf: false);
+            E[$"{Inv}-{I}"] = new(+1, -1, iSelf: true);
+            E[$"{Inv}-{Rn}"] = new(0, 0, false, false, false, false, false, true, iSelf: true);
+            E[$"{Inv}-{Cu}"] = new(0, 0, cSelf: true, iSelf: false);
+            E[$"{Inv}-{S}"] = new(0, -1, iSelf: true);
+            // ▼ [FIX] Add this missing line for Investment vs Investment
+            E[$"{Inv}-{Inv}"] = new(0, 0, iSelf: true, iOpp: true);
         } 
     }
 }
