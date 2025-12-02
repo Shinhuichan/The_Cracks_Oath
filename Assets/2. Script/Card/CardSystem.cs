@@ -177,7 +177,7 @@ namespace GameCore
         }
         Dictionary<string, Effect> E;
 
-        int roundCounter = 1;
+        public int roundCounter = 1;
 
         public bool enableChoiceDrawForPlayer = true;            // 인스펙터에서 켜기
         public event System.Action<GameCore.CardType, GameCore.CardType> OnOfferChoiceForPlayer;
@@ -246,6 +246,20 @@ namespace GameCore
 
         public int lastCardDeltaP1, lastCardDeltaP2;         // 카드/혼합 효과로 변한 HP
         public int lastDisasterDeltaP1, lastDisasterDeltaP2; // 자연재해로 변한 HP
+
+        // ▼▼▼ [이 부분을 추가해주세요] ▼▼▼
+        public void ManualInitialize()
+        {
+            if (bootstrapped) return;
+            bootstrapped = true;
+
+            ApplyModeIfAvailable();     // 모드 적용
+            ResetForNewMatch();         // 덱/변수 초기화
+            BuildEffects_WithRecon();   // 상성표 빌드 (이게 없으면 오류 발생)
+            
+            // 시뮬레이터에서는 UI가 없으므로 RaiseDisasterUI 등은 호출되어도 무시됨
+        }
+        // ▲▲▲ [추가 완료] ▲▲▲
 
         private void Awake()
         {
@@ -365,6 +379,25 @@ namespace GameCore
             // ▼▼▼ [신규] Sacrifice 카운트 및 특수 승리 체크 ▼▼▼
             if (a == CardType.Sacrifice) sacrificePlayedP1++;
             if (b == CardType.Sacrifice) sacrificePlayedP2++;
+
+            // 4장 모으면 즉시 승리 (상대를 패배 처리)
+            bool p1SacComplete = sacrificePlayedP1 >= 4;
+            bool p2SacComplete = sacrificePlayedP2 >= 4;
+
+            if (p1SacComplete) 
+            {
+                playerIILost = true;
+                IsSacrificeWinP1 = true; // ★ P1 특수 승리 확정
+            }
+            if (p2SacComplete) 
+            {
+                playerILost = true;
+                IsSacrificeWinP2 = true; // ★ P2 특수 승리 확정
+            }
+            
+            // 특수 승리가 발생했더라도, 동시 달성 시 무승부 처리를 위해 아래 로직 진행
+            // (이미 Lost 상태이므로 결과에는 반영됨)
+            // ▲▲▲ [신규 구현 종료] ▲▲▲
 
             // 4장 모으면 즉시 승리 (상대를 패배 처리)
             // 동시 달성 시 무승부(둘 다 패배) 처리가 되도록 플래그 설정
@@ -606,6 +639,9 @@ namespace GameCore
             carryAfterColdWaveP1 = carryAfterColdWaveP2 = false;
 
             ClearLoseFlags();
+            // ★ [추가] 특수 승리 플래그 초기화
+            IsSacrificeWinP1 = false;
+            IsSacrificeWinP2 = false;
             publicDeck.Clear();
             playerIHands.Clear();
             playerIIHands.Clear();
@@ -1130,6 +1166,11 @@ namespace GameCore
             Draw(publicDeck, hand, drawLimit); // Chaos 리셋 시에도 한파면 최대 2장만
         }
         
+
+        // 강제 패배 처리 (테스트용)
+        public void ForceLoseP1() { playerILost = true; }
+        public void ForceLoseP2() { playerIILost = true; }
+
         // 페이즈 시작 보너스(동점이면 없음)
         bool phaseBonusAppliedThisRound = false;
         void ApplyPhaseStartBonusIfNeeded()
@@ -1173,7 +1214,10 @@ namespace GameCore
             DrawToLimitByDisaster(true);
         }
 
-        CardType UseCard(List<CardType> hand, int index)
+        // ★ [정밀 구현] 승리 원인 판별을 위한 프로퍼티
+        public bool IsSacrificeWinP1 { get; private set; }
+        public bool IsSacrificeWinP2 { get; private set; }
+        private CardType UseCard(List<CardType> hand, int index)
         { if (index < 0 || index >= hand.Count) return CardType.None; var c = hand[index]; hand.RemoveAt(index); discardCards.Add(c); return c; }
         
         // === 모드 적용 유틸 ===

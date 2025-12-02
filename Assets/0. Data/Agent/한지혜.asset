@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   agentName: 4
   title: The Balancer
+  icon: {fileID: -1579906505, guid: a6281a5e270526b4c97596b97ee94190, type: 3}
   description: "\uACE0\uB4F1\uD559\uC0DD\uC774\uB77C\uB294 \uB098\uC774\uC5D0\uB3C4
     \uBD88\uAD6C\uD558\uACE0 \uB180\uB77C\uC6B4 \uADE0\uD615 \uAC10\uAC01\uC744 \uBCF4\uC778\uB2E4.
     \uAC10\uC815\uACFC \uB17C\uB9AC\uC758 \uACBD\uACC4\uB97C \uC870\uC728\uD558\uBA70,
@@ -29,29 +30,134 @@ MonoBehaviour:
     \uC5F0\uD569\uC774 \uBB34\uB108\uC9C8 \uB54C \uAC00\uC7A5 \uD070 \uCDA9\uACA9\uC744
     \uBC1B\uB294 \uCC38\uAC00\uC790 \uC911 \uD558\uB098\uB2E4. \uC720\uC5F0\uD558\uC9C0\uB9CC
     \uC27D\uAC8C \uC0C1\uCC98\uBC1B\uB294 \uC774\uC0C1\uC801\uC778 \uD611\uC0C1\uAC00."
-  threatLevel: 1
+  threatLevel: 3
   stats:
-    Lethality: 20
-    Survivability: 70
-    Calculation: 65
-    Adaptability: 70
-    Insight: 50
-    Unpredictability: 30
+    Judgment: 75
+    Aggressive: 40
+    Defensive: 75
+    Stability: 85
+    Growth: 70
+    Control: 40
   personality: 6
-  elo: 1568.8800526664274
+  elo: 1394.239264937593
   records:
   - verseAgent: 8
-    matchCount: 129
-    winCount: 48
-    loseCount: 75
-    drawCount: 6
+    matchCount: 16133
+    winCount: 9316
+    loseCount: 6519
+    drawCount: 298
   - verseAgent: 9
-    matchCount: 13000
-    winCount: 6130
-    loseCount: 6670
-    drawCount: 200
+    matchCount: 64014
+    winCount: 31470
+    loseCount: 31468
+    drawCount: 1076
   - verseAgent: 12
-    matchCount: 10000
-    winCount: 4819
-    loseCount: 4992
-    drawCount: 189
+    matchCount: 60020
+    winCount: 30087
+    loseCount: 28788
+    drawCount: 1145
+  - verseAgent: 1
+    matchCount: 31014
+    winCount: 14285
+    loseCount: 16155
+    drawCount: 574
+  - verseAgent: 15
+    matchCount: 58032
+    winCount: 27332
+    loseCount: 29608
+    drawCount: 1092
+  - verseAgent: 17
+    matchCount: 16004
+    winCount: 10225
+    loseCount: 5520
+    drawCount: 259
+  - verseAgent: 5
+    matchCount: 22008
+    winCount: 9086
+    loseCount: 12486
+    drawCount: 436
+  - verseAgent: 19
+    matchCount: 56024
+    winCount: 26857
+    loseCount: 28164
+    drawCount: 1003
+  - verseAgent: 10
+    matchCount: 13002
+    winCount: 8769
+    loseCount: 4029
+    drawCount: 204
+  - verseAgent: 20
+    matchCount: 13002
+    winCount: 7659
+    loseCount: 5202
+    drawCount: 141
+  - verseAgent: 14
+    matchCount: 29006
+    winCount: 15976
+    loseCount: 12495
+    drawCount: 535
+  - verseAgent: 2
+    matchCount: 31014
+    winCount: 16507
+    loseCount: 13949
+    drawCount: 558
+  - verseAgent: 7
+    matchCount: 32008
+    winCount: 15845
+    loseCount: 15565
+    drawCount: 598
+  - verseAgent: 13
+    matchCount: 42028
+    winCount: 19813
+    loseCount: 21452
+    drawCount: 763
+  - verseAgent: 16
+    matchCount: 30020
+    winCount: 14064
+    loseCount: 15291
+    drawCount: 665
+  - verseAgent: 23
+    matchCount: 33022
+    winCount: 16579
+    loseCount: 15781
+    drawCount: 662
+  - verseAgent: 3
+    matchCount: 33022
+    winCount: 13995
+    loseCount: 18396
+    drawCount: 631
+  - verseAgent: 22
+    matchCount: 12008
+    winCount: 6574
+    loseCount: 5221
+    drawCount: 213
+  - verseAgent: 11
+    matchCount: 15010
+    winCount: 6243
+    loseCount: 8499
+    drawCount: 268
+  - verseAgent: 6
+    matchCount: 36024
+    winCount: 16996
+    loseCount: 18384
+    drawCount: 644
+  - verseAgent: 18
+    matchCount: 9006
+    winCount: 4926
+    loseCount: 3934
+    drawCount: 146
+  - verseAgent: 25
+    matchCount: 15010
+    winCount: 7598
+    loseCount: 7108
+    drawCount: 304
+  - verseAgent: 21
+    matchCount: 21014
+    winCount: 10392
+    loseCount: 10258
+    drawCount: 364
+  - verseAgent: 24
+    matchCount: 27018
+    winCount: 12926
+    loseCount: 13382
+    drawCount: 710

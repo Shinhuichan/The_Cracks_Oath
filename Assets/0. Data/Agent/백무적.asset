@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   agentName: 11
   title: The Perfect
+  icon: {fileID: 1327179568, guid: a6281a5e270526b4c97596b97ee94190, type: 3}
   description: "\uB178\uB144\uC758 \uCE74\uB4DC \uB9C8\uC2A4\uD130. \uADF8\uB294
     \uC774\uBBF8 \uBAA8\uB4E0 \uC804\uB7B5\uC744 \uACAA\uC5C8\uB2E4. \uC0C1\uB300\uC758
     \uC190\uD328\uAC00 \uC544\uB2C8\uB77C \u2018\uC758\uB3C4\u2019\uB97C \uC77D\uB294\uB2E4.
@@ -31,17 +32,112 @@ MonoBehaviour:
     \uAC74 \uD589\uC6B4 \uC678\uC5D4 \uC5C6\uB2E4."
   threatLevel: 6
   stats:
-    Lethality: 90
-    Survivability: 99
-    Calculation: 99
-    Adaptability: 98
-    Insight: 99
-    Unpredictability: 50
+    Judgment: 100
+    Aggressive: 85
+    Defensive: 95
+    Stability: 99
+    Growth: 70
+    Control: 95
   personality: 0
-  elo: 1542.0950593771556
+  elo: 2434.125553137554
   records:
   - verseAgent: 5
-    matchCount: 200
-    winCount: 99
-    loseCount: 95
-    drawCount: 6
+    matchCount: 91254
+    winCount: 45796
+    loseCount: 43645
+    drawCount: 1813
+  - verseAgent: 13
+    matchCount: 58032
+    winCount: 33031
+    loseCount: 23842
+    drawCount: 1159
+  - verseAgent: 1
+    matchCount: 70040
+    winCount: 39757
+    loseCount: 28878
+    drawCount: 1405
+  - verseAgent: 3
+    matchCount: 79046
+    winCount: 42249
+    loseCount: 35383
+    drawCount: 1414
+  - verseAgent: 16
+    matchCount: 88052
+    winCount: 45652
+    loseCount: 40592
+    drawCount: 1808
+  - verseAgent: 6
+    matchCount: 61034
+    winCount: 34911
+    loseCount: 24881
+    drawCount: 1242
+  - verseAgent: 15
+    matchCount: 49026
+    winCount: 28824
+    loseCount: 19226
+    drawCount: 976
+  - verseAgent: 12
+    matchCount: 40020
+    winCount: 22683
+    loseCount: 16507
+    drawCount: 830
+  - verseAgent: 19
+    matchCount: 22008
+    winCount: 13124
+    loseCount: 8428
+    drawCount: 456
+  - verseAgent: 7
+    matchCount: 19006
+    winCount: 11672
+    loseCount: 6931
+    drawCount: 403
+  - verseAgent: 23
+    matchCount: 18076
+    winCount: 10542
+    loseCount: 7165
+    drawCount: 369
+  - verseAgent: 24
+    matchCount: 75050
+    winCount: 38476
+    loseCount: 34780
+    drawCount: 1794
+  - verseAgent: 4
+    matchCount: 15010
+    winCount: 8499
+    loseCount: 6243
+    drawCount: 268
+  - verseAgent: 21
+    matchCount: 9006
+    winCount: 5455
+    loseCount: 3403
+    drawCount: 148
+  - verseAgent: 14
+    matchCount: 3002
+    winCount: 2125
+    loseCount: 836
+    drawCount: 41
+  - verseAgent: 2
+    matchCount: 6004
+    winCount: 3926
+    loseCount: 1971
+    drawCount: 107
+  - verseAgent: 18
+    matchCount: 3002
+    winCount: 1864
+    loseCount: 1084
+    drawCount: 54
+  - verseAgent: 9
+    matchCount: 3002
+    winCount: 1944
+    loseCount: 1015
+    drawCount: 43
+  - verseAgent: 20
+    matchCount: 3002
+    winCount: 1837
+    loseCount: 1127
+    drawCount: 38
+  - verseAgent: 25
+    matchCount: 6004
+    winCount: 3548
+    loseCount: 2321
+    drawCount: 135

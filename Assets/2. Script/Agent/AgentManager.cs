@@ -169,6 +169,47 @@ public class AgentManager : SingletonBehaviour<AgentManager>
         return runtimeWeights[key];
     }
 
+    // ============================================================
+    // ★ [신규 기능] Threat Level 자동 산정 시스템
+    // ============================================================
+
+    /// <summary>
+    /// 현재 등록된 모든 에이전트의 ELO를 기준으로 ThreatLevel(티어)을 재분배합니다.
+    /// (시뮬레이션 리그 종료 후 호출 권장)
+    /// </summary>
+    public void RecalculateThreatLevels()
+    {
+        if (currentAgent == null || currentAgent.Count == 0) return;
+
+        // 1. ELO 기준 오름차순 정렬 (낮은 점수 -> 높은 점수)
+        // sortedList[0] = 꼴찌, sortedList[Last] = 1등
+        var sortedList = currentAgent.OrderBy(a => a.elo).ToList();
+        int totalCount = sortedList.Count;
+
+        for (int i = 0; i < totalCount; i++)
+        {
+            // 2. 백분위 계산 (하위 몇 %인지)
+            // (i + 1)을 사용하여 0%가 나오지 않도록 함
+            float percentile = (float)(i + 1) / totalCount * 100f;
+            
+            ThreatLevel newTier;
+
+            // 3. 티어 분배 로직 (사용자 정의 비율)
+            if (percentile <= 10f)      newTier = ThreatLevel.Prey;         // 하위 0 ~ 10%
+            else if (percentile <= 25f) newTier = ThreatLevel.Unstable;     // 하위 10 ~ 25%
+            else if (percentile <= 40f) newTier = ThreatLevel.Variables;    // 하위 25 ~ 40%
+            else if (percentile <= 60f) newTier = ThreatLevel.Challengers;  // 하위 40 ~ 60%
+            else if (percentile <= 75f) newTier = ThreatLevel.Masters;      // 하위 60 ~ 75%
+            else if (percentile <= 90f) newTier = ThreatLevel.Grandmasters; // 하위 75 ~ 90%
+            else                        newTier = ThreatLevel.Absolute;     // 하위 90 ~ 100% (상위 10%)
+
+            // 4. 데이터 적용
+            sortedList[i].threatLevel = newTier;
+        }
+
+        Debug.Log($"[AgentManager] Threat Levels Recalculated based on ELO distribution (Total: {totalCount})");
+    }
+
     /// <summary>
     /// 라운드 결과에 따라 AI의 카드 가중치를 '성격'에 맞게 업데이트(학습)합니다.
     /// </summary>
@@ -275,6 +316,44 @@ public class AgentManager : SingletonBehaviour<AgentManager>
         SaveRecord(da, recA);
         SaveRecord(db, recB);
     }
+
+    // ★ [추가] 시뮬레이션 결과(수천 판)를 한 번에 전적에 반영하는 메서드
+    public void ApplyBatchResult(AgentList a, AgentList b, int winsA, int winsB, int draws, double k = 24.0)
+    {
+        // 1) ELO 갱신 (배치 단위에서는 평균 승률로 1회만 갱신하거나, 가중치를 줄여서 반영)
+        // 여기서는 '전체 승률'을 기반으로 1회 갱신하되 K값을 매치 수에 비례하게 조정하는 방식 등 다양하지만,
+        // 단순하게 '다수결 승자' 기준으로 1회만 반영하는 것이 ELO 인플레이션 방지에 좋습니다.
+        // (수천 번 ELO를 갱신하면 값이 폭주할 수 있음)
+        
+        MatchOutcome outcome = MatchOutcome.Draw;
+        if (winsA > winsB) outcome = MatchOutcome.Win;
+        else if (winsB > winsA) outcome = MatchOutcome.Loss;
+        
+        ApplyMatchResult(a, b, outcome, k); // ELO는 대표 결과로 1회만
+
+        var da = GetData(a);
+        var db = GetData(b);
+        var recA = GetOrCreateRecord(da, b);
+        var recB = GetOrCreateRecord(db, a);
+
+        int totalPlayed = winsA + winsB + draws;
+        recA.matchCount += totalPlayed;
+        recB.matchCount += totalPlayed;
+        recA.winCount += winsA;
+        recA.loseCount += winsB;
+        recA.drawCount += draws;
+        recB.winCount += winsB;
+        recB.loseCount += winsA;
+        recB.drawCount += draws;
+
+        SaveRecord(da, recA);
+        SaveRecord(db, recB);
+        
+        // ★ [선택 사항] 배치 결과가 반영될 때마다 티어를 갱신하고 싶다면 여기서 호출
+        // 하지만 매번 부르면 성능/로그 낭비가 심하므로, 보통은 리그 종료 시점에 호출하는 것을 권장합니다.
+        // RecalculateThreatLevels();
+    }
+
     public double GetElo(AgentList id)
     {
         if (currentAgent.Find(x => x.agentName == id) is not AgentData data)
@@ -319,7 +398,23 @@ public class AgentManager : SingletonBehaviour<AgentManager>
         // 등록 목록에서 해당 에이전트 데이터를 반환. 없으면 null
         return currentAgent?.Find(x => x.agentName == id);
     }
-    AgentData GetData(AgentList id) => currentAgent.Find(x => x.agentName == id);
+    AgentData GetData(AgentList id) 
+    {
+        var found = currentAgent.Find(x => x.agentName == id);
+        
+        // ★ [디버그 추가] 민도형인데 데이터를 못 찾으면 경고 띄우기
+        if (found == null && id.ToString() == "민도형")
+        {
+            Debug.LogError($"[AgentManager] '민도형' 데이터를 찾을 수 없습니다! CurrentAgent 리스트에 등록된 {currentAgent.Count}명을 확인하세요.");
+            foreach(var a in currentAgent)
+            {
+                if(a == null) Debug.LogWarning(" -> 빈 슬롯(Null)이 발견되었습니다.");
+                else Debug.Log($" -> 등록됨: {a.agentName}");
+            }
+        }
+        
+        return found;
+    }
 
     // 상대별 레코드 가져오기/없으면 추가
     AgentRecord GetOrCreateRecord(AgentData data, AgentList versus)

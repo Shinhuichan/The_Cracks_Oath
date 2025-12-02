@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   agentName: 8
   title: Iron Wall
+  icon: {fileID: 591627783, guid: a6281a5e270526b4c97596b97ee94190, type: 3}
   description: "\uADF8\uB140\uB294 \uC2A4\uC2A4\uB85C\uB97C \u2018\uC8FC\uC778\uACF5\u2019\uC774\uB77C
     \uC0DD\uAC01\uD558\uC9C0 \uC54A\uB294\uB2E4. \uB298 \uD0C0\uC778\uC758 \uD750\uB984\uC744
     \uC77D\uACE0 \uB530\uB77C\uAC04\uB2E4. \uC218\uBE44\uD615 \uD50C\uB808\uC774\uC5B4\uC9C0\uB9CC,
@@ -31,12 +32,12 @@ MonoBehaviour:
     \uC54A\uC9C0\uB9CC, \uB9C8\uC9C0\uB9C9\uC5D4 \uC5B8\uC81C\uB098 \uC0B4\uC544\uB0A8\uB294\uB2E4."
   threatLevel: 1
   stats:
-    Lethality: 10
-    Survivability: 90
-    Calculation: 50
-    Adaptability: 80
-    Insight: 40
-    Unpredictability: 10
+    Judgment: 40
+    Aggressive: 10
+    Defensive: 85
+    Stability: 70
+    Growth: 30
+    Control: 20
   personality: 3
   elo: 1442.6229702202504
   records:

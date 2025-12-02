@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 36f56d37b0e3bc245a1bd4ba0a9a2e09, type: 3}
+  m_Name: "\uC784\uC0AC\uB791"
+  m_EditorClassIdentifier: 
+  agentName: 17
+  title: The Saint
+  icon: {fileID: -1457779307, guid: a6281a5e270526b4c97596b97ee94190, type: 3}
+  description: "\"\uC6B0\uB9B0 \uC2F8\uC6B0\uB7EC \uC628 \uAC8C \uC544\uB2C8\uC5D0\uC694.\"
+    \uADF8\uB140\uC758 \uC0AC\uC804\uC5D0\uB294 '\uACF5\uACA9'\uC774 \uC5C6\uB2E4.
+    \uADF8\uB140\uB294 \uC5B4\uB5A4 \uC0C1\uD669\uC5D0\uC11C\uB3C4 Betrayal\uC774\uB098
+    Pollution \uAC19\uC740 \uC9C1\uC811 \uACF5\uACA9 \uCE74\uB4DC\uB97C \uC808\uB300
+    \uB0B4\uC9C0 \uC54A\uB294\uB2E4. \uC624\uB85C\uC9C0 Cooperation\uACFC Investment\uB9CC\uC744
+    \uC0AC\uC6A9\uD558\uC5EC \uC0C1\uB300\uC640 \uD568\uAED8 \uC0B4\uC544\uAC00\uB824
+    \uD55C\uB2E4. \uADF8\uB140\uB97C \uC774\uAE30\uB294 \uAC83\uC740 \uC27D\uC9C0\uB9CC,
+    \uADF8\uB140\uB97C \uBC30\uC2E0\uD558\uACE0 \uC774\uACBC\uC744 \uB54C \uC0C1\uB300\uBC29\uC740
+    \uBB18\uD55C \uC8C4\uCC45\uAC10\uC744 \uB290\uB07C\uAC8C \uB41C\uB2E4. \uAC00\uB054
+    \uADF8\uB140\uC758 \uBB34\uD55C\uD55C \uD68C\uBCF5\uB825\uC5D0 \uB9D0\uB824 \uC2A4\uC2A4\uB85C
+    \uC9C0\uCCD0 \uC4F0\uB7EC\uC9C0\uB294 \uC0C1\uB300\uB3C4 \uC788\uB2E4."
+  threatLevel: 0
+  stats:
+    Judgment: 10
+    Aggressive: 0
+    Defensive: 50
+    Stability: 50
+    Growth: 50
+    Control: 10
+  personality: 0
+  elo: 1500
+  records: []

@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   agentName: 10
   title: The Innocent
+  icon: {fileID: -1440063314, guid: a6281a5e270526b4c97596b97ee94190, type: 3}
   description: "\uC720\uCE58\uC6D0\uC0DD\uC758 \uC2DC\uC120\uC73C\uB85C \uAC8C\uC784\uC744
     \uBCF8\uB2E4. \uCE74\uB4DC\uC758 \uADF8\uB9BC, \uC0C9\uAC10, \uBAA8\uC591\uC744
     \uBCF4\uACE0 \uC120\uD0DD\uD55C\uB2E4. \uC2B9\uBD80 \uC758\uC2DD\uC774 \uC804\uD600
@@ -32,17 +33,57 @@ MonoBehaviour:
     \uBBFF\uB294 \uC720\uC77C\uD55C \uCC38\uAC00\uC790."
   threatLevel: 0
   stats:
-    Lethality: 5
-    Survivability: 40
-    Calculation: 10
-    Adaptability: 20
-    Insight: 30
-    Unpredictability: 50
+    Judgment: 10
+    Aggressive: 5
+    Defensive: 30
+    Stability: 20
+    Growth: 50
+    Control: 10
   personality: 0
-  elo: 1424.9554026836595
+  elo: 958.4897556796157
   records:
   - verseAgent: 12
     matchCount: 112
     winCount: 38
     loseCount: 72
     drawCount: 2
+  - verseAgent: 21
+    matchCount: 6004
+    winCount: 1687
+    loseCount: 4253
+    drawCount: 64
+  - verseAgent: 4
+    matchCount: 3002
+    winCount: 943
+    loseCount: 2007
+    drawCount: 52
+  - verseAgent: 17
+    matchCount: 21014
+    winCount: 9953
+    loseCount: 10400
+    drawCount: 661
+  - verseAgent: 20
+    matchCount: 21014
+    winCount: 8908
+    loseCount: 11625
+    drawCount: 481
+  - verseAgent: 8
+    matchCount: 15010
+    winCount: 4555
+    loseCount: 10178
+    drawCount: 277
+  - verseAgent: 22
+    matchCount: 6004
+    winCount: 1571
+    loseCount: 4356
+    drawCount: 77
+  - verseAgent: 18
+    matchCount: 6004
+    winCount: 2269
+    loseCount: 3617
+    drawCount: 118
+  - verseAgent: 14
+    matchCount: 3002
+    winCount: 879
+    loseCount: 2079
+    drawCount: 44

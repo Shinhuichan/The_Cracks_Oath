@@ -1,0 +1,154 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 36f56d37b0e3bc245a1bd4ba0a9a2e09, type: 3}
+  m_Name: "\uBBFC\uC18C\uD76C"
+  m_EditorClassIdentifier: 
+  agentName: 19
+  title: The Glitch
+  icon: {fileID: -2072144856, guid: a6281a5e270526b4c97596b97ee94190, type: 3}
+  description: "\uADF8\uB140\uB294 \uC774\uAE30\uB294 \uAC83\uBCF4\uB2E4 \uC0C1\uB300\uAC00
+    \uCCA0\uC800\uD558\uAC8C \uBC15\uC0B4\uB0B4\uB294 \uAC83\uC744 \uC911\uC810\uC73C\uB85C
+    \uD589\uB3D9\uD55C\uB2E4. \uAE30\uBCF8\uC801\uC73C\uB85C \uC790\uC2E0\uC758 \uC591\uCD08\uAC00
+    \uCDA9\uBD84\uD560 \uB54C, Sacrifice\uB97C \uC120\uD638\uD558\uBA74\uC11C Curse\uC640
+    Interrupt\uAC19\uC740 \uD76C\uADC0 \uCE74\uB4DC\uB97C \uC0C1\uB300\uC758 \uC131\uD5A5\uC5D0
+    \uB530\uB77C \uACE8\uB77C\uC11C \uC81C\uCD9C\uD558\uB294 \uCCA0\uB450\uCCA0\uBBF8\uB97C
+    \uBCF4\uC5EC\uC900\uB2E4. Betrayal\uC740 \uD655\uC2E4\uD55C \uD0AC\uAC01\uC77C
+    \uB54C\uB9CC \uC120\uD638\uD558\uACE0 \uADF8\uB807\uC9C0 \uC54A\uC73C\uBA74 \uC120\uD638\uD558\uC9C0
+    \uC54A\uB294\uB2E4. Investment\uB294 \uC2A4\uD14D\uC774 3 \uC774\uC0C1 \uC313\uC5EC\uC788\uC744
+    \uB54C\uB9CC \uC120\uD638\uD558\uC5EC \uD655\uC2E4\uD55C \uC774\uB4DD\uC774 \uC5C6\uC73C\uBA74
+    \uC801\uC744 \uC555\uBC15\uD558\uB294 \uAC83\uC5D0 \uC911\uC810\uC744 \uB454\uB2E4."
+  threatLevel: 3
+  stats:
+    Judgment: 60
+    Aggressive: 80
+    Defensive: 40
+    Stability: 50
+    Growth: 60
+    Control: 85
+  personality: 0
+  elo: 1421.3141011146654
+  records:
+  - verseAgent: 9
+    matchCount: 34016
+    winCount: 19075
+    loseCount: 14324
+    drawCount: 617
+  - verseAgent: 12
+    matchCount: 50020
+    winCount: 23256
+    loseCount: 25705
+    drawCount: 1059
+  - verseAgent: 6
+    matchCount: 44016
+    winCount: 20371
+    loseCount: 22749
+    drawCount: 896
+  - verseAgent: 4
+    matchCount: 56024
+    winCount: 28164
+    loseCount: 26857
+    drawCount: 1003
+  - verseAgent: 13
+    matchCount: 40020
+    winCount: 19000
+    loseCount: 20231
+    drawCount: 789
+  - verseAgent: 2
+    matchCount: 38012
+    winCount: 22465
+    loseCount: 14806
+    drawCount: 741
+  - verseAgent: 14
+    matchCount: 19006
+    winCount: 12013
+    loseCount: 6668
+    drawCount: 325
+  - verseAgent: 18
+    matchCount: 16004
+    winCount: 9120
+    loseCount: 6554
+    drawCount: 330
+  - verseAgent: 11
+    matchCount: 22008
+    winCount: 8428
+    loseCount: 13124
+    drawCount: 456
+  - verseAgent: 5
+    matchCount: 22008
+    winCount: 8401
+    loseCount: 13161
+    drawCount: 446
+  - verseAgent: 15
+    matchCount: 34016
+    winCount: 15562
+    loseCount: 17746
+    drawCount: 708
+  - verseAgent: 7
+    matchCount: 40020
+    winCount: 21128
+    loseCount: 18076
+    drawCount: 816
+  - verseAgent: 3
+    matchCount: 18012
+    winCount: 7696
+    loseCount: 9967
+    drawCount: 349
+  - verseAgent: 22
+    matchCount: 15010
+    winCount: 9522
+    loseCount: 5240
+    drawCount: 248
+  - verseAgent: 21
+    matchCount: 36024
+    winCount: 18937
+    loseCount: 16411
+    drawCount: 676
+  - verseAgent: 1
+    matchCount: 24016
+    winCount: 10600
+    loseCount: 12923
+    drawCount: 493
+  - verseAgent: 16
+    matchCount: 15010
+    winCount: 6676
+    loseCount: 8020
+    drawCount: 314
+  - verseAgent: 8
+    matchCount: 9006
+    winCount: 5747
+    loseCount: 3116
+    drawCount: 143
+  - verseAgent: 25
+    matchCount: 18012
+    winCount: 9324
+    loseCount: 8379
+    drawCount: 309
+  - verseAgent: 23
+    matchCount: 36024
+    winCount: 17161
+    loseCount: 18106
+    drawCount: 757
+  - verseAgent: 24
+    matchCount: 21014
+    winCount: 9083
+    loseCount: 11468
+    drawCount: 463
+  - verseAgent: 20
+    matchCount: 6004
+    winCount: 3946
+    loseCount: 1980
+    drawCount: 78
+  - verseAgent: 17
+    matchCount: 3002
+    winCount: 1889
+    loseCount: 1060
+    drawCount: 53

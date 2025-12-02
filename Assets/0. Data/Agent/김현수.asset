@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   agentName: 1
   title: The Shield
+  icon: {fileID: 1894113136, guid: a6281a5e270526b4c97596b97ee94190, type: 3}
   description: "\uC9C1\uC7A5\uC778\uC73C\uB85C\uC11C\uC758 \uADDC\uCE59\uC801\uC778
     \uC0B6\uC774 \uADF8\uC758 \uC0AC\uACE0\uBC29\uC2DD \uC804\uBC18\uC5D0 \uAE54\uB824
     \uC788\uB2E4. \uADF8\uB294 \uBAA8\uB4E0 \uC0C1\uD669\uC744 \uC218\uCE58\uD654\uD558\uB824
@@ -35,24 +36,124 @@ MonoBehaviour:
     \uB3D9\uC694\uAC00 \uAC70\uC758 \uC5C6\uACE0, Condition \uBCC0\uD654\uB3C4 \uC548\uC815\uC801\uC774\uB2E4.
     \uAC8C\uC784\uC774 \uC7A5\uAE30\uD654\uB420\uC218\uB85D \uAC15\uD574\uC9C0\uB294
     \uB300\uD45C\uC801\uC778 \u2018\uB0C9\uC18C\uD615 \uC804\uB7B5\uAC00\u2019\uB2E4."
-  threatLevel: 0
+  threatLevel: 5
   stats:
-    Lethality: 50
-    Survivability: 95
-    Calculation: 88
-    Adaptability: 60
-    Insight: 70
-    Unpredictability: 15
+    Judgment: 85
+    Aggressive: 40
+    Defensive: 98
+    Stability: 95
+    Growth: 75
+    Control: 80
   personality: 4
-  elo: 1374.0055563766693
+  elo: 1760.6717122175833
   records:
   - verseAgent: 2
-    matchCount: 10200
-    winCount: 3579
-    loseCount: 6454
-    drawCount: 167
+    matchCount: 35210
+    winCount: 19073
+    loseCount: 15509
+    drawCount: 628
   - verseAgent: 9
+    matchCount: 26004
+    winCount: 13153
+    loseCount: 12379
+    drawCount: 472
+  - verseAgent: 3
+    matchCount: 77038
+    winCount: 37265
+    loseCount: 38301
+    drawCount: 1472
+  - verseAgent: 4
+    matchCount: 31014
+    winCount: 16155
+    loseCount: 14285
+    drawCount: 574
+  - verseAgent: 5
+    matchCount: 89046
+    winCount: 37651
+    loseCount: 49631
+    drawCount: 1764
+  - verseAgent: 6
+    matchCount: 62028
+    winCount: 30962
+    loseCount: 29721
+    drawCount: 1345
+  - verseAgent: 7
+    matchCount: 41014
+    winCount: 23043
+    loseCount: 17116
+    drawCount: 855
+  - verseAgent: 8
+    matchCount: 6570
+    winCount: 4322
+    loseCount: 2126
+    drawCount: 122
+  - verseAgent: 20
     matchCount: 10000
-    winCount: 3916
-    loseCount: 5912
-    drawCount: 172
+    winCount: 6273
+    loseCount: 3606
+    drawCount: 121
+  - verseAgent: 16
+    matchCount: 61034
+    winCount: 28946
+    loseCount: 30757
+    drawCount: 1331
+  - verseAgent: 11
+    matchCount: 70040
+    winCount: 28878
+    loseCount: 39757
+    drawCount: 1405
+  - verseAgent: 13
+    matchCount: 40020
+    winCount: 20469
+    loseCount: 18700
+    drawCount: 851
+  - verseAgent: 15
+    matchCount: 55030
+    winCount: 28313
+    loseCount: 25573
+    drawCount: 1144
+  - verseAgent: 14
+    matchCount: 6004
+    winCount: 3865
+    loseCount: 2020
+    drawCount: 119
+  - verseAgent: 19
+    matchCount: 24016
+    winCount: 12923
+    loseCount: 10600
+    drawCount: 493
+  - verseAgent: 24
+    matchCount: 45030
+    winCount: 21077
+    loseCount: 22887
+    drawCount: 1066
+  - verseAgent: 22
+    matchCount: 9006
+    winCount: 5865
+    loseCount: 2975
+    drawCount: 166
+  - verseAgent: 18
+    matchCount: 9006
+    winCount: 5065
+    loseCount: 3762
+    drawCount: 179
+  - verseAgent: 23
+    matchCount: 18012
+    winCount: 9617
+    loseCount: 8012
+    drawCount: 383
+  - verseAgent: 12
+    matchCount: 24016
+    winCount: 11764
+    loseCount: 11735
+    drawCount: 517
+  - verseAgent: 21
+    matchCount: 6004
+    winCount: 3365
+    loseCount: 2530
+    drawCount: 109
+  - verseAgent: 25
+    matchCount: 18012
+    winCount: 9700
+    loseCount: 8001
+    drawCount: 311

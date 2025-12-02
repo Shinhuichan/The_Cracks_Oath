@@ -1,0 +1,137 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 36f56d37b0e3bc245a1bd4ba0a9a2e09, type: 3}
+  m_Name: "\uC815\uAC74\uC6B0"
+  m_EditorClassIdentifier: 
+  agentName: 20
+  title: The Builder
+  icon: {fileID: 768083768, guid: a6281a5e270526b4c97596b97ee94190, type: 3}
+  description: "\uADF8\uB294 \uD30C\uAD34\uBCF4\uB2E4 \uAC74\uC124\uC744 \uC990\uAE34\uB2E4.
+    \uB2E8\uBC1C\uC131 \uC774\uB4DD\uBCF4\uB2E4\uB294 \uC2A4\uD0DD(Stack)\uC744 \uC313\uB294
+    \uD589\uC704 \uC790\uCCB4\uC5D0 \uC9D1\uCC29\uD55C\uB2E4. Investment\uC758 \uCE74\uC6B4\uD2B8\uB97C
+    \uC62C\uB9AC\uAC70\uB098, Sacrifice 4\uC7A5\uC744 \uBAA8\uC73C\uB294 \uBE4C\uB4DC\uC5C5
+    \uACFC\uC815\uC5D0 \uD76C\uC5F4\uC744 \uB290\uB080\uB2E4. \uBC18\uBA74, \uACF5\uB4E4\uC5EC
+    \uC313\uC740 \uD0D1\uC744 \uBB34\uB108\uB728\uB9AC\uB294 Chaos\uB098 Interrupt\uB97C
+    \uB2F9\uD558\uBA74 \uC774\uC131\uC744 \uC783\uACE0 \uBB34\uB108\uC9C4\uB2E4.
+    \uC2B9\uB9AC\uBCF4\uB2E4\uB294 '\uC644\uC131\uB41C \uD615\uD0DC'\uB97C \uBCF4\uACE0
+    \uC2F6\uC5B4 \uD558\uB294 \uC608\uC220\uAC00\uC801 \uAE30\uC9C8\uC758 \uD50C\uB808\uC774\uC5B4\uB2E4."
+  threatLevel: 1
+  stats:
+    Judgment: 40
+    Aggressive: 10
+    Defensive: 40
+    Stability: 40
+    Growth: 90
+    Control: 10
+  personality: 0
+  elo: 990.0267292544437
+  records:
+  - verseAgent: 16
+    matchCount: 13002
+    winCount: 4636
+    loseCount: 8175
+    drawCount: 191
+  - verseAgent: 1
+    matchCount: 10000
+    winCount: 3606
+    loseCount: 6273
+    drawCount: 121
+  - verseAgent: 2
+    matchCount: 25010
+    winCount: 8048
+    loseCount: 16621
+    drawCount: 341
+  - verseAgent: 9
+    matchCount: 28012
+    winCount: 9395
+    loseCount: 18208
+    drawCount: 409
+  - verseAgent: 8
+    matchCount: 28012
+    winCount: 11211
+    loseCount: 16412
+    drawCount: 389
+  - verseAgent: 17
+    matchCount: 31014
+    winCount: 16350
+    loseCount: 14081
+    drawCount: 583
+  - verseAgent: 10
+    matchCount: 31014
+    winCount: 17087
+    loseCount: 13186
+    drawCount: 741
+  - verseAgent: 18
+    matchCount: 28012
+    winCount: 11488
+    loseCount: 16085
+    drawCount: 439
+  - verseAgent: 4
+    matchCount: 13002
+    winCount: 5202
+    loseCount: 7659
+    drawCount: 141
+  - verseAgent: 14
+    matchCount: 22008
+    winCount: 8400
+    loseCount: 13329
+    drawCount: 279
+  - verseAgent: 13
+    matchCount: 10000
+    winCount: 3432
+    loseCount: 6446
+    drawCount: 122
+  - verseAgent: 3
+    matchCount: 3002
+    winCount: 919
+    loseCount: 2045
+    drawCount: 38
+  - verseAgent: 22
+    matchCount: 9006
+    winCount: 3464
+    loseCount: 5437
+    drawCount: 105
+  - verseAgent: 12
+    matchCount: 6004
+    winCount: 2652
+    loseCount: 3244
+    drawCount: 108
+  - verseAgent: 7
+    matchCount: 6004
+    winCount: 2244
+    loseCount: 3688
+    drawCount: 72
+  - verseAgent: 19
+    matchCount: 6004
+    winCount: 1980
+    loseCount: 3946
+    drawCount: 78
+  - verseAgent: 5
+    matchCount: 3002
+    winCount: 1021
+    loseCount: 1947
+    drawCount: 34
+  - verseAgent: 11
+    matchCount: 3002
+    winCount: 1127
+    loseCount: 1837
+    drawCount: 38
+  - verseAgent: 15
+    matchCount: 3002
+    winCount: 1073
+    loseCount: 1888
+    drawCount: 41
+  - verseAgent: 6
+    matchCount: 3002
+    winCount: 1086
+    loseCount: 1876
+    drawCount: 40

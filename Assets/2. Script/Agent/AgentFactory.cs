@@ -21,6 +21,16 @@ public enum AgentList
     서유리,
     강은호,
     전아람,
+    차무식,
+    임사랑,
+    천명심,
+    민소희,
+    정건우,
+    신지아,
+    홍장미,
+    렉스,
+    고아라,
+    Zero
 }
 
 namespace GameCore
@@ -46,6 +56,16 @@ namespace GameCore
             "서유리" => Build_서유리(AgentList.서유리),
             "강은호" => Build_강은호(AgentList.강은호),
             "전아람" => Build_전아람(AgentList.전아람),
+            "차무식" => Build_차무식(AgentList.차무식),
+            "임사랑" => Build_임사랑(AgentList.임사랑),
+            "천명심" => Build_천명심(AgentList.천명심),
+            "민소희" => Build_민소희(AgentList.민소희),
+            "정건우" => Build_정건우(AgentList.정건우),
+            "Zero" => Build_Zero(AgentList.Zero), // ★ 추가
+            "신지아" => Build_신지아(AgentList.신지아), // ★ 추가
+            "홍장미" => Build_홍장미(AgentList.홍장미), // ★ 추가
+            "렉스" => Build_렉스(AgentList.렉스), // ★ 추가
+            "고아라" => Build_고아라(AgentList.고아라), // ★ 추가
             _ => Build_Default(who, (AgentList)System.Enum.Parse(typeof(AgentList), who)),
         };
 
@@ -2617,6 +2637,1230 @@ namespace GameCore
                 CardType.Doubt, CardType.Betrayal, CardType.Interrupt, 
                 CardType.Investment, CardType.Cooperation, CardType.Chaos, CardType.Sacrifice 
             };
+            return A;
+        }
+
+        // Cha Mu-sik — The Survivor: Masochistic Stuntman (Crisis Awakening & Sacrifice Specialist)
+        static Agent Build_차무식(AgentList id)
+        {
+            var A = new Agent("차무식", id);
+
+            A.rules.Add(I =>
+            {
+                var weights = AgentManager.I.GetWeights(I.selfID);
+                int R = Math.Max(1, I.s.round);
+                bool nf = !I.s.IsFirst;
+                var history = I.HistoryOpponent();
+
+                // [Status Check]
+                int maxHp = 10; // Default max HP (Adjust if dynamic max HP is available)
+                bool isCrisis = I.s.selfLife <= (maxHp / 2); // Awakened if HP <= 50%
+
+                // 1. [Lazy Mode] HP > 50%: Play carelessly
+                if (!isCrisis)
+                {
+                    // Randomly play cards without much thought (30% chance to just pick random)
+                    if (UnityEngine.Random.value < 0.3f)
+                        return I.FirstOrNone();
+                    
+                    // Slightly prefers 'boring' cards
+                    if (I.HandHas(CardType.Recon)) return CardType.Recon;
+                    if (I.HandHas(CardType.Cooperation)) return CardType.Cooperation;
+                }
+
+                // --- [Awakened Mode] HP <= 50%: Serious Survival ---
+
+                // 2. [Sacrifice Mastery] "Pain makes me stronger."
+                // In crisis, actively go for Sacrifice win
+                int mySacCount = 0; // * Ideally needs tracking, assume he knows his count
+                // Estimate my played sacrifices: 4 (total) - unseen - hand
+                int unseenSac = I.unseen.TryGetValue(CardType.Sacrifice, out int v) ? v : 0;
+                int handSac = I.hand.Count(c => c == CardType.Sacrifice);
+                int estPlayed = Math.Max(0, 4 - unseenSac - handSac);
+
+                if (I.HandHas(CardType.Sacrifice))
+                {
+                    // If lethal (3 played + 1 in hand), DO IT.
+                    if (estPlayed >= 3) return CardType.Sacrifice;
+                    
+                    // If in crisis, accumulate Sacrifice aggressively
+                    if (isCrisis) return CardType.Sacrifice;
+                }
+
+                // 3. [Survival Instinct] Perfect Defense
+                // If opponent is aggressive, prioritize defense
+                bool oppAggro = I.Ratio(CardType.Betrayal) + I.Ratio(CardType.Pollution) > 0.3f;
+                if (isCrisis && (oppAggro || I.s.selfLife <= 2))
+                {
+                    if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt;
+                    if (I.HandHas(CardType.Doubt)) return CardType.Doubt;
+                }
+
+                // 4. [Counter Attack]
+                // If he has high HP difference or opponent is weak, strike back
+                if (isCrisis && I.HandHas(CardType.Betrayal))
+                {
+                    // If opponent is vulnerable (low defense probability)
+                    if (I.Ratio(CardType.Doubt) < 0.3f) return CardType.Betrayal;
+                }
+
+                // 5. Score Calculation
+                float Score(CardType c)
+                {
+                    float baseScore = 0;
+
+                    if (!isCrisis) // [Lazy Mode]
+                    {
+                        baseScore = c switch {
+                            CardType.Recon => 10,       // Waste turn
+                            CardType.Cooperation => 8,  // Passive
+                            CardType.Investment => 7,   // Whatever
+                            CardType.Chaos => 6,        // Fun?
+                            CardType.Doubt => 2,        // Too lazy to defend
+                            CardType.Interrupt => 2,
+                            CardType.Sacrifice => -5,   // Not desperate yet
+                            _ => 5
+                        };
+                    }
+                    else // [Awakened Mode]
+                    {
+                        baseScore = c switch {
+                            CardType.Sacrifice => 15,   // [Core] Win condition
+                            CardType.Interrupt => 12,   // [Core] Survival
+                            CardType.Doubt => 10,       // [Core] Survival
+                            CardType.Betrayal => 8,     // Counter
+                            CardType.Pollution => 7,
+                            CardType.Curse => 6,
+                            CardType.Investment => 5,   // Good for recovery
+                            CardType.Cooperation => 3,
+                            CardType.Recon => 2,
+                            CardType.Chaos => 1,
+                            _ => 0
+                        };
+                    }
+
+                    // ★ [Safe Access]
+                    return baseScore * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+                }
+
+                return I.hand.Distinct().Where(I.HandHas).OrderByDescending(Score).FirstOrDefault();
+            });
+
+            // --- Selective Draw ---
+            A.chooseFromTwo = (a, b, I) =>
+            {
+                var weights = AgentManager.I.GetWeights(I.selfID);
+                bool isCrisis = I.s.selfLife <= 5;
+
+                // [Sacrifice]
+                // In crisis: Priority #1 (To win or feel pain)
+                // Not crisis: Low priority
+                if (isCrisis)
+                {
+                    if (a == CardType.Sacrifice && b != CardType.Sacrifice) return 0;
+                    if (b == CardType.Sacrifice && a != CardType.Sacrifice) return 1;
+                }
+
+                float Score(CardType c)
+                {
+                    float s = 0;
+                    if (!isCrisis)
+                    {
+                        // Lazy picking: Prefers low-impact cards
+                        s = c switch {
+                            CardType.Recon => 100,
+                            CardType.Cooperation => 90,
+                            CardType.Investment => 80,
+                            _ => 50
+                        };
+                    }
+                    else
+                    {
+                        // Survival picking: Defense & Sacrifice & High Damage
+                        s = c switch {
+                            CardType.Sacrifice => 150, // [Core]
+                            CardType.Interrupt => 120, // [Core]
+                            CardType.Doubt => 110,     // [Core]
+                            CardType.Betrayal => 100,
+                            CardType.Curse => 90,
+                            CardType.Pollution => 80,
+                            CardType.Investment => 70,
+                            _ => 20
+                        };
+                    }
+                    // ★ [Safe Access]
+                    return s * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+                }
+
+                float sa = Score(a), sb = Score(b);
+                if (Math.Abs(sa - sb) < 0.1f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                return sa > sb ? 0 : 1;
+            };
+
+            A.fallback = new[] {
+                CardType.Sacrifice, CardType.Interrupt, CardType.Doubt, // Crisis priorities
+                CardType.Betrayal, CardType.Curse, CardType.Pollution, 
+                CardType.Investment, CardType.Cooperation, CardType.Recon, CardType.Chaos 
+            };
+
+            return A;
+        }
+
+        // Im Sa-rang — The Saint: Blind Pacifist (Absolute Altruism & Infinite Healing)
+        static Agent Build_임사랑(AgentList id)
+        {
+            var A = new Agent("임사랑", id);
+
+            A.rules.Add(I =>
+            {
+                var weights = AgentManager.I.GetWeights(I.selfID);
+
+                // [The Saint's Oath] Never Attack.
+                // She simply ignores attack cards in her hand.
+                // Priority: Heal (Inv/Coop) > Defense (Doubt/Int) > Recon > Chaos
+
+                // 1. [Love & Peace] Maximize Healing
+                if (I.HandHas(CardType.Investment)) return CardType.Investment;
+                if (I.HandHas(CardType.Cooperation)) return CardType.Cooperation;
+
+                // 2. [Self-Preservation] Defense (Only if no heal options)
+                if (I.HandHas(CardType.Doubt)) return CardType.Doubt;
+                if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt;
+
+                // 3. [Harmless Action]
+                if (I.HandHas(CardType.Recon)) return CardType.Recon;
+                
+                // 4. [Last Resort] Chaos (Resetting is better than attacking)
+                if (I.HandHas(CardType.Chaos)) return CardType.Chaos;
+
+                // 5. [Forced to Attack?]
+                // If she ONLY has attack cards (Betrayal/Pollution/Curse/Sacrifice),
+                // she will try to play the one that deals the least damage to the opponent.
+                // Ideally, this shouldn't happen often due to her drafting logic.
+                
+                // Score Calculation
+                float Score(CardType c)
+                {
+                    float baseScore = c switch {
+                        CardType.Investment => 100,  // [Core] Best healing
+                        CardType.Cooperation => 90,  // [Core] Peace
+                        CardType.Doubt => 50,        // Defense
+                        CardType.Interrupt => 40,    // Passive defense
+                        CardType.Recon => 30,        // Harmless
+                        CardType.Chaos => 10,        // Reset
+                        // Attack cards are effectively banned
+                        CardType.Betrayal => -999,
+                        CardType.Pollution => -999,
+                        CardType.Curse => -999,
+                        CardType.Sacrifice => -999,
+                        _ => 0
+                    };
+                    // ★ [Safe Access]
+                    return baseScore * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+                }
+
+                return I.hand.Distinct().Where(I.HandHas).OrderByDescending(Score).FirstOrDefault();
+            });
+
+            // --- Selective Draw: "I won't hurt anyone." ---
+            A.chooseFromTwo = (a, b, I) =>
+            {
+                var weights = AgentManager.I.GetWeights(I.selfID);
+
+                // [Absolute Rule] Reject Attack Cards
+                bool IsAttack(CardType t) => t == CardType.Betrayal || t == CardType.Pollution || t == CardType.Curse || t == CardType.Sacrifice;
+
+                if (IsAttack(a) && !IsAttack(b)) return 1;
+                if (IsAttack(b) && !IsAttack(a)) return 0;
+
+                // If both are attacks, pick the one that might be blocked or fails (Logic is hard here, just pick random or lower dmg)
+                if (IsAttack(a) && IsAttack(b)) return UnityEngine.Random.value < 0.5f ? 0 : 1;
+
+                float Score(CardType c)
+                {
+                    float s = c switch
+                    {
+                        CardType.Investment  => 100f, // Love it
+                        CardType.Cooperation => 95f,  // Love it
+                        CardType.Doubt       => 60f,
+                        CardType.Interrupt   => 50f,
+                        CardType.Recon       => 30f,
+                        CardType.Chaos       => 20f,
+                        _ => -100f // Attacks
+                    };
+                    // ★ [Safe Access]
+                    return s * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+                }
+
+                float sa = Score(a), sb = Score(b);
+                if (Math.Abs(sa - sb) < 0.1f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                return sa > sb ? 0 : 1;
+            };
+
+            A.fallback = new[] {
+                CardType.Investment, CardType.Cooperation, 
+                CardType.Doubt, CardType.Interrupt, CardType.Recon, CardType.Chaos,
+                // She puts attack cards at the very end, effectively never playing them unless forced
+                CardType.Curse, CardType.Pollution, CardType.Betrayal, CardType.Sacrifice 
+            };
+
+            return A;
+        }
+
+        // 천명심 — The Mystic: 자연의 섭리 (재해에 따른 미신적 플레이)
+        static Agent Build_천명심(AgentList id)
+        {
+            var A = new Agent("천명심", id);
+
+            A.rules.Add(I =>
+            {
+                var weights = AgentManager.I.GetWeights(I.selfID);
+                
+                // [수정] CardSystem 인스턴스에서 현재 재해 가져오기
+                var sys = UnityEngine.Object.FindObjectOfType<CardSystem>();
+                var currentDisaster = sys != null ? sys.currentDisaster : CardSystem.NaturalDisaster.Peace;
+
+                // 1. 재해별 행동 강령 (직관적 규칙)
+                switch (currentDisaster)
+                {
+                    case CardSystem.NaturalDisaster.Peace:
+                        // "평화에는 피를 보지 않는다." -> 공격 카드 자제, 협력 선호
+                        if (I.HandHas(CardType.Betrayal) || I.HandHas(CardType.Pollution) || I.HandHas(CardType.Sacrifice)) 
+                        {
+                            // 공격 카드를 낼 바엔 아무것도 안 내거나(다른 룰로 넘어감), 협력이 있으면 냄
+                            if (I.HandHas(CardType.Cooperation)) return CardType.Cooperation;
+                        }
+                        break;
+
+                    case CardSystem.NaturalDisaster.Eclipse:
+                        // "달이 차오르니 재물도 불어난다." -> Investment(투자) 선호
+                        if (I.HandHas(CardType.Investment)) return CardType.Investment;
+                        break;
+
+                    case CardSystem.NaturalDisaster.Drought:
+                        // "물이 말랐으니 치유는 거짓이다." -> Cooperation, Investment 기피
+                        // (아래 Score 함수에서 점수 깎임)
+                        break;
+
+                    case CardSystem.NaturalDisaster.Lightning:
+                        // "하늘이 노했으니 숨어야 한다." -> Doubt(방패) 선호
+                        if (I.HandHas(CardType.Doubt)) return CardType.Doubt;
+                        break;
+                        
+                    case CardSystem.NaturalDisaster.Storm:
+                        // "폭풍 속에서는 혼란이 답이다." -> Chaos 선호
+                        if (I.HandHas(CardType.Chaos)) return CardType.Chaos;
+                        break;
+
+                    case CardSystem.NaturalDisaster.Sandstorm:
+                        // "앞이 안 보이니 눈을 떠야 한다." -> Recon 선호
+                        if (I.HandHas(CardType.Recon)) return CardType.Recon;
+                        break;
+                }
+
+                // 2. 재해별 점수 가중치
+                float Score(CardType c)
+                {
+                    float baseScore = 10f;
+
+                    switch (currentDisaster)
+                    {
+                        case CardSystem.NaturalDisaster.Peace:
+                            if (c == CardType.Cooperation) baseScore = 30f;
+                            if (c == CardType.Investment) baseScore = 20f;
+                            if (c == CardType.Betrayal || c == CardType.Pollution || c == CardType.Sacrifice) baseScore = -50f;
+                            break;
+
+                        case CardSystem.NaturalDisaster.Eclipse:
+                            if (c == CardType.Investment) baseScore = 40f;
+                            if (c == CardType.Curse) baseScore = 25f;
+                            break;
+
+                        case CardSystem.NaturalDisaster.Drought:
+                            if (c == CardType.Cooperation || c == CardType.Investment) baseScore = -100f; // 무효화되므로 쓰레기 취급
+                            if (c == CardType.Pollution) baseScore = 20f;
+                            break;
+
+                        case CardSystem.NaturalDisaster.Lightning:
+                            if (c == CardType.Doubt || c == CardType.Interrupt) baseScore = 25f;
+                            break;
+                        
+                        case CardSystem.NaturalDisaster.Plague:
+                            // "역병은 머무르는 자를 덮친다." -> 같은 카드 연속 제출 기피
+                            if (c == I.s.lastSelf) baseScore = -100f;
+                            break;
+                            
+                        case CardSystem.NaturalDisaster.Sandstorm:
+                            if (c == CardType.Pollution) baseScore = -50f; // 내가 데미지 입음
+                            if (c == CardType.Recon) baseScore = 25f;
+                            break;
+                            
+                        case CardSystem.NaturalDisaster.MidnightSun:
+                             if (c == CardType.Betrayal) baseScore = 20f;
+                             break;
+                    }
+
+                    // [안전한 가중치 접근]
+                    return baseScore * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+                }
+
+                return I.hand.Distinct().Where(I.HandHas).OrderByDescending(Score).FirstOrDefault();
+            });
+
+            // --- 선택 드로우 (재해에 맞춰 뽑기) ---
+            A.chooseFromTwo = (a, b, I) =>
+            {
+                var weights = AgentManager.I.GetWeights(I.selfID);
+                var sys = UnityEngine.Object.FindObjectOfType<CardSystem>();
+                var currentDisaster = sys != null ? sys.currentDisaster : CardSystem.NaturalDisaster.Peace;
+
+                float Score(CardType c)
+                {
+                    float s = 50f;
+                    switch (currentDisaster)
+                    {
+                        case CardSystem.NaturalDisaster.Peace:
+                            if (c == CardType.Cooperation) s = 100f;
+                            if (c == CardType.Betrayal || c == CardType.Pollution) s = -100f;
+                            break;
+                        case CardSystem.NaturalDisaster.Eclipse:
+                            if (c == CardType.Investment) s = 100f;
+                            break;
+                        case CardSystem.NaturalDisaster.Drought:
+                            if (c == CardType.Cooperation || c == CardType.Investment) s = -100f;
+                            break;
+                        case CardSystem.NaturalDisaster.Lightning:
+                            if (c == CardType.Doubt) s = 90f;
+                            break;
+                        case CardSystem.NaturalDisaster.Sandstorm:
+                            if (c == CardType.Pollution) s = -50f;
+                            if (c == CardType.Recon) s = 80f;
+                            break;
+                    }
+                    return s * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+                }
+
+                float sa = Score(a), sb = Score(b);
+                if (Math.Abs(sa - sb) < 0.1f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                return sa > sb ? 0 : 1;
+            };
+
+            A.fallback = new[] { 
+                CardType.Cooperation, CardType.Investment, CardType.Doubt, 
+                CardType.Recon, CardType.Interrupt, CardType.Betrayal, 
+                CardType.Pollution, CardType.Curse, CardType.Chaos, CardType.Sacrifice 
+            };
+
+            return A;
+        }
+
+        // Min So-hee — The Glitch: Disruptive Hacker (System Breaker & Calculated Malice)
+        static Agent Build_민소희(AgentList id)
+        {
+            var A = new Agent("민소희", id);
+
+            A.rules.Add(I =>
+            {
+                var weights = AgentManager.I.GetWeights(I.selfID);
+                int R = Math.Max(1, I.s.round);
+                var history = I.HistoryOpponent();
+                
+                // [State Check]
+                // "Enough health? Time to break them."
+                bool sufficientHealth = I.s.selfLife >= 5;
+                
+                // [Glitch Logic 1] Sacrifice Aggression
+                // If health is good, she loves to use Sacrifice to pressure or win.
+                if (sufficientHealth && I.HandHas(CardType.Sacrifice))
+                {
+                    return CardType.Sacrifice;
+                }
+
+                // [Glitch Logic 2] Investment Sniping
+                // Only use Investment if the stack is high (>= 3, estimated via Round or external tracking)
+                // *Note: Since we can't access globalInvestmentCount directly here easily, we estimate.
+                // Assume stack is high if round is mid-late (R >= 6) or if she's seen many investments.
+                bool investmentValuable = R >= 6; 
+                if (I.HandHas(CardType.Investment))
+                {
+                    if (investmentValuable) return CardType.Investment; // Cash out
+                    // Otherwise, ignore it to pressure opponent
+                }
+
+                // [Glitch Logic 3] Calculated Lethal
+                // Only use Betrayal if it kills.
+                if (I.HandHas(CardType.Betrayal) && I.s.oppLife <= R)
+                {
+                    return CardType.Betrayal;
+                }
+
+                // [Glitch Logic 4] Disruption (Curse & Interrupt)
+                // Primary playstyle: Torment.
+                if (I.HandHas(CardType.Curse)) return CardType.Curse;
+                if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt;
+
+                // [Glitch Logic 5] Pollution over Betrayal (if not lethal)
+                // She prefers annoying DoT or status effects over raw damage unless lethal.
+                if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
+
+                // [Score Calculation]
+                float Score(CardType c)
+                {
+                    float baseScore = c switch {
+                        CardType.Curse => 10,      // [Core] Torment
+                        CardType.Interrupt => 9,   // [Core] Break flow
+                        CardType.Sacrifice => sufficientHealth ? 8 : -5, // High priority if healthy
+                        CardType.Pollution => 7,   // Annoyance
+                        CardType.Chaos => 6,       // System Error
+                        CardType.Investment => investmentValuable ? 5 : -2, // Only if profitable
+                        CardType.Betrayal => (I.s.oppLife <= R) ? 100 : 2, // Execution only
+                        CardType.Recon => 3,
+                        CardType.Cooperation => 1, // Boring
+                        CardType.Doubt => 1,       // Boring
+                        _ => 0
+                    };
+                    // ★ [Safe Access]
+                    return baseScore * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+                }
+
+                return I.hand.Distinct().Where(I.HandHas).OrderByDescending(Score).FirstOrDefault();
+            });
+
+            // --- Selective Draw ---
+            A.chooseFromTwo = (a, b, I) =>
+            {
+                var weights = AgentManager.I.GetWeights(I.selfID);
+                int R = Math.Max(1, I.s.round);
+                bool sufficientHealth = I.s.selfLife >= 5;
+
+                // [Priority] Rare Cards (Curse, Interrupt, Sacrifice)
+                float Score(CardType c)
+                {
+                    float s = c switch
+                    {
+                        CardType.Curse       => 100f, // Loves it
+                        CardType.Interrupt   => 95f,  // Loves it
+                        CardType.Sacrifice   => sufficientHealth ? 90f : 0f,
+                        CardType.Pollution   => 70f,
+                        CardType.Chaos       => 60f,
+                        CardType.Investment  => (R >= 6) ? 50f : 10f, // Late game only
+                        CardType.Betrayal    => (I.s.oppLife <= R) ? 200f : 30f, // Lethal only
+                        CardType.Recon       => 20f,
+                        CardType.Cooperation => 10f,
+                        CardType.Doubt       => 10f,
+                        _ => 0f
+                    };
+                    // ★ [Safe Access]
+                    return s * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+                }
+
+                float sa = Score(a), sb = Score(b);
+                if (Math.Abs(sa - sb) < 0.1f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                return sa > sb ? 0 : 1;
+            };
+
+            A.fallback = new[] {
+                CardType.Curse, CardType.Interrupt, CardType.Pollution, 
+                CardType.Sacrifice, CardType.Chaos, CardType.Betrayal, 
+                CardType.Investment, CardType.Recon, CardType.Doubt, CardType.Cooperation 
+            };
+
+            return A;
+        }
+
+        // Jung Geon-woo — The Builder: Constructive Architect (Stack Obsession & Disruption Hate)
+        static Agent Build_정건우(AgentList id)
+        {
+            var A = new Agent("정건우", id);
+
+            A.rules.Add(I =>
+            {
+                var weights = AgentManager.I.GetWeights(I.selfID);
+                int R = Math.Max(1, I.s.round);
+                var history = I.HistoryOpponent();
+
+                // [Stack Check]
+                // Estimate current stack counts (Simplified)
+                // Since exact global counts aren't passed in DecisionInput, use heuristics or external tracking if available.
+                // Here we assume he values them intrinsically.
+
+                // 1. [The Builder's Joy] Investment
+                // "Let's add another floor."
+                if (I.HandHas(CardType.Investment))
+                {
+                    // Always prioritizes Investment unless in immediate danger
+                    if (I.s.selfLife > 3) return CardType.Investment;
+                }
+
+                // 2. [The Grand Design] Sacrifice
+                // "The foundation must be laid."
+                // He willingly plays Sacrifice to build the stack towards 4.
+                if (I.HandHas(CardType.Sacrifice))
+                {
+                    // If he has enough health to pay the cost, he builds.
+                    if (I.s.selfLife > 2) return CardType.Sacrifice;
+                }
+
+                // 3. [Disruption Hate]
+                // If opponent played Chaos or Interrupt recently, he might panic or try to rebuild (Coop).
+                if (!I.s.IsFirst && (I.s.lastOpp == CardType.Chaos || I.s.lastOpp == CardType.Interrupt))
+                {
+                    // Try to stabilize with Cooperation
+                    if (I.HandHas(CardType.Cooperation)) return CardType.Cooperation;
+                }
+
+                // 4. [Maintenance] Defense
+                // To protect his building, he uses Doubt.
+                if (I.HandHas(CardType.Doubt)) return CardType.Doubt;
+
+                // 5. [Score Calculation]
+                float Score(CardType c)
+                {
+                    float baseScore = c switch {
+                        CardType.Investment => 100, // [Core] Building block
+                        CardType.Sacrifice => 90,   // [Core] The ultimate structure
+                        CardType.Cooperation => 50, // Maintenance
+                        CardType.Doubt => 40,       // Protection
+                        CardType.Recon => 30,       // Surveying
+                        CardType.Pollution => 20,   // Slow decay (acceptable)
+                        CardType.Betrayal => 10,    // Destruction (disliked)
+                        CardType.Interrupt => -50,  // [Hate] Disruption
+                        CardType.Chaos => -100,     // [Hate] Collapse
+                        CardType.Curse => 0,
+                        _ => 0
+                    };
+
+                    // ★ [Safe Access]
+                    return baseScore * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+                }
+
+                return I.hand.Distinct().Where(I.HandHas).OrderByDescending(Score).FirstOrDefault();
+            });
+
+            // --- Selective Draw ---
+            A.chooseFromTwo = (a, b, I) =>
+            {
+                var weights = AgentManager.I.GetWeights(I.selfID);
+
+                // [Builder's Choice] Always pick Stack cards
+                bool IsStackCard(CardType t) => t == CardType.Investment || t == CardType.Sacrifice;
+
+                if (IsStackCard(a) && !IsStackCard(b)) return 0;
+                if (IsStackCard(b) && !IsStackCard(a)) return 1;
+
+                // [Builder's Hate] Never pick Chaos/Interrupt
+                bool IsDestructive(CardType t) => t == CardType.Chaos || t == CardType.Interrupt;
+
+                if (IsDestructive(a) && !IsDestructive(b)) return 1;
+                if (IsDestructive(b) && !IsDestructive(a)) return 0;
+
+                float Score(CardType c)
+                {
+                    float s = c switch
+                    {
+                        CardType.Investment  => 100f,
+                        CardType.Sacrifice   => 95f,
+                        CardType.Cooperation => 60f,
+                        CardType.Doubt       => 50f,
+                        CardType.Recon       => 40f,
+                        CardType.Pollution   => 30f,
+                        CardType.Betrayal    => 10f,
+                        CardType.Curse       => 10f,
+                        CardType.Interrupt   => -50f,
+                        CardType.Chaos       => -100f,
+                        _ => 0f
+                    };
+                    // ★ [Safe Access]
+                    return s * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+                }
+
+                float sa = Score(a), sb = Score(b);
+                if (Math.Abs(sa - sb) < 0.1f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                return sa > sb ? 0 : 1;
+            };
+
+            A.fallback = new[] {
+                CardType.Investment, CardType.Sacrifice, 
+                CardType.Cooperation, CardType.Doubt, CardType.Recon, 
+                CardType.Pollution, CardType.Betrayal, CardType.Curse, 
+                CardType.Interrupt, CardType.Chaos 
+            };
+
+            return A;
+        }
+
+        // Shin Ji-ah — The Attention Seeker: Streamer (Hates Boredom, Loves Chaos & RNG)
+        static Agent Build_신지아(AgentList id)
+        {
+            var A = new Agent("신지아", id);
+
+            A.rules.Add(I =>
+            {
+                var weights = AgentManager.I.GetWeights(I.selfID);
+                int R = Math.Max(1, I.s.round);
+                bool winning = I.s.selfLife > I.s.oppLife;
+                var history = I.HistoryOpponent();
+
+                // 1. [Chat Mission] "Mission: Play random card! (15%)"
+                // She ignores logic and plays a random card for "content".
+                if (UnityEngine.Random.value < 0.15f)
+                {
+                    var randomPick = I.hand[UnityEngine.Random.Range(0, I.hand.Count)];
+                    return randomPick;
+                }
+
+                // 2. [No-Jam Police] Hates Boring Plays
+                // If opponent played Doubt or Cooperation last turn -> Punish with Chaos or Pollution
+                if (!I.s.IsFirst && (I.s.lastOpp == CardType.Doubt || I.s.lastOpp == CardType.Cooperation))
+                {
+                    // "Boring! Reset!"
+                    if (I.HandHas(CardType.Chaos)) return CardType.Chaos;
+                    // "Take this slime!"
+                    if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
+                }
+
+                // 3. [Trolling] Winning is Boring
+                // If she is winning by a large margin (HP gap >= 4), she throws Chaos to make it "exciting".
+                if (winning && (I.s.selfLife - I.s.oppLife >= 4) && I.HandHas(CardType.Chaos))
+                {
+                    return CardType.Chaos;
+                }
+
+                // 4. [Visual Impact] Preference for Flashy Cards
+                // Priority: Sacrifice > Betrayal > Pollution > Curse
+                if (I.HandHas(CardType.Sacrifice)) return CardType.Sacrifice; // High stakes drama
+                if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;   // Drama
+                if (I.HandHas(CardType.Pollution)) return CardType.Pollution; // Visuals
+
+                // 5. [Score Calculation]
+                float Score(CardType c)
+                {
+                    float baseScore = c switch {
+                        CardType.Chaos       => 20,   // [Core] Content God
+                        CardType.Sacrifice   => 15,   // [Core] Do or Die
+                        CardType.Betrayal    => 12,   // Aggro
+                        CardType.Pollution   => 10,   // Visuals
+                        CardType.Curse       => 8,    // Content
+                        CardType.Interrupt   => 5,    // Reaction
+                        CardType.Investment  => -5,   // Too complex/boring
+                        CardType.Recon       => -10,  // Boring
+                        CardType.Cooperation => -20,  // No Jam
+                        CardType.Doubt       => -20,  // No Jam
+                        _ => 0
+                    };
+
+                    // ★ [Safe Access]
+                    return baseScore * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+                }
+
+                return I.hand.Distinct().Where(I.HandHas).OrderByDescending(Score).FirstOrDefault();
+            });
+
+            // --- Selective Draw: "Which thumbnail is better?" ---
+            A.chooseFromTwo = (a, b, I) =>
+            {
+                var weights = AgentManager.I.GetWeights(I.selfID);
+
+                // [Content First] Always pick Chaos/Sacrifice
+                bool isContent(CardType t) => t == CardType.Chaos || t == CardType.Sacrifice;
+                
+                if (isContent(a) && !isContent(b)) return 0;
+                if (isContent(b) && !isContent(a)) return 1;
+
+                // [Boring Filter] Avoid Doubt/Coop/Recon
+                bool isBoring(CardType t) => t == CardType.Doubt || t == CardType.Cooperation || t == CardType.Recon;
+                
+                if (isBoring(a) && !isBoring(b)) return 1;
+                if (isBoring(b) && !isBoring(a)) return 0;
+
+                float Score(CardType c)
+                {
+                    float s = c switch
+                    {
+                        CardType.Chaos       => 100f, // Thumbnail material
+                        CardType.Sacrifice   => 95f,
+                        CardType.Betrayal    => 80f,
+                        CardType.Pollution   => 70f,
+                        CardType.Curse       => 60f,
+                        CardType.Interrupt   => 40f,
+                        CardType.Investment  => 20f,
+                        CardType.Recon       => -50f,
+                        CardType.Cooperation => -100f,
+                        CardType.Doubt       => -100f,
+                        _ => 0f
+                    };
+                    return s * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+                }
+
+                float sa = Score(a), sb = Score(b);
+                if (Math.Abs(sa - sb) < 0.1f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                return sa > sb ? 0 : 1;
+            };
+
+            A.fallback = new[] { 
+                CardType.Chaos, CardType.Sacrifice, CardType.Betrayal, 
+                CardType.Pollution, CardType.Curse, CardType.Interrupt, 
+                CardType.Investment, CardType.Recon, CardType.Cooperation, CardType.Doubt 
+            };
+
+            return A;
+        }
+
+        // Hong Jang-mi — The Gardener: Distorted Nurturer (Investment/Pollution Planting & Pruning Rage)
+        static Agent Build_홍장미(AgentList id)
+        {
+            var A = new Agent("홍장미", id);
+
+            A.rules.Add(I =>
+            {
+                var weights = AgentManager.I.GetWeights(I.selfID);
+                bool nf = !I.s.IsFirst;
+
+                // 1. [Pruning Shear Protocol] Retaliate against Ruin
+                // "How dare you trample my garden?"
+                // If opponent used Interrupt (ruining stacks/flow), she snaps.
+                if (nf && I.s.lastOpp == CardType.Interrupt)
+                {
+                    if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal; // The Shears
+                    if (I.HandHas(CardType.Pollution)) return CardType.Pollution; // Poison
+                }
+
+                // 2. [Planting Flowers] Investment Obsession
+                // She wants to see the garden grow. Uses it regardless of profit/loss logic.
+                if (I.HandHas(CardType.Investment))
+                {
+                    return CardType.Investment;
+                }
+
+                // 3. [Planting Weeds] Pollution
+                // "Even poisonous flowers are beautiful."
+                // She treats Pollution as a planting act, not just an attack.
+                if (I.HandHas(CardType.Pollution))
+                {
+                    return CardType.Pollution;
+                }
+
+                // 4. [Watering] Cooperation
+                // If she has no seeds (Inv/Pol), she waters the garden (Cooperation).
+                // But she hates Doubt because it implies she has something to hide (she is proud of her garden).
+                if (I.HandHas(CardType.Cooperation))
+                {
+                    // Use Cooperation unless she needs to prune
+                    return CardType.Cooperation;
+                }
+
+                // 5. [Score Calculation]
+                float Score(CardType c)
+                {
+                    float baseScore = c switch {
+                        CardType.Investment => 20,   // [Core] The Flower
+                        CardType.Pollution  => 15,   // [Core] The Poison Ivy
+                        CardType.Betrayal   => 5,    // Pruning tool (Passive)
+                        CardType.Cooperation=> 8,    // Watering
+                        CardType.Curse      => 4,    // Fertilizer?
+                        CardType.Recon      => 2,    // Looking at garden
+                        CardType.Doubt      => -5,   // Hates barriers
+                        CardType.Interrupt  => -10,  // Hates cutting flow
+                        CardType.Chaos      => -20,  // [Hate] Storm destroys garden
+                        CardType.Sacrifice  => -20,  // Premature harvest
+                        _ => 0
+                    };
+
+                    // [Rage Bonus]
+                    if (nf && I.s.lastOpp == CardType.Interrupt && c == CardType.Betrayal)
+                    {
+                        baseScore += 50; // Kill mode activated
+                    }
+
+                    // ★ [Safe Access]
+                    return baseScore * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+                }
+
+                return I.hand.Distinct().Where(I.HandHas).OrderByDescending(Score).FirstOrDefault();
+            });
+
+            // --- Selective Draw: "Choosing Seeds" ---
+            A.chooseFromTwo = (a, b, I) =>
+            {
+                var weights = AgentManager.I.GetWeights(I.selfID);
+
+                // [Seed Priority] Investment & Pollution
+                bool isSeed(CardType t) => t == CardType.Investment || t == CardType.Pollution;
+                
+                if (isSeed(a) && !isSeed(b)) return 0;
+                if (isSeed(b) && !isSeed(a)) return 1;
+
+                // [Storm Hate] Never pick Chaos
+                if (a == CardType.Chaos && b != CardType.Chaos) return 1;
+                if (b == CardType.Chaos && a != CardType.Chaos) return 0;
+
+                float Score(CardType c)
+                {
+                    float s = c switch
+                    {
+                        CardType.Investment  => 100f, // Flower seed
+                        CardType.Pollution   => 90f,  // Weed seed
+                        CardType.Cooperation => 70f,  // Water
+                        CardType.Betrayal    => 60f,  // Shears (Just in case)
+                        CardType.Curse       => 50f,
+                        CardType.Recon       => 30f,
+                        CardType.Doubt       => 10f,
+                        CardType.Interrupt   => 0f,   // Doesn't like interrupting
+                        CardType.Sacrifice   => -50f,
+                        CardType.Chaos       => -100f,
+                        _ => 0f
+                    };
+                    // ★ [Safe Access]
+                    return s * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+                }
+
+                float sa = Score(a), sb = Score(b);
+                if (Math.Abs(sa - sb) < 0.1f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                return sa > sb ? 0 : 1;
+            };
+
+            A.fallback = new[] { 
+                CardType.Investment, CardType.Pollution, 
+                CardType.Cooperation, CardType.Betrayal, CardType.Curse, 
+                CardType.Recon, CardType.Doubt, CardType.Interrupt, 
+                CardType.Sacrifice, CardType.Chaos 
+            };
+
+            return A;
+        }
+
+        // Rex — The Rebel: Punk Rocker (Anti-System, Hates Inv/Coop, Loves Chaos/Int/Pol)
+        static Agent Build_렉스(AgentList id)
+        {
+            var A = new Agent("렉스", id);
+
+            A.rules.Add(I =>
+            {
+                var weights = AgentManager.I.GetWeights(I.selfID);
+                bool nf = !I.s.IsFirst;
+
+                // 1. [System Crash] Retaliate against "Establishment Logic"
+                // If opponent tries to build (Investment) or cooperate, smash it.
+                if (nf && (I.s.lastOpp == CardType.Investment || I.s.lastOpp == CardType.Cooperation))
+                {
+                    // "Disrupt their profit!"
+                    if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt; 
+                    // "Pollute their world!"
+                    if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
+                    // "Flip the table!"
+                    if (I.HandHas(CardType.Chaos)) return CardType.Chaos;
+                }
+
+                // 2. [Anarchy Priority] The Unholy Trinity
+                // He plays these cards whenever possible to ruin the game flow.
+                if (I.HandHas(CardType.Chaos)) return CardType.Chaos;         // Top Priority: Chaos
+                if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt; // Stop flow
+                if (I.HandHas(CardType.Pollution)) return CardType.Pollution; // Damage everyone
+
+                // 3. [Violence]
+                if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;
+
+                // 4. [Rejection] He REFUSES to play Coop/Inv
+                // If he only has these cards (bad luck), he plays them as a last resort but hates it.
+                // The score function handles this.
+
+                // 5. [Score Calculation]
+                float Score(CardType c)
+                {
+                    float baseScore = c switch {
+                        CardType.Chaos      => 100,  // [Core] Anarchy
+                        CardType.Interrupt  => 90,   // [Core] Rebellion
+                        CardType.Pollution  => 80,   // [Core] Destruction
+                        CardType.Betrayal   => 50,   // Violence
+                        CardType.Curse      => 40,   // Annoyance
+                        CardType.Sacrifice  => 20,   // Self-destructive (Punk style)
+                        CardType.Recon      => -10,  // Planning is for squares
+                        CardType.Doubt      => -20,  // Defense is cowardly
+                        CardType.Cooperation=> -100, // [Hate] Sellout
+                        CardType.Investment => -100, // [Hate] Capitalist scum
+                        _ => 0
+                    };
+
+                    // ★ [Safe Access]
+                    return baseScore * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+                }
+
+                return I.hand.Distinct().Where(I.HandHas).OrderByDescending(Score).FirstOrDefault();
+            });
+
+            // --- Selective Draw: "Stick to the Punk Code" ---
+            A.chooseFromTwo = (a, b, I) =>
+            {
+                var weights = AgentManager.I.GetWeights(I.selfID);
+
+                // [Absolute Rejection]
+                bool isSystem(CardType t) => t == CardType.Investment || t == CardType.Cooperation;
+                
+                if (isSystem(a) && !isSystem(b)) return 1;
+                if (isSystem(b) && !isSystem(a)) return 0;
+
+                // [Anarchy Preference]
+                bool isPunk(CardType t) => t == CardType.Chaos || t == CardType.Interrupt || t == CardType.Pollution;
+                
+                if (isPunk(a) && !isPunk(b)) return 0;
+                if (isPunk(b) && !isPunk(a)) return 1;
+
+                float Score(CardType c)
+                {
+                    float s = c switch
+                    {
+                        CardType.Chaos       => 100f,
+                        CardType.Interrupt   => 95f,
+                        CardType.Pollution   => 90f,
+                        CardType.Betrayal    => 70f,
+                        CardType.Curse       => 60f,
+                        CardType.Sacrifice   => 30f,
+                        CardType.Recon       => 0f,
+                        CardType.Doubt       => -10f,
+                        CardType.Cooperation => -200f, // Absolute Hate
+                        CardType.Investment  => -200f, // Absolute Hate
+                        _ => 0f
+                    };
+                    // ★ [Safe Access]
+                    return s * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+                }
+
+                float sa = Score(a), sb = Score(b);
+                if (Math.Abs(sa - sb) < 0.1f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                return sa > sb ? 0 : 1;
+            };
+
+            A.fallback = new[] { 
+                CardType.Chaos, CardType.Interrupt, CardType.Pollution, 
+                CardType.Betrayal, CardType.Curse, CardType.Sacrifice, 
+                CardType.Recon, CardType.Doubt, CardType.Cooperation, CardType.Investment 
+            };
+
+            return A;
+        }
+        
+        // Go A-ra — The Hoarder: Rare Card Obsession (Hoards Sac/Bet/Cur, Reluctant to play)
+        static Agent Build_고아라(AgentList id)
+        {
+            var A = new Agent("고아라", id);
+
+            A.rules.Add(I =>
+            {
+                var weights = AgentManager.I.GetWeights(I.selfID);
+                int R = Math.Max(1, I.s.round);
+                
+                // [Definition of Rare Cards]
+                bool IsRare(CardType t) => t == CardType.Sacrifice || t == CardType.Betrayal || t == CardType.Curse;
+
+                // [Inventory Check]
+                int rareCount = I.hand.Count(IsRare);
+                bool isFullOfRares = rareCount >= 3; // Hand is clogged with collections
+                bool isCrisis = I.s.selfLife <= 4;   // Danger zone
+
+                // 1. [The Explosion] Unleash the Collection
+                // Condition: About to die OR Hand is overflowing with rares (forced to use)
+                if (isCrisis || isFullOfRares)
+                {
+                    // "Fine! I'll use ONE!"
+                    // Priority: Sacrifice (Win) > Betrayal (Kill) > Curse (Poke)
+                    if (I.HandHas(CardType.Sacrifice)) return CardType.Sacrifice;
+                    if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;
+                    if (I.HandHas(CardType.Curse)) return CardType.Curse;
+                }
+
+                // 2. [Hoarding Mode] "My precious..."
+                // She absolutely refuses to play Rare cards in normal situations.
+                // She plays "Trash" cards (Doubt, Recon, etc.) to pass the turn.
+
+                // 3. [Score Calculation]
+                float Score(CardType c)
+                {
+                    float baseScore = c switch {
+                        // [Trash Cards] Use these to protect the collection
+                        CardType.Doubt       => 20,   // Best filler
+                        CardType.Recon       => 15,   // Just looking
+                        CardType.Cooperation => 10,   // Passive
+                        CardType.Interrupt   => 8,
+                        CardType.Pollution   => 5,
+                        CardType.Chaos       => 2,
+                        CardType.Investment  => 0,    // Indifferent
+
+                        // [Collection] "Don't touch these!" (Negative Score)
+                        CardType.Curse       => -50,
+                        CardType.Betrayal    => -80,
+                        CardType.Sacrifice   => -100, // Most precious
+                        _ => 0
+                    };
+
+                    // [Explosion Logic Override]
+                    if (isCrisis || isFullOfRares)
+                    {
+                        if (c == CardType.Sacrifice) baseScore = 100;
+                        else if (c == CardType.Betrayal) baseScore = 90;
+                        else if (c == CardType.Curse) baseScore = 80;
+                    }
+
+                    // ★ [Safe Access]
+                    return baseScore * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+                }
+
+                return I.hand.Distinct().Where(I.HandHas).OrderByDescending(Score).FirstOrDefault();
+            });
+
+            // --- Selective Draw: "I MUST have that!" ---
+            A.chooseFromTwo = (a, b, I) =>
+            {
+                var weights = AgentManager.I.GetWeights(I.selfID);
+
+                // [Collector's Eye] Always pick Rare cards
+                bool IsRare(CardType t) => t == CardType.Sacrifice || t == CardType.Betrayal || t == CardType.Curse;
+
+                if (IsRare(a) && !IsRare(b)) return 0;
+                if (IsRare(b) && !IsRare(a)) return 1;
+
+                // If both are rare, pick the rarer one (Sacrifice > Betrayal > Curse)
+                if (IsRare(a) && IsRare(b))
+                {
+                    int Rarity(CardType t) => t switch { CardType.Sacrifice => 3, CardType.Betrayal => 2, _ => 1 };
+                    return Rarity(a) >= Rarity(b) ? 0 : 1;
+                }
+
+                float Score(CardType c)
+                {
+                    float s = c switch
+                    {
+                        // [Collection Targets]
+                        CardType.Sacrifice   => 200f, // SSR
+                        CardType.Betrayal    => 150f, // SR
+                        CardType.Curse       => 100f, // R
+                        
+                        // [Filler]
+                        CardType.Doubt       => 50f,  // Good shield for collection
+                        CardType.Recon       => 30f,
+                        CardType.Interrupt   => 20f,
+                        CardType.Pollution   => 10f,
+                        CardType.Investment  => 5f,   // Meh
+                        CardType.Cooperation => 0f,
+                        CardType.Chaos       => -10f, // Might lose collection
+                        _ => 0f
+                    };
+                    // ★ [Safe Access]
+                    return s * (weights.ContainsKey(c) ? weights[c] : 1.0f);
+                }
+
+                float sa = Score(a), sb = Score(b);
+                if (Math.Abs(sa - sb) < 0.1f) return UnityEngine.Random.value < 0.5f ? 0 : 1;
+                return sa > sb ? 0 : 1;
+            };
+
+            A.fallback = new[] { 
+                CardType.Doubt, CardType.Recon, CardType.Cooperation, 
+                CardType.Interrupt, CardType.Pollution, CardType.Chaos, CardType.Investment,
+                // Rares are last resort
+                CardType.Curse, CardType.Betrayal, CardType.Sacrifice 
+            };
+
+            return A;
+        }
+
+
+
+        // Gate Keeper of the Agents
+        // ==========================================
+        //  Agent Zero — The Mirror: Absolute Karma
+        // ==========================================
+        static Agent Build_Zero(AgentList id)
+        {
+            var A = new Agent("Zero", id);
+
+            A.rules.Add(I =>
+            {
+                // 1. 첫 라운드: 절대적 평화 (투자 혹은 협력)
+                if (I.s.IsFirst)
+                {
+                    if (I.HandHas(CardType.Investment)) return CardType.Investment;
+                    if (I.HandHas(CardType.Cooperation)) return CardType.Cooperation;
+                    return CardType.Recon; // 정 없으면 정찰
+                }
+
+                var lastOpp = I.s.lastOpp;
+
+                // 2. [응징 프로토콜] 상대가 적대적 행위를 했는가?
+                bool enemyAttacked = lastOpp == CardType.Betrayal || lastOpp == CardType.Pollution || lastOpp == CardType.Curse;
+                bool enemyGreedy = lastOpp == CardType.Sacrifice; // 감히 내 앞에서 제물을?
+
+                if (enemyAttacked || enemyGreedy)
+                {
+                    // 즉시, 가장 강력한 공격 수단으로 보복
+                    if (I.HandHas(CardType.Betrayal)) return CardType.Betrayal;
+                    if (I.HandHas(CardType.Pollution)) return CardType.Pollution;
+                    if (I.HandHas(CardType.Curse)) return CardType.Curse;
+                    if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt; // 공격 카드가 없으면 방해라도
+                }
+
+                // 3. [혼란 차단] 상대가 Chaos를 썼는가?
+                if (lastOpp == CardType.Chaos)
+                {
+                    // 리셋을 시도하면 방해(Interrupt)하거나 같이 Chaos
+                    if (I.HandHas(CardType.Interrupt)) return CardType.Interrupt;
+                    if (I.HandHas(CardType.Chaos)) return CardType.Chaos;
+                }
+
+                // 4. [상생 프로토콜] 상대가 평화/방어적인가?
+                // 상대가 협력/투자/방어/정찰을 했다면 -> 나도 이득(Investment)을 취하거나 협력
+                if (I.HandHas(CardType.Investment)) return CardType.Investment;
+                if (I.HandHas(CardType.Cooperation)) return CardType.Cooperation;
+                
+                // 5. [기본] 할 게 없으면 방어
+                if (I.HandHas(CardType.Doubt)) return CardType.Doubt;
+
+                // 6. [최후의 수단] 아무것도 해당 안 되면 점수 높은 순
+                // (응징해야 하는데 공격 카드가 없어서 여기까지 왔다면, 방어라도 함)
+                return I.hand.OrderByDescending(c => c == CardType.Doubt ? 10 : 0).FirstOrDefault();
+            });
+
+            // 드로우 전략: "보복과 번영을 위한 균형"
+            A.chooseFromTwo = (a, b, I) =>
+            {
+                // 0. Sacrifice는 절대 집지 않음 (제로의 철학: 시스템 붕괴 거부)
+                if (a == CardType.Sacrifice) return 1;
+                if (b == CardType.Sacrifice) return 0;
+
+                // 1. 공격 카드(Betrayal) 1장은 필수 (보복용 보험)
+                bool hasWeapon = I.HandHas(CardType.Betrayal) || I.HandHas(CardType.Pollution);
+                bool isWeapon(CardType t) => t == CardType.Betrayal || t == CardType.Pollution;
+
+                if (!hasWeapon)
+                {
+                    if (isWeapon(a) && !isWeapon(b)) return 0;
+                    if (isWeapon(b) && !isWeapon(a)) return 1;
+                }
+
+                // 2. 투자(Investment) 카드 최우선 확보 (상생용)
+                if (a == CardType.Investment && b != CardType.Investment) return 0;
+                if (b == CardType.Investment && a != CardType.Investment) return 1;
+
+                // 3. 나머지는 기본 가치 판단
+                int Score(CardType t) => t switch
+                {
+                    CardType.Investment => 100,
+                    CardType.Betrayal => 90,   // 보복 수단
+                    CardType.Cooperation => 80,
+                    CardType.Doubt => 70,
+                    CardType.Pollution => 60,
+                    CardType.Interrupt => 50,
+                    CardType.Curse => 40,
+                    CardType.Recon => 30,
+                    CardType.Chaos => 0,      // 변수 싫어함
+                    CardType.Sacrifice => -99,
+                    _ => 0
+                };
+
+                return Score(a) >= Score(b) ? 0 : 1;
+            };
+
+            A.fallback = new[] { CardType.Investment, CardType.Cooperation, CardType.Doubt, CardType.Betrayal, CardType.Pollution, CardType.Interrupt };
+
             return A;
         }
     }

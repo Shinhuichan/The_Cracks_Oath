@@ -8,36 +8,37 @@ public enum Personality
     Static, Pragmatic, Aggressive, Defensive, Specialist, Erratic, Emotional
 }
 
-public enum ThreatLevel {Prey, Unstable, Gamblers, Challengers, Masters, Grandmasters, Absolute}
+public enum ThreatLevel {Prey, Unstable, Variables, Challengers, Masters, Grandmasters, Absolute}
 
 [System.Serializable]
 public struct AgentStats
 {
-    [Range(0, 100), Tooltip("공격성, 킬각 결정력")]
-    public int Lethality;       // 살상력
+    [Range(0, 100), Tooltip("현재 상황에서 최적의 수(EV)를 찾아내는 지능. (S티어의 핵심)")]
+    public int Judgment;       // 판단력
     
-    [Range(0, 100), Tooltip("방어 능력, 위기 관리")]
-    public int Survivability;   // 생존력
+    [Range(0, 100), Tooltip("상대를 타격하고 킬각을 잡는 결정력. (메타 파괴력)")]
+    public int Aggressive;   // 공격력
     
-    [Range(0, 100), Tooltip("기댓값(EV) 계산 및 수 싸움")]
-    public int Calculation;     // 연산력
+    [Range(0, 100), Tooltip("위기 상황에서 생존하고 피해를 최소화하는 능력.")]
+    public int Defensive;     // 방어력
     
-    [Range(0, 100), Tooltip("데이터 학습 및 유연함")]
-    public int Adaptability;    // 적응력
+    [Range(0, 100), Tooltip("감정이나 확률에 휘둘리지 않고 꾸준히 제 성능을 내는 능력. (낮으면 트롤 가능성 높음)")]
+    public int Stability;    // 안정성
     
-    [Range(0, 100), Tooltip("상대 패턴 파악 및 심리전")]
-    public int Insight;         // 통찰력
+    [Range(0, 100), Tooltip("Investment나 Sacrifice 스택을 쌓아 후반 밸류를 창출하는 운영 능력.")]
+    public int Growth;         // 성장력
     
-    [Range(0, 100), Tooltip("변수 창출 및 종잡을 수 없음")]
-    public int Unpredictability;// 의외성
+    [Range(0, 100), Tooltip("정보(Recon)를 선점하거나 상대의 흐름(Interrupt)을 끊어 판을 주도하는 능력.")]
+    public int Control;         // 통제력
 }
 
 [CreateAssetMenu(fileName = "AgentData", menuName = "AI/Agent Data", order = 1)]
 public class AgentData : ScriptableObject
 {
     [Header("Identity")]
-    [ReadOnly] public AgentList agentName;
+    public AgentList agentName;
     public string title;        // 예: "심리전의 여왕"
+    [Preview] public Sprite icon;
     [TextArea(2, 5)] public string description; // 소개 문구
     public ThreatLevel threatLevel; // 종합 위험도
 

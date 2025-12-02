@@ -684,6 +684,7 @@ public class PlayerBattle : MonoBehaviour
         UpdateBothRankUI();
     }
 
+    [SerializeField] private float simulateAIVsAI_Count = 20; // 기본 20판
     // ▼ [신규] AI vs AI 5판 승부 함수
     IEnumerator SimulateAIVsAI_BestOf5(AgentList A1, AgentList A2)
     {
@@ -692,7 +693,7 @@ public class PlayerBattle : MonoBehaviour
         int draws = 0;
 
         // 5판 반복
-        for (int i = 0; i < 15; i++)
+        for (int i = 0; i < simulateAIVsAI_Count; i++)
         {
             // 한 판 시뮬레이션 (기존 로직 재사용, 결과만 받음)
             // 결과를 기다리기 위해 Coroutine을 호출하고 대기해야 함
@@ -740,7 +741,7 @@ public class PlayerBattle : MonoBehaviour
             UnityEngine.Object.Destroy(go);
         }
 
-        // 5판 종료 후 최종 승자 결정
+        // X판 종료 후 최종 승자 결정
         int finalScoreA = 0;
         int finalScoreB = 0;
 
