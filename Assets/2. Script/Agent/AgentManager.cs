@@ -9,12 +9,35 @@ using System.IO;
 
 public class AgentManager : SingletonBehaviour<AgentManager>
 {
+    // 싱글톤 설정
     protected override bool IsDontDestroy() => true;
-    // ... (Elo 및 Record 관련 코드는 동일) ...
+
     [Header("Register Agents in Inspector")]
-    [Header("Settings")]
     public List<AgentData> currentAgent;
     [SerializeField] private string saveFileName = "agent_learning_data.json";
+
+    [Header("ELO Settings")]
+    [Tooltip("기본 시작 ELO 점수입니다.")]
+    public double startingElo = 1500.0;
+
+    [Tooltip("변동폭 계수(K-Factor). 값이 클수록 한 판의 결과가 점수에 큰 영향을 줍니다. (기본 24 -> 32~40 추천)")]
+    public double kFactor = 16.0;
+
+    [Tooltip("승리 시 점수 획득 배율 (1.0 = 표준). 낮추면(0.8) 점수 올리기가 더 힘들어집니다.")]
+    public double winWeight = 0.5f;
+
+    [Tooltip("패배 시 점수 차감 배율 (1.0 = 표준). 높이면(1.2) 패배 시 점수가 더 많이 깎입니다.")]
+    public double loseWeight = 0.75;
+    // [변수 추가] 인스펙터에서 설정 가능하도록 public으로 선언
+    [Header("Advanced ELO Settings")]
+    [Tooltip("업셋/쉴드 가중치가 적용되는 기준 ELO 차이입니다. (예: 100점 차이마다 가중치 적용)")]
+    public double standardElo = 100.0;
+
+    [Tooltip("역배(Upset) 시 점수 변동폭 증가율 (기본 0.05 = 5%). 격차가 클수록 증폭됩니다.")]
+    public double upsetWeight = 0.05;
+
+    [Tooltip("정배(Shield) 시 점수 변동폭 감소율 (기본 0.05 = 5%). 격차가 클수록 많이 감소합니다.")]
+    public double shieldWeight = 0.05;
 
     // 런타임 고속 접근용 캐시: [AgentName][CardType] = Weight
     private Dictionary<string, Dictionary<CardType, float>> runtimeWeights = new Dictionary<string, Dictionary<CardType, float>>();
@@ -170,6 +193,43 @@ public class AgentManager : SingletonBehaviour<AgentManager>
     }
 
     // ============================================================
+    // ★ [신규 기능] 초기화 메서드 (Context Menu & Public)
+    // ============================================================
+
+    /// <summary>
+    /// 모든 에이전트의 ELO와 전적 기록을 초기화합니다.
+    /// 에디터에서 AgentManager 컴포넌트를 우클릭하여 실행할 수 있습니다.
+    /// </summary>
+    [ContextMenu("Reset All Records & ELO")]
+    public void ResetAllRecordsAndElo()
+    {
+        if (currentAgent == null) return;
+
+        foreach (var agent in currentAgent)
+        {
+            if (agent == null) continue;
+            
+            // ELO 초기화
+            agent.elo = startingElo;
+            
+            // 전적 리스트 초기화
+            if (agent.records != null)
+            {
+                agent.records.Clear();
+            }
+            else
+            {
+                agent.records = new List<AgentRecord>();
+            }
+        }
+
+        // 파일에도 즉시 저장하여 반영
+        SaveLearningData(); 
+        
+        Debug.Log($"[AgentManager] 모든 참가자의 ELO가 {startingElo}으로, 전적이 0으로 초기화되었습니다.");
+    }
+
+    // ============================================================
     // ★ [신규 기능] Threat Level 자동 산정 시스템
     // ============================================================
 
@@ -210,97 +270,12 @@ public class AgentManager : SingletonBehaviour<AgentManager>
         Debug.Log($"[AgentManager] Threat Levels Recalculated based on ELO distribution (Total: {totalCount})");
     }
 
-    /// <summary>
-    /// 라운드 결과에 따라 AI의 카드 가중치를 '성격'에 맞게 업데이트(학습)합니다.
-    /// </summary>
-    /// <param name="who">학습할 AI</param>
-    /// <param name="selfCard">AI가 낸 카드</param>
-    /// <param name="oppCard">상대가 낸 카드</param>
-    /// <param name="hpDeltaThisRound">AI의 이번 라운드 총 양초 변화량</param>
-    /// <param name="selfLife">AI의 현재 양초</param>
-    /// <param name="oppLife">상대의 현재 양초</param>
-    // ============================================================
-    // 3. 핵심 학습 로직 (Learning Logic)
-    // ============================================================
-    public void LearnFromRound(AgentList agentId, CardType playedCard, int hpDelta, int currentHp, int oppHp)
+    // ▼ [수정됨] 인스펙터 설정을 사용하는 단일 매치 결과 적용
+    // k 파라미터를 -1로 주면 인스펙터의 kFactor를 사용합니다.
+    public void ApplyMatchResult(AgentList a, AgentList b, MatchOutcome outcomeA, double k = -1.0)
     {
-        // if (playedCard == CardType.None) return;
+        CalculateAndSetElo(a, b, outcomeA, k);
 
-        // // 1) 에이전트의 성향(AgentData) 가져오기
-        // AgentData data = GetAgentData(agentId);
-        // Personality personality = (data != null) ? data.personality : Personality.Static;
-
-        // if (personality == Personality.Static) return;
-
-        // // 2) 현재 가중치 가져오기
-        // var weights = GetWeights(agentId);
-        
-        // // [안전 접근] 키가 없으면 1.0f
-        // float currentW = weights.ContainsKey(playedCard) ? weights[playedCard] : 1.0f;
-
-        // // 3) 학습률(Learning Rate) 및 보상(Reward) 결정
-        // float changeRate = 1.0f;
-        
-        // bool success = hpDelta > 0;
-        // bool fail = hpDelta < 0;
-        
-        // switch (personality)
-        // {
-        //     case Personality.Pragmatic: 
-        //         if (success) changeRate = 1.02f;      
-        //         else if (fail) changeRate = 0.98f;    
-        //         break;
-
-        //     case Personality.Aggressive: 
-        //         bool isAtk = (playedCard == CardType.Betrayal || playedCard == CardType.Pollution);
-        //         if (isAtk && success) changeRate = 1.10f;      
-        //         else if (isAtk && fail) changeRate = 0.90f;    
-        //         else if (fail) changeRate = 0.99f;             
-        //         break;
-
-        //     case Personality.Defensive: 
-        //         bool isDef = (playedCard == CardType.Doubt || playedCard == CardType.Interrupt);
-        //         if (isDef && fail) changeRate = 0.85f;         
-        //         else if (success) changeRate = 1.03f;          
-        //         break;
-            
-        //     case Personality.Emotional: 
-        //         bool losing = currentHp < oppHp;
-        //         float strength = losing ? 0.15f : 0.05f; 
-        //         if (success) changeRate = 1.0f + strength;
-        //         else if (fail) changeRate = 1.0f - strength;
-        //         break;
-
-        //      case Personality.Erratic: 
-        //         changeRate = UnityEngine.Random.Range(0.9f, 1.1f);
-        //         break;
-                
-        //      case Personality.Specialist: 
-        //          changeRate = success ? 1.05f : 0.95f;
-        //          break;
-        // }
-
-        // // 4) 가중치 적용 (changeRate가 1.0f이므로 변화 없음)
-        // float finalW = Mathf.Clamp(currentW * changeRate, 0.1f, 3.0f);
-        // weights[playedCard] = finalW;
-    }
-
-    public void ApplyMatchResult(AgentList a, AgentList b, MatchOutcome outcomeA, double k = 24.0)
-    {
-        // 1) ELO 양쪽 갱신
-        var ra = GetElo(a);
-        var rb = GetElo(b);
-        double ea = 1.0 / (1.0 + Math.Pow(10.0, (rb - ra) / 400.0));
-        double sa = outcomeA == MatchOutcome.Win ? 1.0 : outcomeA == MatchOutcome.Draw ? 0.5 : 0.0;
-        double sb = 1.0 - sa;
-
-        ra = ra + k * (sa - ea);
-        rb = rb + k * (sb - (1.0 - ea));
-
-        SetElo(a, ra);
-        SetElo(b, rb);
-
-        // 2) 상대별 전적 집계
         var da = GetData(a);
         var db = GetData(b);
         var recA = GetOrCreateRecord(da, b);
@@ -317,47 +292,143 @@ public class AgentManager : SingletonBehaviour<AgentManager>
         SaveRecord(db, recB);
     }
 
-    // ★ [추가] 시뮬레이션 결과(수천 판)를 한 번에 전적에 반영하는 메서드
-    public void ApplyBatchResult(AgentList a, AgentList b, int winsA, int winsB, int draws, double k = 24.0)
+    // ▼ [수정됨] 배치 결과 개별 반영 (정확도 향상)
+    public void ApplyBatchResult(AgentList a, AgentList b, int winsA, int winsB, int draws, double k = -1.0)
     {
-        // 1) ELO 갱신 (배치 단위에서는 평균 승률로 1회만 갱신하거나, 가중치를 줄여서 반영)
-        // 여기서는 '전체 승률'을 기반으로 1회 갱신하되 K값을 매치 수에 비례하게 조정하는 방식 등 다양하지만,
-        // 단순하게 '다수결 승자' 기준으로 1회만 반영하는 것이 ELO 인플레이션 방지에 좋습니다.
-        // (수천 번 ELO를 갱신하면 값이 폭주할 수 있음)
+        // 1. 전체 경기 수 및 결과 배열 생성
+        int totalPlayed = winsA + winsB + draws;
         
-        MatchOutcome outcome = MatchOutcome.Draw;
-        if (winsA > winsB) outcome = MatchOutcome.Win;
-        else if (winsB > winsA) outcome = MatchOutcome.Loss;
+        // 결과 목록 생성 (0:무, 1:A승, 2:B승)
+        // 메모리 할당 최적화를 위해 int 배열 사용
+        int[] results = new int[totalPlayed];
+        int idx = 0;
         
-        ApplyMatchResult(a, b, outcome, k); // ELO는 대표 결과로 1회만
+        for (int i = 0; i < winsA; i++) results[idx++] = 1;
+        for (int i = 0; i < winsB; i++) results[idx++] = 2;
+        for (int i = 0; i < draws; i++) results[idx++] = 0;
 
+        // 2. 결과 셔플 (Fisher-Yates Shuffle)
+        // 실제 경기 순서를 알 수 없으므로, 랜덤하게 섞어서 시뮬레이션해야 
+        // ELO의 '연승/연패' 왜곡을 줄이고 평균적인 변화를 반영할 수 있음.
+        for (int i = 0; i < totalPlayed; i++)
+        {
+            int r = UnityEngine.Random.Range(i, totalPlayed);
+            int temp = results[i];
+            results[i] = results[r];
+            results[r] = temp;
+        }
+
+        // 3. 개별 게임 ELO 반영 (Loop)
+        // 각 판마다 ELO가 변동되고, 그 변동된 ELO가 다음 판의 기대 승률에 영향을 줌 -> 정확성 UP
+        for (int i = 0; i < totalPlayed; i++)
+        {
+            MatchOutcome outcome;
+            if (results[i] == 1) outcome = MatchOutcome.Win;
+            else if (results[i] == 2) outcome = MatchOutcome.Loss;
+            else outcome = MatchOutcome.Draw;
+
+            // 개별 게임이므로 K값을 그대로 사용하면 변동폭이 너무 클 수 있음.
+            // 하지만 사용자가 '개별 반영'을 원했으므로 설정된 K값을 그대로 적용.
+            // (너무 크다면 인스펙터에서 K-Factor를 줄이는 것을 권장)
+            CalculateAndSetElo(a, b, outcome, k);
+        }
+
+        // 4. 전적(Record) 누적 (이건 합산해서 한 번에 해도 됨)
         var da = GetData(a);
         var db = GetData(b);
         var recA = GetOrCreateRecord(da, b);
         var recB = GetOrCreateRecord(db, a);
 
-        int totalPlayed = winsA + winsB + draws;
         recA.matchCount += totalPlayed;
-        recB.matchCount += totalPlayed;
         recA.winCount += winsA;
         recA.loseCount += winsB;
         recA.drawCount += draws;
+
+        recB.matchCount += totalPlayed;
         recB.winCount += winsB;
-        recB.loseCount += winsA;
+        recB.loseCount += winsA; 
         recB.drawCount += draws;
 
         SaveRecord(da, recA);
         SaveRecord(db, recB);
+    }
+    
+    // ▼ [수정됨] ELO 계산 로직 (비례 가중치 적용)
+    private void CalculateAndSetElo(AgentList a, AgentList b, MatchOutcome outcomeA, double kOverride)
+    {
+        // 1. 기본 설정
+        double baseK = (kOverride > 0) ? kOverride : kFactor;
+        var ra = GetElo(a);
+        var rb = GetElo(b);
+
+        // 2. 기대 승률 계산
+        double ea = 1.0 / (1.0 + Math.Pow(10.0, (rb - ra) / 400.0));
+        double eb = 1.0 - ea; 
+
+        // 3. 실제 결과
+        double sa = outcomeA == MatchOutcome.Win ? 1.0 : outcomeA == MatchOutcome.Draw ? 0.5 : 0.0;
+        double sb = 1.0 - sa;
+
+        // 4. 기본 점수 변동량 (Delta)
+        double deltaA = baseK * (sa - ea);
+        double deltaB = baseK * (sb - eb);
+
+        // 5. ★ [핵심] 격차 기반 동적 가중치 적용
+        double eloGap = Math.Abs(ra - rb);
         
-        // ★ [선택 사항] 배치 결과가 반영될 때마다 티어를 갱신하고 싶다면 여기서 호출
-        // 하지만 매번 부르면 성능/로그 낭비가 심하므로, 보통은 리그 종료 시점에 호출하는 것을 권장합니다.
-        // RecalculateThreatLevels();
+        // 격차 비율 (몇 배의 standardElo 차이인가?)
+        // 예: 차이 200, 기준 100 -> ratio 2.0
+        double gapRatio = eloGap / Math.Max(1.0, standardElo); 
+
+        // 비선형 스케일링 (가파르게 만들기 위해 제곱 등 적용 가능, 여기선 선형+추가 보정)
+        // 격차가 클수록 효과를 극대화하기 위해 ratio를 그대로 사용하거나 제곱 사용
+        // double scaleFactor = Math.Pow(gapRatio, 1.5); // (선택사항: 더 가파르게 하려면 사용)
+        double scaleFactor = gapRatio; 
+
+        // [상황 판별]
+        // Upset (역배): (강자가 짐) OR (약자가 이김)
+        bool isUpset = (ra > rb && outcomeA == MatchOutcome.Loss) || (ra < rb && outcomeA == MatchOutcome.Win);
+        
+        // Shield (정배): (강자가 이김) OR (약자가 짐)
+        bool isShield = (ra > rb && outcomeA == MatchOutcome.Win) || (ra < rb && outcomeA == MatchOutcome.Loss);
+
+        double modifier = 1.0;
+
+        if (isUpset)
+        {
+            // 역배: 변동폭 증가 (Boost)
+            // scaleFactor * upsetWeight 만큼 추가 (예: 2배 격차 * 5% = 10% 증가)
+            // 1.0 + (2.0 * 0.05) = 1.1배
+            modifier = 1.0 + (scaleFactor * upsetWeight);
+        }
+        else if (isShield)
+        {
+            // 정배: 변동폭 감소 (Dampen)
+            // scaleFactor * shieldWeight 만큼 감소 (최소 10%는 남김)
+            // 1.0 - (2.0 * 0.05) = 0.9배
+            modifier = Math.Max(0.1, 1.0 - (scaleFactor * shieldWeight));
+        }
+
+        // 가중치 적용
+        deltaA *= modifier;
+        deltaB *= modifier;
+
+        // 6. 승패 기본 가중치 적용 (인스펙터 설정)
+        if (deltaA > 0) deltaA *= winWeight; else deltaA *= loseWeight;
+        if (deltaB > 0) deltaB *= winWeight; else deltaB *= loseWeight;
+
+        // 7. 최종 반영
+        ra += deltaA;
+        rb += deltaB;
+
+        SetElo(a, ra);
+        SetElo(b, rb);
     }
 
     public double GetElo(AgentList id)
     {
         if (currentAgent.Find(x => x.agentName == id) is not AgentData data)
-            return 1000.0; // 기본값
+            return 1500.0; // 기본값
         return data.elo;
     }
 
@@ -522,6 +593,42 @@ public class AgentManager : SingletonBehaviour<AgentManager>
             }
         }
         currentMatchOpponentMoves[obsKey].Clear();
+    }
+
+    // ▼ [추가됨] 라운드 학습 메서드 (오류 해결용)
+    public void LearnFromRound(AgentList agentId, CardType playedCard, int hpDelta, int currentHp, int oppHp)
+    {
+        // 1. 데이터 로드
+        string key = agentId.ToString();
+        if (!runtimeWeights.ContainsKey(key))
+        {
+            // 없으면 초기화
+            var newDict = new Dictionary<CardType, float>();
+            foreach (CardType c in Enum.GetValues(typeof(CardType)))
+                if (c != CardType.None) newDict[c] = 1.0f;
+            runtimeWeights[key] = newDict;
+        }
+        var weights = runtimeWeights[key];
+
+        // 2. 학습 로직 (간단한 강화학습)
+        // hpDelta > 0 이면 좋은 수 -> 가중치 증가
+        // hpDelta < 0 이면 나쁜 수 -> 가중치 감소
+        
+        float learningRate = 0.05f; // 학습률
+        float reward = 0f;
+
+        if (hpDelta > 0) reward = 1.0f;       // 이득
+        else if (hpDelta < 0) reward = -1.0f; // 손해
+        else reward = 0.1f;                   // 무승부는 약간 긍정 (버티기)
+
+        // 가중치 업데이트
+        if (weights.ContainsKey(playedCard))
+        {
+            weights[playedCard] += learningRate * reward;
+            
+            // 가중치 범위 제한 (0.1 ~ 5.0)
+            weights[playedCard] = Mathf.Clamp(weights[playedCard], 0.1f, 5.0f);
+        }
     }
 
     // 헬퍼 함수: 역사 속에 특정 시퀀스가 존재하는지 확인

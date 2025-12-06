@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e0feac0b93001254b835ecddcb436fd3, type: 3}
+  m_Name: "\uC194\uB77C \uD31D"
+  m_EditorClassIdentifier: 
+  stockName: "\uC194\uB77C \uD31D"
+  symbol: SOLAR
+  description: "\"\uC9C0\uC18D \uAC00\uB2A5\uD55C \uBE5B.\" \uB300\uADDC\uBAA8 \uD0DC\uC591\uAD11
+    \uBC1C\uC804 \uB2E8\uC9C0\uB97C \uC6B4\uC601\uD558\uB294 \uCE5C\uD658\uACBD \uAE30\uC5C5\uC785\uB2C8\uB2E4.
+    \uC9C8\uB9AC\uC544\uC2A4 \uC5D0\uB108\uC9C0\uC758 \uACF5\uACA9\uC801\uC778 \uACAC\uC81C\uC5D0\uB3C4
+    \uBD88\uAD6C\uD558\uACE0 \uC815\uBD80\uC758 \uBCF4\uC870\uAE08 \uC815\uCC45\uC5D0
+    \uD798\uC785\uC5B4 \uAFB8\uC900\uD788 \uC131\uC7A5 \uC911\uC785\uB2C8\uB2E4.
+    \uB0AE\uC5D0\uB294 \uC804\uB825\uC744 \uC0DD\uC0B0\uD558\uACE0 \uBC24\uC5D0\uB294
+    \uD50C\uB7ED\uC2A4 \uC140(\uBC30\uD130\uB9AC)\uC758 ESS(\uC5D0\uB108\uC9C0 \uC800\uC7A5
+    \uC7A5\uCE58)\uC5D0 \uC804\uB825\uC744 \uC800\uC7A5\uD558\uB294 \uACF5\uC0DD
+    \uAD00\uACC4\uB97C \uB9FA\uACE0 \uC788\uC2B5\uB2C8\uB2E4."
+  icon: {fileID: 0}
+  startPrice: 9800
+  volatility: 0.03
+  sector: 4
+  totalShares: 150000
+  eventPotential: 0.4
+  eventWeight: 2
+  dividendPerShare: 70

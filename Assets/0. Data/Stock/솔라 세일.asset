@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e0feac0b93001254b835ecddcb436fd3, type: 3}
+  m_Name: "\uC194\uB77C \uC138\uC77C"
+  m_EditorClassIdentifier: 
+  stockName: "\uC194\uB77C \uC138\uC77C"
+  symbol: SAIL
+  description: "\uC5F0\uB8CC \uC5C6\uC774 \uD0DC\uC591\uAD11 \uB3DB\uC744 \uD3BC\uCCD0
+    \uC6B0\uC8FC\uB97C \uC720\uC601\uD558\uB294 \uB7ED\uC154\uB9AC \uC694\uD2B8 \uC81C\uC870\uC0AC\uC785\uB2C8\uB2E4.
+    \uC9C8\uB9AC\uC544\uC2A4 \uC5D0\uB108\uC9C0(\uD654\uC11D\uC5F0\uB8CC)\uB098 \uD50C\uB7ED\uC2A4
+    \uC140\uC5D0\uC11C \uC790\uC720\uB85C\uC6CC \uC5D0\uB108\uC9C0 \uC704\uAE30\uAC00
+    \uB2E5\uCCE4\uC744 \uB54C \uD53C\uB09C\uCC98 \uC5ED\uD560\uC744 \uD569\uB2C8\uB2E4.
+    \uC570\uBE0C\uB85C\uC2DC\uC544(\uCD5C\uACE0\uAE09 \uC2DD\uD488)\uC640 \uD568\uAED8
+    \uC288\uD37C\uB9AC\uCE58\uB4E4\uC758 \uC804\uC720\uBB3C\uC774\uBA70, '\uBD80\uC720\uC138
+    \uC2E0\uC124'\uC774\uB098 '\uC0AC\uCE58\uD488 \uADDC\uC81C' \uAC19\uC740 \uC815\uCE58\uC801
+    \uC774\uC288\uC5D0\uB294 \uBBFC\uAC10\uD569\uB2C8\uB2E4. \uD0DC\uC591\uD48D\uC5D0
+    \uC758\uC874\uD558\uAE30 \uB54C\uBB38\uC5D0 '\uD0DC\uC591 \uD751\uC810 \uD3ED\uBC1C'\uC774\uB098
+    '\uC6B0\uC8FC \uBC29\uC0AC\uB2A5 \uD3ED\uD48D' \uACBD\uBCF4\uAC00 \uB728\uBA74
+    \uC6B4\uD56D\uC774 \uC911\uB2E8\uB418\uC5B4 \uC8FC\uAC00\uAC00 \uAE09\uB77D\uD569\uB2C8\uB2E4."
+  icon: {fileID: 0}
+  startPrice: 120000
+  volatility: 0.05
+  sector: 2
+  totalShares: 10000
+  eventPotential: 0.8
+  eventWeight: 2.2
+  dividendPerShare: 100

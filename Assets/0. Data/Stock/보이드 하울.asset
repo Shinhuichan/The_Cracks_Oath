@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e0feac0b93001254b835ecddcb436fd3, type: 3}
+  m_Name: "\uBCF4\uC774\uB4DC \uD558\uC6B8"
+  m_EditorClassIdentifier: 
+  stockName: "\uBCF4\uC774\uB4DC \uD558\uC6B8"
+  symbol: VOID
+  description: "\"\uC6B0\uC8FC\uC758 \uC9D0\uAFBC.\" \uD589\uC131 \uAC04 \uC790\uC6D0\uC744
+    \uB098\uB974\uB294 \uCD08\uB300\uD615 \uC6B0\uC8FC \uD654\uBB3C \uC6B4\uC1A1\uC0AC\uC785\uB2C8\uB2E4.
+    \uC9C8\uB9AC\uC544\uC2A4 \uC5D0\uB108\uC9C0(\uC790\uC6D0)\uC640 \uB8E8\uB098
+    \uB85C\uBC84(\uD0D0\uC0AC)\uC758 \uBB3C\uB7C9\uC744 \uC804\uB2F4\uD558\uACE0
+    \uC788\uC2B5\uB2C8\uB2E4. \uC6B0\uC8FC\uC120\uC774 \uC6CC\uB099 \uAC70\uB300\uD558\uACE0
+    \uB290\uB824 \uD574\uC801\uC758 \uD45C\uC801\uC774 \uB418\uAC70\uB098 \uC18C\uD589\uC131
+    \uCDA9\uB3CC \uC0AC\uACE0\uC5D0 \uD718\uB9D0\uB9AC\uACE4 \uD569\uB2C8\uB2E4.
+    \uC6B0\uC8FC \uC4F0\uB808\uAE30 \uC774\uC288\uC5D0 \uBBFC\uAC10\uD569\uB2C8\uB2E4."
+  icon: {fileID: 0}
+  startPrice: 9200
+  volatility: 0.04
+  sector: 2
+  totalShares: 12500
+  eventPotential: 0.7
+  eventWeight: 1.8
+  dividendPerShare: 80

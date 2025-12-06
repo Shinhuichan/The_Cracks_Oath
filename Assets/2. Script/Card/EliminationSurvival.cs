@@ -15,14 +15,28 @@ public class EliminationSwissSurvival : MonoBehaviour
     [SerializeField] private int gamesPerMatch = 1000;
 
     [Header("Award Settings")]
-    [SerializeField] private int butcherBonusScore = 5;      // 학살자 보너스 점수
-    [SerializeField] private int giantSlayerBonusScore = 5;  // 자이언트 슬레이어 보너스 점수
-    [SerializeField] private AudioClip sfxAward;             // 어워드 팡파레 효과음
+    [SerializeField] private int butcherBonusScore = 1;      // 학살자 보너스 점수
+    [SerializeField] private int giantSlayerBonusScore = 3;  // 자이언트 슬레이어 보너스 점수
+    [SerializeField] private int doomsdayClockBonusScore = 1; // 종말의 시계 보너스 점수
+    [SerializeField] private int zombieBonusScore = 1;       // 언다잉 보너스 점수;
+    [SerializeField] private int kingSlayerBonusScore = 3;   // 킹 슬레이어 보너스 점수
+    [SerializeField] private int swampMasterBonusScore = 1;  // 늪의 지배자 보너스 점수
+    [SerializeField] private int blitzerBonusScore = 2;      // 전광석화 보너스 점수
+    [SerializeField] private int perfectionistBonusScore = 1; // 완벽주의자 보너스 점수
+    [SerializeField] private int hardRoadBonusScore = 2;     // 고난의 행군 보너스 점수
+    [SerializeField] private int streakerBonusScore = 2;      // 파죽지세 보너스 점수
+    [SerializeField] private int pacifistsBonusScore = 1;     // 평화주의자 보너스 점수
+    [SerializeField] private int dominantsBonusScore = 1;     // 우성인자 보너스 점수
+
+
+    // ★ [추가] 라운드별 해설 로그를 저장할 리스트
+    private List<string> roundHighlights = new List<string>();  
 
     [Header("VFX / SFX")]
     [SerializeField] private GameObject eliminationAlertPanel; // (선택) 붉은 비상등 패널
     [SerializeField] private AudioClip eliminationSfx;         // (선택) 쾅! 소리
     [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip sfxAward;             // 어워드 팡파레 효과음
 
     [Header("Advanced VFX / SFX")]
     [SerializeField] private AudioClip sfxRouletteTick;  // 룰렛 돌아가는 소리 (틱, 틱)
@@ -44,6 +58,15 @@ public class EliminationSwissSurvival : MonoBehaviour
         public int sacrificeWins;    
         public int closeWins;        
         public int kingSlayerPoints; 
+        
+        // ★ [추가] 신규 어워드용 누적 데이터
+        public int perfectWins; // 완벽주의자
+        public int fastWins;    // 전광석화
+        public int currentStreak; // 현재 연승
+        public int maxStreak;     // 최대 연승 (파죽지세)
+
+        public int coopCount;       // ★ 평화주의자
+        public int phaseBonusCount; // ★ 우성인자
 
         // ★★★ [필수 추가] 이게 없어서 오류 발생함 ★★★
         public HashSet<AgentList> beatenOpponents = new HashSet<AgentList>();
@@ -163,6 +186,8 @@ public class EliminationSwissSurvival : MonoBehaviour
         // === 스위스 라운드 루프 ===
         for (int round = 1; round <= calculatedTotalRounds; round++)
         {
+            // ★ 라운드 시작 시 하이라이트 초기화
+            roundHighlights.Clear();
 
             // ★ [King Slayer 준비] Top 3 (왕좌) 식별
             HashSet<AgentList> currentKings = new HashSet<AgentList>();
@@ -216,11 +241,20 @@ public class EliminationSwissSurvival : MonoBehaviour
                 // ★ [데이터 반영] H2HMatchLoop에서 집계된 상세 데이터 누적
                 p1.sacrificeWins += result.p1SacrificeWins;
                 p1.closeWins += result.p1CloseWins;
+                p1.perfectWins += result.p1PerfectWins; // ★
+                p1.fastWins += result.p1FastWins;       // ★
+                // ▼ 여기 두 줄이 빠져 있었습니다!
+                p1.coopCount += result.p1CoopCount;       // 평화주의자 데이터
+                p1.phaseBonusCount += result.p1PhaseBonusCount; // 우성인자 데이터
                 
                 p2.sacrificeWins += result.p2SacrificeWins;
                 p2.closeWins += result.p2CloseWins;
+                p2.perfectWins += result.p2PerfectWins; // ★
+                p2.fastWins += result.p2FastWins;       // ★
+                // ▼ 여기 두 줄이 빠져 있었습니다!
+                p2.coopCount += result.p2CoopCount;
+                p2.phaseBonusCount += result.p2PhaseBonusCount;
 
-                // ★ [수정 3] AgentManager에 '대량 전적' 반영
                 if (AgentManager.I != null) AgentManager.I.ApplyBatchResult(p1.id, p2.id, result.p1Wins, result.p2Wins, result.draws);
 
                 // 결과 변수
@@ -272,6 +306,12 @@ public class EliminationSwissSurvival : MonoBehaviour
                             p1.kingSlayerPoints += 1; 
                         }
                     }
+
+                    // [Streak] 연승 계산
+                    p1.currentStreak++;
+                    if (p1.currentStreak > p1.maxStreak) p1.maxStreak = p1.currentStreak;
+                    
+                    p2.currentStreak = 0; // 패자는 연승 초기화
                     
                     outcomeP1 = AgentManager.MatchOutcome.Win;
                     p1.beatenOpponents.Add(p2.id);
@@ -296,6 +336,12 @@ public class EliminationSwissSurvival : MonoBehaviour
                             p2.kingSlayerPoints += 1;
                         }
                     }
+                    
+                    // [Streak]
+                    p2.currentStreak++;
+                    if (p2.currentStreak > p2.maxStreak) p2.maxStreak = p2.currentStreak;
+
+                    p1.currentStreak = 0;
 
                     outcomeP1 = AgentManager.MatchOutcome.Loss;
                     p2.beatenOpponents.Add(p1.id);
@@ -308,7 +354,8 @@ public class EliminationSwissSurvival : MonoBehaviour
                     outcomeP1 = AgentManager.MatchOutcome.Draw;
                 }
 
-                if (AgentManager.I != null) AgentManager.I.ApplyMatchResult(p1.id, p2.id, outcomeP1);
+                // === [★ 신규] 시스템 해설 생성 로직 ===
+                GenerateMatchCommentary(p1, p2, result, p1W > p2W ? p1 : (p2W > p1W ? p2 : null));
 
                 // ★ [통합된 로그 출력 로직] ★
                 // 문지기 매치인지 확인
@@ -318,7 +365,7 @@ public class EliminationSwissSurvival : MonoBehaviour
                 if (isGatekeeperMatch)
                 {
                     // Case A: 문지기 매치 (회색, 업셋 판정 제외)
-                    logLine = $"<color=#AAAAAA>■ {p1.id} vs {p2.id} : {winnerStr} ({p1W}/{dr}/{p2W}) - 문지기 매치</color>";
+                    logLine = $"<color=black>■ {p1.id} vs {p2.id} : {winnerStr} ({p1W}/{dr}/{p2W}) - 문지기 매치</color>";
                 }
                 else
                 {
@@ -332,8 +379,8 @@ public class EliminationSwissSurvival : MonoBehaviour
                         
                         // 이변 UI 연출 (잠시 멈춤)
                         UIManager.I.TrySetText(UI_GROUP, "RankingText", 
-                            $"<size=50><color=yellow>⚡ 대이변 발생! ⚡</color></size>\n\n" +
-                            $"<size=40>{(p1W > p2W ? p1.id : p2.id)}</size> 가\n상위 랭커를 격파했습니다!");
+                            $"<size=50><color=yellow> 대이변 발생! </color></size>\n\n" +
+                            $"<size=40>{(p1W > p2W ? p1.id : p2.id)}</size>이(가)\n상위 랭커를 격파했습니다!");
                         yield return new WaitForSeconds(1.5f);
                     }
                 }
@@ -347,7 +394,7 @@ public class EliminationSwissSurvival : MonoBehaviour
                     if (audioSource && sfxUpsetAlert) audioSource.PlayOneShot(sfxUpsetAlert);
 
                     // 2. UI에 크게 띄우기 (잠시 랭킹판을 가리고 속보 전달)
-                    string upsetMsg = $"<size=50><color=yellow>⚡ 대이변 발생! ⚡</color></size>\n\n" +
+                    string upsetMsg = $"<size=50><color=yellow> 대이변 발생! </color></size>\n\n" +
                                       $"<size=40>{(p1W > p2W ? p1.id : p2.id)}</size> 가\n" +
                                       $"<size=30>상위 랭커 {(p1W > p2W ? p2.id : p1.id)}를 격파했습니다!</size>";
                     
@@ -405,131 +452,194 @@ public class EliminationSwissSurvival : MonoBehaviour
             UIManager.I.TrySetText(UI_GROUP, "StatusText", $"<color=yellow>★ {currentSurvivalRound}회차 종료. 탈락자 발생 ★</color>");
     }
 
-    // ★ [수정 완료] 모든 어워드 포함 & 변수 오류 해결된 시상식 시퀀스
+    // ★ [수정됨] MatchCommentarySystem을 활용한 고도화된 해설 생성
+    private void GenerateMatchCommentary(Participant p1, Participant p2, H2HMatchLoop.BatchResult result, Participant winner)
+    {
+        // AgentManager에서 티어 및 ELO 정보 가져오기
+        ThreatLevel t1 = GetAgentThreatLevel(p1.id);
+        ThreatLevel t2 = GetAgentThreatLevel(p2.id);
+        double elo1 = AgentManager.I != null ? AgentManager.I.GetElo(p1.id) : 1000;
+        double elo2 = AgentManager.I != null ? AgentManager.I.GetElo(p2.id) : 1000;
+
+        // 해설 생성 (정적 클래스 호출)
+        string commentary = MatchCommentarySystem.I.GenerateCommentary(
+            p1.id, p2.id, result, t1, t2, elo1, elo2
+        );
+
+        // 하이라이트 리스트에 추가
+        roundHighlights.Add(commentary);
+    }
+
     private IEnumerator AwardCeremonySequence()
     {
         // ----------------------------------------------------------------------
-        // 1. 수상자 후보 선정 (LINQ로 데이터 조회)
-        // ----------------------------------------------------------------------
-        
-        // 학살자: 득실차 1위
-        var butcher = currentLeagueParticipants.OrderByDescending(p => p.totalCandleGap).FirstOrDefault();
-        
-        // 자이언트 슬레이어: 업셋 점수 1위 (0점 이상)
-        var slayer = currentLeagueParticipants.OrderByDescending(p => p.upsetScore).FirstOrDefault();
-        if (slayer != null && slayer.upsetScore == 0) slayer = null;
-
-        // 종말의 시계: 특수 승리 횟수 1위 (1회 이상)
-        var cultist = currentLeagueParticipants.OrderByDescending(p => p.sacrificeWins).FirstOrDefault();
-        if (cultist != null && cultist.sacrificeWins == 0) cultist = null;
-
-        // 불사신: 신승(HP<=3) 횟수 1위 (전체 게임의 5% 이상)
-        var zombie = currentLeagueParticipants.OrderByDescending(p => p.closeWins).FirstOrDefault();
-        // ★ [핵심 수정] totalRounds 대신 클래스 멤버변수 calculatedTotalRounds 사용
-        int undyingThreshold = Mathf.FloorToInt(gamesPerMatch * calculatedTotalRounds * 0.05f); 
-        if (zombie != null && zombie.closeWins < undyingThreshold) zombie = null;
-
-        // 킹 슬레이어: Top3 처치 횟수 1위 (1회 이상)
-        var kingSlayer = currentLeagueParticipants.OrderByDescending(p => p.kingSlayerPoints).FirstOrDefault();
-        if (kingSlayer != null && kingSlayer.kingSlayerPoints == 0) kingSlayer = null;
-
-        // 대상자가 아무도 없으면 바로 종료
-        if (butcher == null && slayer == null && cultist == null && zombie == null && kingSlayer == null) 
-            yield break;
-
-        // ----------------------------------------------------------------------
-        // 2. 시상식 연출 시작
+        // 1. 시상식 준비
         // ----------------------------------------------------------------------
         UIManager.I.TrySetText(UI_GROUP, "StatusText", "<color=#98FB98>★ 특별 보너스 점수 심사 중... ★</color>");
         yield return new WaitForSeconds(1.5f);
 
-        // [A] The Butcher (학살자)
-        if (butcher != null)
+        // 시상 처리용 로컬 함수 (고정 보너스)
+        void AwardList(List<Participant> winners, int bonus, string title, string desc, string color)
         {
-            butcher.score += butcherBonusScore;
-            UpdateRankingBoard(calculatedTotalRounds, true); // 순위 갱신
+            if (winners == null || winners.Count == 0) return;
+
+            foreach (var p in winners) p.score += bonus;
             
+            UpdateRankingBoard(calculatedTotalRounds, true);
             if (audioSource && sfxAward) audioSource.PlayOneShot(sfxAward);
+            
+            StringBuilder sprites = new StringBuilder();
+            foreach (var p in winners) sprites.Append($"<sprite name=\"{p.id}\">   "); 
 
-            string msg = $"<size=40><color=red>🩸 THE BUTCHER AWARD 🩸</color></size>\n\n" +
-                         $"<size=50><b>{butcher.id}</b></size>\n" +
-                         $"<size=30>압도적인 파괴력 (득실 +{butcher.totalCandleGap})</size>\n" +
-                         $"<color=yellow><b>▶ 승점 +{butcherBonusScore} 획득!</b></color>";
+            string names = string.Join(", ", winners.Select(p => p.id.ToString()));
+
+            string msg = $"<size=35><color={color}>{title}</color></size>\n\n" +
+                         $"<size=50>{sprites} <b>{names}</b></size>\n" +
+                         $"<size=25>{desc}</size>\n" +
+                         $"<color=yellow><b>▶ 승점 +{bonus} 획득!</b></color>";
             
             UIManager.I.TrySetText(UI_GROUP, "RankingText", msg);
             StartCoroutine(ShakeUI(0.5f, 5f));
-            yield return new WaitForSeconds(3.5f);
         }
 
-        // [B] Giant Slayer (자이언트 슬레이어)
-        if (slayer != null)
-        {
-            slayer.score += giantSlayerBonusScore;
-            UpdateRankingBoard(calculatedTotalRounds, true);
+        // ----------------------------------------------------------------------
+        // 2. 어워드별 선정 및 시상
+        // ----------------------------------------------------------------------
 
+        // [1] 학살자 (The Butcher)
+        int maxGap = currentLeagueParticipants.Max(p => p.totalCandleGap);
+        var butchers = currentLeagueParticipants.Where(p => p.totalCandleGap == maxGap).ToList();
+        AwardList(butchers, butcherBonusScore, " THE BUTCHER ", $"압도적인 파괴력 (득실 +{maxGap})", "red");
+        yield return new WaitForSeconds(3.5f);
+
+        // [2] 거인 살해자 (수정됨: 모든 달성자에게 개별 포인트 지급)
+        var slayers = currentLeagueParticipants.Where(p => p.upsetScore > 0).OrderByDescending(p => p.upsetScore).ToList();
+        if (slayers.Count > 0)
+        {
+            // 점수 부여 (각자의 upsetScore만큼)
+            foreach (var p in slayers) p.score += p.upsetScore;
+
+            UpdateRankingBoard(calculatedTotalRounds, true);
             if (audioSource && sfxAward) audioSource.PlayOneShot(sfxAward);
 
-            string msg = $"<size=40><color=#00FFFF>🥊 GIANT SLAYER AWARD 🥊</color></size>\n\n" +
-                         $"<size=50><b>{slayer.id}</b></size>\n" +
-                         $"<size=30>강자를 꺾은 용기 (업셋 포인트 {slayer.upsetScore})</size>\n" +
-                         $"<color=yellow><b>▶ 승점 +{giantSlayerBonusScore} 획득!</b></color>";
+            StringBuilder sprites = new StringBuilder();
+            foreach (var p in slayers) sprites.Append($"<sprite name=\"{p.id}\">   ");
+
+            // 이름 뒤에 각자의 점수 표시
+            string names = string.Join(", ", slayers.Select(p => $"{p.id}(+{p.upsetScore})"));
+
+            string msg = $"<size=32><color=#00FFFF> GIANT SLAYER </color></size>\n\n" +
+                         $"<size=36>{sprites} <b>{names}</b></size>\n" +
+                         $"<size=30>강자를 꺾은 용기 ({slayers.Count}명)</size>\n" +
+                         $"<color=yellow><b>▶ 누적된 업셋 포인트만큼 승점 획득!</b></color>";
 
             UIManager.I.TrySetText(UI_GROUP, "RankingText", msg);
             StartCoroutine(ShakeUI(0.5f, 5f));
             yield return new WaitForSeconds(3.5f);
         }
 
-        // [C] The Doomsday Clock (종말의 시계)
-        if (cultist != null)
+        // [3] 종말의 시계
+        int maxSac = currentLeagueParticipants.Max(p => p.sacrificeWins);
+        if (maxSac > 0)
         {
-            cultist.score += 1; // 대박 점수
-            UpdateRankingBoard(calculatedTotalRounds, true);
-
-            if (audioSource && sfxAward) audioSource.PlayOneShot(sfxAward);
-
-            string msg = $"<size=40><color=#800080>🕯️ THE DOOMSDAY CLOCK 🕯️</color></size>\n\n" +
-                         $"<size=50><b>{cultist.id}</b></size>\n" +
-                         $"<size=30>완성된 의식 (Sacrifice 승리 {cultist.sacrificeWins}회)</size>\n" +
-                         $"<color=yellow><b>▶ 승점 +1 획득!</b></color>";
-
-            UIManager.I.TrySetText(UI_GROUP, "RankingText", msg);
-            StartCoroutine(ShakeUI(0.5f, 5f));
+            var cultists = currentLeagueParticipants.Where(p => p.sacrificeWins == maxSac).ToList();
+            AwardList(cultists, doomsdayClockBonusScore, " DOOMSDAY CLOCK ", $"완성된 의식 ({maxSac}회)", "#800080");
             yield return new WaitForSeconds(3.5f);
         }
 
-        // [D] The Undying (불사신)
-        if (zombie != null)
+        // [4] 불사신
+        int undyingThreshold = Mathf.FloorToInt(gamesPerMatch * calculatedTotalRounds * 0.05f);
+        var zombieCandidates = currentLeagueParticipants.Where(p => p.closeWins >= undyingThreshold).ToList();
+        if (zombieCandidates.Count > 0)
         {
-            zombie.score += 1;
-            UpdateRankingBoard(calculatedTotalRounds, true);
-
-            if (audioSource && sfxAward) audioSource.PlayOneShot(sfxAward);
-
-            string msg = $"<size=40><color=#2E8B57>🧟 THE UNDYING 🧟</color></size>\n\n" +
-                         $"<size=50><b>{zombie.id}</b></size>\n" +
-                         $"<size=30>죽음의 문턱에서 생환 (빈사 승리 {zombie.closeWins}회)</size>\n" +
-                         $"<color=yellow><b>▶ 승점 +1 획득!</b></color>";
-
-            UIManager.I.TrySetText(UI_GROUP, "RankingText", msg);
-            StartCoroutine(ShakeUI(0.5f, 5f));
+            int maxClose = zombieCandidates.Max(p => p.closeWins);
+            var zombies = zombieCandidates.Where(p => p.closeWins == maxClose).ToList();
+            AwardList(zombies, zombieBonusScore, " THE UNDYING ", $"죽음의 문턱에서 생환 ({maxClose}회)", "#2E8B57");
             yield return new WaitForSeconds(3.5f);
         }
 
-        // [E] The King Slayer (왕좌의 파괴자)
-        if (kingSlayer != null)
+        // [5] 왕위 찬탈자
+        int maxKingKills = currentLeagueParticipants.Max(p => p.kingSlayerPoints);
+        if (maxKingKills > 0)
         {
-            kingSlayer.score += 2;
-            UpdateRankingBoard(calculatedTotalRounds, true);
+            var kingSlayers = currentLeagueParticipants.Where(p => p.kingSlayerPoints == maxKingKills).ToList();
+            AwardList(kingSlayers, kingSlayerBonusScore, " USURPER OF THE THRONE ", $"왕관의 무게를 견뎌라 ({maxKingKills}회 처치)", "#DC143C");
+            yield return new WaitForSeconds(3.5f);
+        }
 
-            if (audioSource && sfxAward) audioSource.PlayOneShot(sfxAward);
+        // [6] 늪의 지배자
+        float swampThreshold = gamesPerMatch * calculatedTotalRounds * 0.1f;
+        var swampCandidates = currentLeagueParticipants.Where(p => p.draws >= swampThreshold).ToList();
+        if (swampCandidates.Count > 0)
+        {
+            int maxDraws = swampCandidates.Max(p => p.draws);
+            var swampMasters = swampCandidates.Where(p => p.draws == maxDraws).ToList();
+            AwardList(swampMasters, swampMasterBonusScore, " SWAMP MASTER ", $"지지 않는 끈기 ({maxDraws}무)", "#8FBC8F");
+            yield return new WaitForSeconds(3.5f);
+        }
 
-            string msg = $"<size=40><color=#DC143C>👑 THE KING SLAYER 👑</color></size>\n\n" +
-                         $"<size=50><b>{kingSlayer.id}</b></size>\n" +
-                         $"<size=30>왕관의 무게를 견뎌라 (Top 3 격파 {kingSlayer.kingSlayerPoints}회)</size>\n" +
-                         $"<color=yellow><b>▶ 승점 +2 획득!</b></color>";
+        // [7] 전광석화
+        int maxFast = currentLeagueParticipants.Max(p => p.fastWins);
+        if (maxFast > 0)
+        {
+            var blitzers = currentLeagueParticipants.Where(p => p.fastWins == maxFast).ToList();
+            AwardList(blitzers, blitzerBonusScore, " THE BLITZ ", $"눈보다 빠른 승리 ({maxFast}회 조기 종료)", "#FFD700");
+            yield return new WaitForSeconds(3.5f);
+        }
 
-            UIManager.I.TrySetText(UI_GROUP, "RankingText", msg);
-            StartCoroutine(ShakeUI(0.5f, 10f)); // 더 강하게 흔들기
+        // [8] 완벽주의자
+        int maxPerfect = currentLeagueParticipants.Max(p => p.perfectWins);
+        if (maxPerfect > 0)
+        {
+            var perfectionists = currentLeagueParticipants.Where(p => p.perfectWins == maxPerfect).ToList();
+            AwardList(perfectionists, perfectionistBonusScore, " THE PERFECTIONIST ", $"흠집 없는 승리 ({maxPerfect}회 퍼펙트)", "#E0FFFF");
+            yield return new WaitForSeconds(3.5f);
+        }
+
+        // [9] 고난의 행군
+        // ★ [수정] 상위권 제외 로직이 너무 엄격했음. (정렬 후 3위 밖에서 부흐홀츠 1위)
+        // 만약 참가자가 적다면 스킵될 수 있음. 안전장치 추가.
+        var sortedForHardRoad = SortParticipants(currentLeagueParticipants);
+        if (sortedForHardRoad.Count > 3)
+        {
+            var hardRoadCandidates = sortedForHardRoad.Skip(3).ToList();
+            int maxBuchholz = hardRoadCandidates.Max(p => p.buchholz);
+            
+            // 부흐홀츠가 0보다 커야 함
+            if (maxBuchholz > 0)
+            {
+                var hardRoaders = hardRoadCandidates.Where(p => p.buchholz == maxBuchholz).ToList();
+                AwardList(hardRoaders, hardRoadBonusScore, " THE HARD ROAD ", $"가시밭길을 걸어온 자 (부흐홀츠 {maxBuchholz})", "#8B4513");
+                yield return new WaitForSeconds(3.5f);
+            }
+        }
+
+        // [10] 파죽지세
+        int maxStreak = currentLeagueParticipants.Max(p => p.maxStreak);
+        if (maxStreak >= 3)
+        {
+            var streakers = currentLeagueParticipants.Where(p => p.maxStreak == maxStreak).ToList();
+            AwardList(streakers, streakerBonusScore, " UNSTOPPABLE ", $"멈출 수 없는 기세 ({maxStreak}연승)", "#FF4500");
+            yield return new WaitForSeconds(3.5f);
+        }
+
+        // --- ★ [누락 수정] 신규 어워드 시상 로직 추가 ---
+
+        // [11] 평화주의자 (The Pacifist)
+        int maxCoop = currentLeagueParticipants.Max(p => p.coopCount);
+        if (maxCoop > 0)
+        {
+            var pacifists = currentLeagueParticipants.Where(p => p.coopCount == maxCoop).ToList();
+            AwardList(pacifists, pacifistsBonusScore, " THE PACIFIST ", $"평화를 사랑하는 마음 ({maxCoop}회 협력)", "#98FB98");
+            yield return new WaitForSeconds(3.5f);
+        }
+
+        // [12] 우성인자 (Dominant Gene)
+        int maxBonus = currentLeagueParticipants.Max(p => p.phaseBonusCount);
+        if (maxBonus > 0)
+        {
+            var dominants = currentLeagueParticipants.Where(p => p.phaseBonusCount == maxBonus).ToList();
+            AwardList(dominants, dominantsBonusScore, " DOMINANT GENE ", $"우월한 생존력 ({maxBonus}회 보너스)", "#FFD700");
             yield return new WaitForSeconds(3.5f);
         }
 
@@ -549,6 +659,7 @@ public class EliminationSwissSurvival : MonoBehaviour
         Vector3 originalPos = eliminationAlertPanel.transform.localPosition;
         float elapsed = 0.0f;
 
+        // 3. 흔들림 효과
         while (elapsed < duration)
         {
             // UI이므로 Z축은 건드리지 않고 X, Y만 흔듦
@@ -577,6 +688,7 @@ public class EliminationSwissSurvival : MonoBehaviour
         }
     }
 
+    // ★ [수정됨] 탈락자 처리 함수
     private void ProcessElimination()
     {
         var sorted = SortParticipants(currentLeagueParticipants);
@@ -593,16 +705,18 @@ public class EliminationSwissSurvival : MonoBehaviour
         if (survivors.Count == 1)
         {
             string winner = survivors[0].ToString();
-            UIManager.I.TrySetText(UI_GROUP, "RankingText", $"<size=60>🏆 최종 우승 🏆</size>\n\n<size=50><color=#FFD700>{winner}</color></size>");
+            UIManager.I.TrySetText(UI_GROUP, "RankingText", $"<size=60> 최종 우승 </size>\n\n<size=50><color=#FFD700>{winner}</color></size>");
         }
     }
 
+    // ★ [수정됨] 스위스 매치업 생성 함수
     private List<Tuple<Participant, Participant>> GenerateSwissPairings(List<Participant> players)
     {
         var sorted = players.OrderByDescending(p => p.score).ThenByDescending(p => p.wins).ThenBy(p => Guid.NewGuid()).ToList();
         var pairs = new List<Tuple<Participant, Participant>>();
         var used = new HashSet<Participant>();
 
+        // 매치업 생성
         for (int i = 0; i < sorted.Count; i++)
         {
             if (used.Contains(sorted[i])) continue;
@@ -647,11 +761,13 @@ public class EliminationSwissSurvival : MonoBehaviour
     {
         private EliminationSwissSurvival _system;
 
+        // 생성자
         public ParticipantComparer(EliminationSwissSurvival system)
         {
             _system = system;
         }
-
+        
+        // 비교 함수
         public int Compare(Participant x, Participant y)
         {
             if (x == y) return 0;
@@ -703,12 +819,26 @@ public class EliminationSwissSurvival : MonoBehaviour
         return winner.beatenOpponents.Contains(loser.id);
     }
 
-    // ★ [수정됨] 랭킹 보드 업데이트 로직 (자이언트 슬레이어, 불사신 추가)
+    // ★ [수정됨] 랭킹 보드 업데이트 로직 (자이언트 슬레이어 모든 달성자 표시)
     private void UpdateRankingBoard(int round, bool final)
     {
         var sorted = SortParticipants(currentLeagueParticipants);
         StringBuilder sb = new StringBuilder();
         
+        // --- 내부 헬퍼 함수 ---
+        void AppendAwardLine(List<Participant> winners, string emoji, string title, string valueDesc)
+        {
+            if (winners == null || winners.Count == 0) return;
+
+            StringBuilder sprites = new StringBuilder();
+            foreach (var p in winners) sprites.Append($"<sprite name=\"{p.id}\">   ");
+
+            string names = string.Join(", ", winners.Select(p => p.id.ToString()));
+            sb.AppendLine($"{emoji} <size=28>{sprites}</size> <b>{title}:</b> {names} <size=18>({valueDesc})</size>");
+        }
+        // -----------------------
+
+        // === 최종 순위 뷰 ===
         if (!final)
         {
             // === [진행 중] 요약 뷰 ===
@@ -721,33 +851,111 @@ public class EliminationSwissSurvival : MonoBehaviour
                 FormatRankLine(sb, sorted[i], i + 1, "#FFD700");
             sb.AppendLine(""); 
 
-            // [B] Highlights (진행 중에만 표시)
+            // [B] Highlights & Awards
             sb.AppendLine("<size=24><color=#98FB98>▼ HIGHLIGHTS & AWARDS ▼</color></size>");
             if (sorted.Count > 0)
             {
-                // 1. 학살자 (The Butcher) - 득실차 1위
-                var butcher = sorted.OrderByDescending(p => p.totalCandleGap).First();
-                sb.AppendLine($"🩸 <b>학살자:</b> {butcher.id} <size=18>(+{butcher.totalCandleGap})</size>");
-                
-                // 2. [추가] 자이언트 슬레이어 - 업셋 포인트 1위
-                var slayer = sorted.OrderByDescending(p => p.upsetScore).First();
-                if (slayer.upsetScore > 0)
-                    sb.AppendLine($"🥊 <b>자이언트 슬레이어:</b> {slayer.id} <size=18>(업셋 {slayer.upsetScore}점)</size>");
+                // 1. 학살자
+                int maxGap = sorted.Max(p => p.totalCandleGap);
+                var butchers = sorted.Where(p => p.totalCandleGap == maxGap).ToList();
+                AppendAwardLine(butchers, "", "학살자", $"+{maxGap}");
 
-                // 3. 종말의 시계 - 특수 승리 횟수 1위
-                var cultist = sorted.OrderByDescending(p => p.sacrificeWins).First();
-                if (cultist.sacrificeWins > 0)
-                    sb.AppendLine($"🕯️ <b>종말의 시계:</b> {cultist.id} <size=18>({cultist.sacrificeWins}회)</size>");
+                // 2. 자이언트 슬레이어 (수정됨: 모든 달성자 표시)
+                // 점수가 높은 순으로 정렬하여 표시
+                var slayers = sorted.Where(p => p.upsetScore > 0).OrderByDescending(p => p.upsetScore).ToList();
+                if (slayers.Count > 0)
+                {
+                    // 커스텀 포맷 (이름 뒤에 점수)
+                    StringBuilder sprites = new StringBuilder();
+                    foreach (var p in slayers) sprites.Append($"<sprite name=\"{p.id}\">   ");
+                    string names = string.Join(", ", slayers.Select(p => $"{p.id}({p.upsetScore})"));
+                    
+                    sb.AppendLine($" <size=28>{sprites}</size> <b>거인 살해자:</b> {names} <size=18></size>");
+                }
 
-                // 4. [추가] 불사신 (The Undying) - 신승(빈사 상태 승리) 횟수 1위
-                var zombie = sorted.OrderByDescending(p => p.closeWins).First();
-                if (zombie.closeWins > 0)
-                    sb.AppendLine($"🧟 <b>불사신:</b> {zombie.id} <size=18>({zombie.closeWins}회 신승)</size>");
+                // 3. 종말의 시계
+                int maxSac = sorted.Max(p => p.sacrificeWins);
+                if (maxSac > 0)
+                {
+                    var cultists = sorted.Where(p => p.sacrificeWins == maxSac).ToList();
+                    AppendAwardLine(cultists, "", "종말의 시계", $"{maxSac}회");
+                }
 
-                // 5. 킹 슬레이어 - Top3 처치 횟수 1위
-                var kingSlayer = sorted.OrderByDescending(p => p.kingSlayerPoints).First();
-                if (kingSlayer.kingSlayerPoints > 0)
-                    sb.AppendLine($"👑 <b>킹 슬레이어:</b> {kingSlayer.id} <size=18>({kingSlayer.kingSlayerPoints}회)</size>");
+                // 4. 불사신
+                int maxClose = sorted.Max(p => p.closeWins);
+                if (maxClose > 0)
+                {
+                    var zombies = sorted.Where(p => p.closeWins == maxClose).ToList();
+                    AppendAwardLine(zombies, "", "불사신", $"{maxClose}회 신승");
+                }
+
+                // 5. 킹 슬레이어
+                int maxKingKills = sorted.Max(p => p.kingSlayerPoints);
+                if (maxKingKills > 0)
+                {
+                    var kingSlayers = sorted.Where(p => p.kingSlayerPoints == maxKingKills).ToList();
+                    AppendAwardLine(kingSlayers, "", "왕위 찬탈자", $"{maxKingKills}회");
+                }
+
+                // 6. 늪의 지배자
+                int maxDraws = sorted.Max(p => p.draws);
+                if (maxDraws > 0)
+                {
+                    var swampMasters = sorted.Where(p => p.draws == maxDraws).ToList();
+                    AppendAwardLine(swampMasters, "", "늪의 지배자", $"{maxDraws}무");
+                }
+
+                // 7. 전광석화
+                int maxFast = sorted.Max(p => p.fastWins);
+                if (maxFast > 0)
+                {
+                    var blitzers = sorted.Where(p => p.fastWins == maxFast).ToList();
+                    AppendAwardLine(blitzers, "", "전광석화", $"{maxFast}회 속공 승");
+                }
+
+                // 8. 완벽주의자
+                int maxPerfect = sorted.Max(p => p.perfectWins);
+                if (maxPerfect > 0)
+                {
+                    var perfectionists = sorted.Where(p => p.perfectWins == maxPerfect).ToList();
+                    AppendAwardLine(perfectionists, "", "완벽주의", $"{maxPerfect}회 퍼펙트");
+                }
+
+                // ★ [수정] 고난의 행군 (상위 3명 제외)
+                if (sorted.Count > 3)
+                {
+                    var candidates = sorted.Skip(3).ToList();
+                    int maxBuchholz = candidates.Max(p => p.buchholz);
+                    if (maxBuchholz > 0)
+                    {
+                        var hardRoaders = candidates.Where(p => p.buchholz == maxBuchholz).ToList();
+                        AppendAwardLine(hardRoaders, "", "고난의 행군", $"B:{maxBuchholz}");
+                    }
+                }
+
+                // 10. 파죽지세
+                int maxStreak = sorted.Max(p => p.maxStreak);
+                if (maxStreak >= 3)
+                {
+                    var streakers = sorted.Where(p => p.maxStreak == maxStreak).ToList();
+                    AppendAwardLine(streakers, "", "파죽지세", $"{maxStreak}연승");
+                }
+
+                // ★ [추가] 11. 평화주의자
+                int maxCoop = sorted.Max(p => p.coopCount);
+                if (maxCoop > 0)
+                {
+                    var pacifists = sorted.Where(p => p.coopCount == maxCoop).ToList();
+                    AppendAwardLine(pacifists, "", "평화의 사도", $"{maxCoop}회 협력");
+                }
+
+                // ★ [추가] 12. 우성인자
+                int maxBonus = sorted.Max(p => p.phaseBonusCount);
+                if (maxBonus > 0)
+                {
+                    var dominants = sorted.Where(p => p.phaseBonusCount == maxBonus).ToList();
+                    AppendAwardLine(dominants, "", "우성인자", $"{maxBonus}회 보너스");
+                }
             }
             sb.AppendLine("");
 
@@ -759,7 +967,7 @@ public class EliminationSwissSurvival : MonoBehaviour
         }
         else
         {
-            // === [최종 결과] 전체 순위 상세 뷰 (Special Award 제거, 전체 리스트 표시) ===
+            // === [최종 결과] 전체 순위 상세 뷰 ===
             string title = (survivors.Count <= 1) ? "최종 우승자" : $"{currentSurvivalRound}회차 최종 순위";
             sb.AppendLine($"<size=40><b>=== {title} ===</b></size>");
             sb.AppendLine("<size=18>우선순위: 승점 > 부흐홀츠 > 승자승 > 티어(Low) > 득실</size>\n");
@@ -769,35 +977,33 @@ public class EliminationSwissSurvival : MonoBehaviour
                 var p = sorted[i];
                 int rank = i + 1;
                 
-                // 1. 랭킹 색상/접두사 설정
                 string color = "white";
-                string prefix = "";
                 
-                if (rank == 1) { color = "#FFD700"; prefix = "👑 "; }
-                else if (rank == 2) { color = "#C0C0C0"; prefix = "🥈 "; }
-                else if (rank == 3) { color = "#CD7F32"; prefix = "🥉 "; }
-                else if (i >= sorted.Count - 3 && sorted.Count > 3) { color = "#FF4500"; prefix = "☠️ "; } // 탈락권
+                if (rank == 1) { color = "#FFD700"; }
+                else if (rank == 2) { color = "#C0C0C0"; }
+                else if (rank == 3) { color = "#CD7F32"; }
+                else if (i >= sorted.Count - 3 && sorted.Count > 3) { color = "#FF4500"; } 
 
-                // 2. 한 줄 출력
-                sb.Append($"<color={color}><size=26><b>{prefix}{rank}위. {p.id}</b></size></color>");
+                string spriteTag = $"<sprite name=\"{p.id}\">   ";
+
+                sb.Append($"<size=28>{spriteTag}</size> <color={color}><size=26><b>{rank}위. {p.id}</b></size></color>");
                 sb.Append($" <size=22>: {p.score}점</size>");
                 sb.Append($" <size=18>(승:{p.wins}, B:{p.buchholz})</size>");
 
-                // 3. 동점자 우선순위 설명 (바로 윗 순위와 점수가 같을 경우)
                 if (i > 0)
                 {
                     var prev = sorted[i - 1];
                     if (prev.score == p.score)
                     {
                         string reason = GetTieBreakerReason(prev, p);
-                        sb.Append($" <size=16><color=#888888>{reason}</color></size>");
+                        sb.Append($" <size=16><color=white>{reason}</color></size>");
                     }
                 }
                 sb.AppendLine();
             }
         }
 
-        // 시스템 코멘트 (랜덤)
+        // 시스템 코멘트
         string[] comments = {
             "\"데이터 분석 결과, 이번 라운드의 이변 확률은 14%였습니다.\"",
             "\"하위권의 생존 본능이 감지됩니다.\"",
@@ -811,14 +1017,15 @@ public class EliminationSwissSurvival : MonoBehaviour
             "\"투자(Investment)의 결실을 맺을 타이밍입니다.\"",
             "\"혼돈(Chaos) 속에서 기회를 찾는 자가 승리합니다.\"",
             "\"시스템이 다음 처형 대상을 계산 중입니다.\"",
-            "\"영원한 동맹도, 영원한 적도 없습니다.\"",
             "\"단 한 번의 실수가 치명적인 결과를 초래합니다.\"",
             "\"당신의 '최애' 참가자는 안전합니까?\"",
             "\"역사는 승리한 자의 기록일 뿐입니다.\"",
             "\"생존이 곧 정의입니다.\""
         };
         
-        sb.AppendLine($"\n<color=#BBBBBB><i>System: {comments[UnityEngine.Random.Range(0, comments.Length)]}</i></color>");
+        // 무작위 선택
+        if (roundHighlights.Count > 0 && !final) sb.AppendLine($"\n<color=black><i>AI해설위원\n → {roundHighlights[UnityEngine.Random.Range(0, roundHighlights.Count)]}</i></color>");
+        else sb.AppendLine($"\n<color=black><i>AI해설위원: {comments[UnityEngine.Random.Range(0, comments.Length)]}</i></color>");
 
         UIManager.I.TrySetText(UI_GROUP, "RankingText", sb.ToString());
     }
@@ -853,20 +1060,17 @@ public class EliminationSwissSurvival : MonoBehaviour
         var data = AgentManager.I.GetAgentData(id);
         return data != null ? data.threatLevel : ThreatLevel.Unstable;
     }
-    // 랭킹 한 줄 포맷팅 헬퍼
+
+    // 헬퍼 메서드 업데이트: Top 3 및 Danger Zone에도 스프라이트 적용
     private void FormatRankLine(StringBuilder sb, Participant p, int rank, string colorHex)
     {
-        // 1등은 왕관, 꼴찌는 해골
-        string prefix = "";
-        if (rank == 1) prefix = "👑 ";
-        else if (rank == 2) prefix = "🥈 ";
-        else if (rank == 3) prefix = "🥉 ";
         
-        // 점수 정보
+        // ★ [추가] 스프라이트 태그
+        string spriteTag = $"<size=28><sprite name=\"{p.id}\"></size>   ";
+
         string info = $"<size=20>: {p.score}점 (승:{p.wins})</size>";
         
-        // 강조
-        sb.AppendLine($"<color={colorHex}><size=28><b>{prefix}{rank}위. {p.id}</b></size></color> {info}");
+        sb.AppendLine($"{spriteTag} <color={colorHex}><size=26><b>{rank}위. {p.id}</b></size></color> {info}");
     }
 
     private IEnumerator ProcessEliminationSequence()
@@ -963,8 +1167,8 @@ public class EliminationSwissSurvival : MonoBehaviour
             string winner = survivors[0].ToString();
             UIManager.I.TrySetText(UI_GROUP, "RankingText", 
                 $"<size=60><color=#FFD700>🏆 최종 생존자 🏆</color></size>\n\n" +
-                $"<size=80><b>{winner}</b></size>\n" +
-                $"<size=30>모든 경쟁자를 물리쳤습니다.</size>");
+                $"<size=70><b>{winner}</b></size>\n" +
+                $"<size=30>수고하셨습니다.</size>");
         }
     }
 }

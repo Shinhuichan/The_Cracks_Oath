@@ -31,13 +31,21 @@ public struct AgentStats
     [Range(0, 100), Tooltip("정보(Recon)를 선점하거나 상대의 흐름(Interrupt)을 끊어 판을 주도하는 능력.")]
     public int Control;         // 통제력
 }
+public enum Gender
+{
+    Male = 0,
+    Female
+}
 
 [CreateAssetMenu(fileName = "AgentData", menuName = "AI/Agent Data", order = 1)]
 public class AgentData : ScriptableObject
 {
     [Header("Identity")]
     public AgentList agentName;
-    public string title;        // 예: "심리전의 여왕"
+    public Gender gender;
+    public int age;
+    public string job;
+    public string title;
     [Preview] public Sprite icon;
     [TextArea(2, 5)] public string description; // 소개 문구
     public ThreatLevel threatLevel; // 종합 위험도

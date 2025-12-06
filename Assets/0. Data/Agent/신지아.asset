@@ -13,8 +13,11 @@ MonoBehaviour:
   m_Name: "\uC2E0\uC9C0\uC544"
   m_EditorClassIdentifier: 
   agentName: 21
+  gender: 1
+  age: 23
+  job: "\uC778\uD50C\uB8E8\uC5B8\uC11C"
   title: The Attention Seeker
-  icon: {fileID: 0}
+  icon: {fileID: 205123127, guid: 58fa24bde228d934aa4bd92d69a5dcd0, type: 3}
   description: "\uADF8\uB140\uC5D0\uAC8C \uC911\uC694\uD55C \uAC74 \uC2B9\uD328\uAC00
     \uC544\uB2C8\uB77C '\uBC29\uC1A1\uAC01'\uC774\uB2E4. \uC9C0\uB8E8\uD55C Doubt\uC774\uB098
     \uD3C9\uBC94\uD55C Cooperation\uC740 \uC9C8\uC0C9\uC774\uB2E4. \uD654\uB824\uD55C
@@ -34,65 +37,5 @@ MonoBehaviour:
     Growth: 40
     Control: 70
   personality: 0
-  elo: 1371.0335785821787
-  records:
-  - verseAgent: 6
-    matchCount: 3002
-    winCount: 1029
-    loseCount: 1919
-    drawCount: 54
-  - verseAgent: 20
-    matchCount: 3002
-    winCount: 1809
-    loseCount: 1151
-    drawCount: 42
-  - verseAgent: 19
-    matchCount: 3002
-    winCount: 1036
-    loseCount: 1920
-    drawCount: 46
-  - verseAgent: 8
-    matchCount: 3002
-    winCount: 1623
-    loseCount: 1331
-    drawCount: 48
-  - verseAgent: 21
-    matchCount: 3002
-    winCount: 1089
-    loseCount: 1867
-    drawCount: 46
-  - verseAgent: 23
-    matchCount: 3002
-    winCount: 1037
-    loseCount: 1906
-    drawCount: 59
-  - verseAgent: 4
-    matchCount: 3002
-    winCount: 1309
-    loseCount: 1644
-    drawCount: 49
-  - verseAgent: 17
-    matchCount: 3002
-    winCount: 1929
-    loseCount: 1029
-    drawCount: 44
-  - verseAgent: 14
-    matchCount: 6004
-    winCount: 2925
-    loseCount: 2970
-    drawCount: 109
-  - verseAgent: 1
-    matchCount: 3002
-    winCount: 1043
-    loseCount: 1894
-    drawCount: 65
-  - verseAgent: 25
-    matchCount: 3002
-    winCount: 1193
-    loseCount: 1754
-    drawCount: 55
-  - verseAgent: 9
-    matchCount: 3002
-    winCount: 1212
-    loseCount: 1753
-    drawCount: 37
+  elo: 1500
+  records: []

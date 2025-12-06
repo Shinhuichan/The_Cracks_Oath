@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e0feac0b93001254b835ecddcb436fd3, type: 3}
+  m_Name: "\uC5E0\uBE0C\uB85C\uC2DC\uC544"
+  m_EditorClassIdentifier: 
+  stockName: "\uC5E0\uBE0C\uB85C\uC2DC\uC544"
+  symbol: AMBR
+  description: "\"\uC2E0\uC758 \uC2DD\uD0C1.\" \uC0C1\uC704 1%\uB9CC\uC744 \uC704\uD55C
+    \uCC9C\uC5F0 \uC790\uC5F0\uC0B0 \uC2DD\uC7AC\uB8CC\uB97C \uCDE8\uAE09\uD558\uB294
+    \uBA85\uD488 \uC2DD\uD488\uAD00\uC785\uB2C8\uB2E4. \uC194\uB77C \uC138\uC77C(\uC694\uD2B8)
+    \uACE0\uAC1D\uB4E4\uC5D0\uAC8C \uCF00\uC774\uD130\uB9C1 \uC11C\uBE44\uC2A4\uB97C
+    \uC81C\uACF5\uD569\uB2C8\uB2E4. \uACBD\uAE30 \uBD88\uD669\uC5D0\uB3C4 \uD0C0\uACA9\uC744
+    \uC785\uC9C0 \uC54A\uC9C0\uB9CC, '\uC0AC\uCE58\uC138' \uB3C4\uC785\uC774\uB098
+    \uADC0\uC871\uC8FC\uC758 \uBE44\uD310 \uC5EC\uB860\uC5D0 \uBBFC\uAC10\uD569\uB2C8\uB2E4."
+  icon: {fileID: 0}
+  startPrice: 150000
+  volatility: 0.03
+  sector: 3
+  totalShares: 7500
+  eventPotential: 0.5
+  eventWeight: 1.5
+  dividendPerShare: 200

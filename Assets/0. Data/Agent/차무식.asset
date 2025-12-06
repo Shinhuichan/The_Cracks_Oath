@@ -13,8 +13,11 @@ MonoBehaviour:
   m_Name: "\uCC28\uBB34\uC2DD"
   m_EditorClassIdentifier: 
   agentName: 16
+  gender: 0
+  age: 38
+  job: "\uC2A4\uD134\uD2B8\uB9E8"
   title: The Survivor
-  icon: {fileID: 1055912845, guid: a6281a5e270526b4c97596b97ee94190, type: 3}
+  icon: {fileID: 365336617, guid: 58fa24bde228d934aa4bd92d69a5dcd0, type: 3}
   description: "\uC548 \uC8FD\uC73C\uBA74 \uADF8\uB9CC\uC774\uC57C.\" \uADF8\uB294
     \uBF08\uAC00 \uBD80\uB7EC\uC9C0\uB294 \uACE0\uD1B5 \uC18D\uC5D0\uC11C\uB3C4 \uC6C3\uB294\uB2E4.
     \uADF8\uB294 \uC790\uC2E0\uC758 \uC591\uCD08\uAC00 \uBC18 \uC774\uC0C1\uC77C
@@ -25,7 +28,7 @@ MonoBehaviour:
     \uC801\uC911\uB960\uC774 \uAE30\uC774\uD558\uAC8C \uB192\uC544\uC9C0\uBA70, \uC790\uC2E0\uC758
     \uC0B4\uC744 \uAE4E\uB294 Sacrifice\uB97C \uC8FC\uB825\uC73C\uB85C \uC0AC\uC6A9\uD574
     \uD2B9\uC218 \uC2B9\uB9AC\uAC01\uC744 \uB9E4\uC12D\uAC8C \uB178\uB9B0\uB2E4."
-  threatLevel: 6
+  threatLevel: 5
   stats:
     Judgment: 88
     Aggressive: 80
@@ -34,120 +37,5 @@ MonoBehaviour:
     Growth: 90
     Control: 75
   personality: 0
-  elo: 2124.9352552849873
-  records:
-  - verseAgent: 20
-    matchCount: 13002
-    winCount: 8175
-    loseCount: 4636
-    drawCount: 191
-  - verseAgent: 2
-    matchCount: 10000
-    winCount: 5885
-    loseCount: 3923
-    drawCount: 192
-  - verseAgent: 1
-    matchCount: 61034
-    winCount: 30757
-    loseCount: 28946
-    drawCount: 1331
-  - verseAgent: 12
-    matchCount: 52028
-    winCount: 27746
-    loseCount: 23217
-    drawCount: 1065
-  - verseAgent: 15
-    matchCount: 49026
-    winCount: 25805
-    loseCount: 22145
-    drawCount: 1076
-  - verseAgent: 11
-    matchCount: 88052
-    winCount: 40592
-    loseCount: 45652
-    drawCount: 1808
-  - verseAgent: 5
-    matchCount: 85050
-    winCount: 38512
-    loseCount: 44714
-    drawCount: 1824
-  - verseAgent: 9
-    matchCount: 16004
-    winCount: 8864
-    loseCount: 6824
-    drawCount: 316
-  - verseAgent: 3
-    matchCount: 70040
-    winCount: 35238
-    loseCount: 33376
-    drawCount: 1426
-  - verseAgent: 6
-    matchCount: 52028
-    winCount: 26792
-    loseCount: 24175
-    drawCount: 1061
-  - verseAgent: 8
-    matchCount: 10000
-    winCount: 6194
-    loseCount: 3605
-    drawCount: 201
-  - verseAgent: 4
-    matchCount: 30020
-    winCount: 15291
-    loseCount: 14064
-    drawCount: 665
-  - verseAgent: 13
-    matchCount: 39026
-    winCount: 19445
-    loseCount: 18727
-    drawCount: 854
-  - verseAgent: 7
-    matchCount: 15010
-    winCount: 8424
-    loseCount: 6306
-    drawCount: 280
-  - verseAgent: 19
-    matchCount: 15010
-    winCount: 8020
-    loseCount: 6676
-    drawCount: 314
-  - verseAgent: 24
-    matchCount: 69046
-    winCount: 34032
-    loseCount: 33497
-    drawCount: 1517
-  - verseAgent: 22
-    matchCount: 9006
-    winCount: 5668
-    loseCount: 3182
-    drawCount: 156
-  - verseAgent: 21
-    matchCount: 9006
-    winCount: 4976
-    loseCount: 3850
-    drawCount: 180
-  - verseAgent: 23
-    matchCount: 9006
-    winCount: 5014
-    loseCount: 3811
-    drawCount: 181
-  - verseAgent: 25
-    matchCount: 9006
-    winCount: 4776
-    loseCount: 4039
-    drawCount: 191
-  - verseAgent: 17
-    matchCount: 3002
-    winCount: 1724
-    loseCount: 1236
-    drawCount: 42
-  - verseAgent: 14
-    matchCount: 6004
-    winCount: 3660
-    loseCount: 2219
-    drawCount: 125
-  - verseAgent: 18
-    matchCount: 3002
-    winCount: 1708
-    loseCount: 1234
-    drawCount: 60
+  elo: 1500
+  records: []

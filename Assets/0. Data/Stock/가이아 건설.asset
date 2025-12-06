@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e0feac0b93001254b835ecddcb436fd3, type: 3}
+  m_Name: "\uAC00\uC774\uC544 \uAC74\uC124"
+  m_EditorClassIdentifier: 
+  stockName: "\uAC00\uC774\uC544 \uAC74\uC124"
+  symbol: GAIA
+  description: "\"\uD589\uC131\uC758 \uC870\uAC01\uAC00.\" \uCC99\uBC15\uD55C \uD589\uC131\uC744
+    \uC81C2\uC758 \uC9C0\uAD6C\uB85C \uB9CC\uB4DC\uB294 \uD14C\uB77C\uD3EC\uBC0D
+    \uC804\uBB38 \uAE30\uC5C5\uC785\uB2C8\uB2E4. \uC9C8\uB9AC\uC544\uC2A4 \uC5D0\uB108\uC9C0\uB85C\uBD80\uD130
+    \uB9C9\uB300\uD55C \uC790\uC7AC\uB97C \uACF5\uAE09\uBC1B\uACE0, \uADF8\uB9B0
+    \uB7A9(\uC2DD\uBB3C)\uACFC \uD611\uB825\uD558\uC5EC \uC232\uC744 \uC870\uC131\uD569\uB2C8\uB2E4.
+    \uCF54\uC5B4 \uD4E8\uC804\uC758 \uC778\uACF5 \uD0DC\uC591 \uAE30\uC220\uC744
+    \uB3C4\uC785\uD558\uB824 \uD558\uC9C0\uB9CC \uC548\uC804\uC131 \uBB38\uC81C\uB85C
+    \uAC08\uB4F1\uC744 \uBE5A\uACE0 \uC788\uC2B5\uB2C8\uB2E4."
+  icon: {fileID: 0}
+  startPrice: 11000
+  volatility: 0.05
+  sector: 4
+  totalShares: 100000
+  eventPotential: 1.4
+  eventWeight: 5
+  dividendPerShare: 0

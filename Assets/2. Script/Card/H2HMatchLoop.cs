@@ -197,7 +197,7 @@ public class H2HMatchLoop : MonoBehaviour
         if (p2LoseText) p2LoseText.text = $"Lose: {p1Wins}";
     }
 
-    // 배치 시뮬레이션 결과 전달용 구조체
+    // BatchResult 구조체 수정
     public struct BatchResult
     {
         public int p1Wins;
@@ -206,11 +206,22 @@ public class H2HMatchLoop : MonoBehaviour
         public int p1Candles;
         public int p2Candles;
         
-        // ★ [추가] 신규 어워드용 정밀 데이터
-        public int p1SacrificeWins; // P1의 Sacrifice 승리 횟수
+        public int p1SacrificeWins;
         public int p2SacrificeWins;
-        public int p1CloseWins;     // P1의 신승(HP <= 2) 횟수
+        public int p1CloseWins;
         public int p2CloseWins;
+
+        // ★ [추가] 신규 통계 데이터
+        public int p1PerfectWins; // 퍼펙트 승리 (체력 만땅)
+        public int p2PerfectWins;
+        public int p1FastWins;    // 5라운드 이내 승리
+        public int p2FastWins;
+
+        // ★ [추가] 신규 어워드 집계용 데이터
+        public int p1CoopCount;       // P1 협력 횟수
+        public int p2CoopCount;       // P2 협력 횟수
+        public int p1PhaseBonusCount; // P1 페이즈 보너스 획득 횟수
+        public int p2PhaseBonusCount; // P2 페이즈 보너스 획득 횟수
     }
 
     // [RunBatchSimulation 메서드 수정]
@@ -248,6 +259,15 @@ public class H2HMatchLoop : MonoBehaviour
             {
                 safety++;
                 cardSystem.ResolveRoundAuto(agent1, agent2, ctx1, ctx2);
+
+                // ★ [수정] 협력 횟수 카운트 (CardSystem이 갱신된 직후 확인)
+                if (cardSystem.lastSubmittedP1 == CardType.Cooperation) result.p1CoopCount++;
+                if (cardSystem.lastSubmittedP2 == CardType.Cooperation) result.p2CoopCount++;
+                
+                // ★ [수정] 우성인자 카운트 (CardSystem의 명확한 플래그 확인)
+                if (cardSystem.PhaseBonusAppliedP1) result.p1PhaseBonusCount++;
+                if (cardSystem.PhaseBonusAppliedP2) result.p2PhaseBonusCount++;
+
                 UpdateContext(ref ctx1, cardSystem.playerILife, cardSystem.playerIILife, cardSystem.lastSubmittedP1, cardSystem.lastSubmittedP2, cardSystem.roundCounter);
                 UpdateContext(ref ctx2, cardSystem.playerIILife, cardSystem.playerILife, cardSystem.lastSubmittedP2, cardSystem.lastSubmittedP1, cardSystem.roundCounter);
             }
@@ -276,25 +296,32 @@ public class H2HMatchLoop : MonoBehaviour
             result.p1Candles += cardSystem.playerILife;
             result.p2Candles += cardSystem.playerIILife;
 
-            // ★ [정밀 구현] 어워드 데이터 집계
+            // ★ [추가] 신규 어워드 집계
             if (p1Win)
             {
-                // Doomsday Clock: CardSystem의 실제 플래그 확인
+                result.p1Wins++;
                 if (cardSystem.IsSacrificeWinP1) result.p1SacrificeWins++;
-                
-                // The Undying: 승리했으나 체력이 3 이하인 경우
                 if (cardSystem.playerILife <= 3) result.p1CloseWins++;
+
+                // [NEW] 완벽주의자 (체력 손실 없음)
+                if (cardSystem.playerILife >= cardSystem.startLife) result.p1PerfectWins++;
+                
+                // [NEW] 전광석화 (5라운드 이내 승리)
+                if (cardSystem.roundCounter <= 5) result.p1FastWins++;
             }
             else if (p2Win)
             {
+                result.p2Wins++;
                 if (cardSystem.IsSacrificeWinP2) result.p2SacrificeWins++;
-                if (cardSystem.playerIILife <= 2) result.p2CloseWins++;
-            }
+                if (cardSystem.playerIILife <= 3) result.p2CloseWins++;
 
-            if (Time.realtimeSinceStartup - startTime > timeBudget)
+                // [NEW]
+                if (cardSystem.playerIILife >= cardSystem.startLife) result.p2PerfectWins++;
+                if (cardSystem.roundCounter <= 5) result.p2FastWins++;
+            }
+            else
             {
-                yield return null;
-                startTime = Time.realtimeSinceStartup;
+                result.draws++; // 무승부 카운트 (늪의 지배자용)
             }
         }
 

@@ -13,8 +13,11 @@ MonoBehaviour:
   m_Name: "\uAC15\uC740\uD638"
   m_EditorClassIdentifier: 
   agentName: 14
+  gender: 0
+  age: 32
+  job: "\uD68C\uACC4\uC0AC"
   title: The Actuary
-  icon: {fileID: -1501846616, guid: a6281a5e270526b4c97596b97ee94190, type: 3}
+  icon: {fileID: 1512962892, guid: 58fa24bde228d934aa4bd92d69a5dcd0, type: 3}
   description: "\uADF8\uC758 \uC138\uACC4\uB294 \uC9C8\uC11C\uC640 \uADE0\uD615\uC73C\uB85C
     \uC774\uB8E8\uC5B4\uC838 \uC788\uB2E4. \uC190\uD328\uC758 \uBE44\uC728, \uB371\uC758
     \uB0A8\uC740 \uCE74\uB4DC \uC218, \uC591\uCD08 \uC190\uC775\u2014all \uACC4\uC0B0\uB418\uC5B4
@@ -29,7 +32,7 @@ MonoBehaviour:
     \uD68C\uBCF5\uC774 \uB290\uB9AC\uB2E4. \uC548\uC804\uC744 \uC0AC\uB791\uD558\uB294
     \uADF8\uC5D0\uAC8C, \uC774 \uAC8C\uC784\uC740 \uC218\uD559\uC774 \uC544\uB2C8\uB77C
     \uC2A4\uD2B8\uB808\uC2A4\uB2E4."
-  threatLevel: 1
+  threatLevel: 2
   stats:
     Judgment: 60
     Aggressive: 20
@@ -38,125 +41,5 @@ MonoBehaviour:
     Growth: 40
     Control: 30
   personality: 3
-  elo: 1042.968245480674
-  records:
-  - verseAgent: 8
-    matchCount: 31012
-    winCount: 17104
-    loseCount: 13362
-    drawCount: 546
-  - verseAgent: 3
-    matchCount: 10000
-    winCount: 3028
-    loseCount: 6765
-    drawCount: 207
-  - verseAgent: 6
-    matchCount: 16004
-    winCount: 5471
-    loseCount: 10236
-    drawCount: 297
-  - verseAgent: 1
-    matchCount: 6004
-    winCount: 2020
-    loseCount: 3865
-    drawCount: 119
-  - verseAgent: 17
-    matchCount: 12008
-    winCount: 7804
-    loseCount: 3999
-    drawCount: 205
-  - verseAgent: 21
-    matchCount: 18012
-    winCount: 7012
-    loseCount: 10674
-    drawCount: 326
-  - verseAgent: 2
-    matchCount: 33022
-    winCount: 14753
-    loseCount: 17637
-    drawCount: 632
-  - verseAgent: 7
-    matchCount: 18012
-    winCount: 7618
-    loseCount: 10056
-    drawCount: 338
-  - verseAgent: 20
-    matchCount: 12008
-    winCount: 7296
-    loseCount: 4558
-    drawCount: 154
-  - verseAgent: 18
-    matchCount: 33022
-    winCount: 16441
-    loseCount: 15960
-    drawCount: 621
-  - verseAgent: 9
-    matchCount: 27018
-    winCount: 11456
-    loseCount: 15082
-    drawCount: 480
-  - verseAgent: 22
-    matchCount: 36024
-    winCount: 18108
-    loseCount: 17236
-    drawCount: 680
-  - verseAgent: 5
-    matchCount: 3002
-    winCount: 826
-    loseCount: 2115
-    drawCount: 61
-  - verseAgent: 11
-    matchCount: 3002
-    winCount: 836
-    loseCount: 2125
-    drawCount: 41
-  - verseAgent: 15
-    matchCount: 12008
-    winCount: 4147
-    loseCount: 7643
-    drawCount: 218
-  - verseAgent: 4
-    matchCount: 9006
-    winCount: 3908
-    loseCount: 4957
-    drawCount: 141
-  - verseAgent: 13
-    matchCount: 6004
-    winCount: 2149
-    loseCount: 3757
-    drawCount: 98
-  - verseAgent: 24
-    matchCount: 3002
-    winCount: 1025
-    loseCount: 1915
-    drawCount: 62
-  - verseAgent: 12
-    matchCount: 9006
-    winCount: 3501
-    loseCount: 5336
-    drawCount: 169
-  - verseAgent: 10
-    matchCount: 3002
-    winCount: 2079
-    loseCount: 879
-    drawCount: 44
-  - verseAgent: 19
-    matchCount: 9006
-    winCount: 3182
-    loseCount: 5673
-    drawCount: 151
-  - verseAgent: 23
-    matchCount: 21014
-    winCount: 7412
-    loseCount: 13211
-    drawCount: 391
-  - verseAgent: 16
-    matchCount: 6004
-    winCount: 2219
-    loseCount: 3660
-    drawCount: 125
-  - verseAgent: 25
-    matchCount: 3002
-    winCount: 1239
-    loseCount: 1709
-    drawCount: 54
+  elo: 1500
+  records: []

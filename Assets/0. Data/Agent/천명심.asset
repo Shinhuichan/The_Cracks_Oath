@@ -13,8 +13,11 @@ MonoBehaviour:
   m_Name: "\uCC9C\uBA85\uC2EC"
   m_EditorClassIdentifier: 
   agentName: 18
+  gender: 1
+  age: 55
+  job: "\uBB34\uC18D\uC778"
   title: The Mystic
-  icon: {fileID: 390778882, guid: a6281a5e270526b4c97596b97ee94190, type: 3}
+  icon: {fileID: 1567121097, guid: 58fa24bde228d934aa4bd92d69a5dcd0, type: 3}
   description: "\"\uC624\uB298\uC740 \uBC14\uB78C\uC774 \uBD88\uAE38\uD558\uAD6C\uB098.\"
     \uADF8\uB140\uB294 \uC790\uC2E0\uC758 \uC190\uD328\uAC00 \uC544\uB2C8\uB77C **\uD604\uC7AC\uC758
     'Disaster(\uC7AC\uD574)'**\uB97C \uBCF4\uACE0 \uCE74\uB4DC\uB97C \uB0B8\uB2E4.
@@ -34,55 +37,5 @@ MonoBehaviour:
     Growth: 40
     Control: 40
   personality: 0
-  elo: 1485.7263149005255
-  records:
-  - verseAgent: 8
-    matchCount: 10000
-    winCount: 4959
-    loseCount: 4841
-    drawCount: 200
-  - verseAgent: 3
-    matchCount: 10000
-    winCount: 3767
-    loseCount: 6053
-    drawCount: 180
-  - verseAgent: 13
-    matchCount: 10000
-    winCount: 3858
-    loseCount: 5948
-    drawCount: 194
-  - verseAgent: 9
-    matchCount: 10000
-    winCount: 4565
-    loseCount: 5250
-    drawCount: 185
-  - verseAgent: 14
-    matchCount: 10000
-    winCount: 4872
-    loseCount: 4936
-    drawCount: 192
-  - verseAgent: 17
-    matchCount: 10000
-    winCount: 5352
-    loseCount: 4456
-    drawCount: 192
-  - verseAgent: 20
-    matchCount: 10000
-    winCount: 5807
-    loseCount: 4022
-    drawCount: 171
-  - verseAgent: 19
-    matchCount: 10000
-    winCount: 4044
-    loseCount: 5759
-    drawCount: 197
-  - verseAgent: 10
-    matchCount: 10000
-    winCount: 5806
-    loseCount: 4010
-    drawCount: 184
-  - verseAgent: 2
-    matchCount: 10000
-    winCount: 4711
-    loseCount: 5135
-    drawCount: 154
+  elo: 1500
+  records: []

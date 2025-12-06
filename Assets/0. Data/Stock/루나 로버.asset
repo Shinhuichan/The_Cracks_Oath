@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e0feac0b93001254b835ecddcb436fd3, type: 3}
+  m_Name: "\uB8E8\uB098 \uB85C\uBC84"
+  m_EditorClassIdentifier: 
+  stockName: "\uB8E8\uB098 \uB85C\uBC84"
+  symbol: LUNA
+  description: "\"\uBBF8\uC9C0\uC758 \uD0D0\uD5D8\uAC00.\" \uB2EC, \uD654\uC131 \uB4F1
+    \uCC99\uBC15\uD55C \uD658\uACBD\uC5D0\uC11C \uD65C\uB3D9\uD558\uB294 \uD0D0\uC0AC
+    \uB85C\uBD07\uC744 \uC81C\uC791\uD569\uB2C8\uB2E4. \uBCF4\uC774\uB4DC \uD558\uC6B8\uC774
+    \uC6B4\uC1A1\uD574\uC8FC\uACE0 \uB125\uC11C\uC2A4 \uBD07\uC774 \uBD80\uD488\uC744
+    \uACF5\uAE09\uD558\uB294 \uAD6C\uC870\uC785\uB2C8\uB2E4. \uD76C\uD1A0\uB958\uB098
+    \uC678\uACC4 \uBB38\uBA85\uC758 \uD754\uC801\uC744 \uBC1C\uACAC\uD558\uBA74 \uC8FC\uAC00\uAC00
+    \uCC9C\uC815\uBD80\uC9C0\uB85C \uCE58\uC19F\uC9C0\uB9CC, \uD0D0\uC0AC \uC2E4\uD328
+    \uC2DC \uB9C9\uB300\uD55C \uC190\uC2E4\uC744 \uC785\uC2B5\uB2C8\uB2E4."
+  icon: {fileID: 0}
+  startPrice: 4800
+  volatility: 0.13
+  sector: 2
+  totalShares: 150000
+  eventPotential: 2.1
+  eventWeight: 5.8
+  dividendPerShare: 0

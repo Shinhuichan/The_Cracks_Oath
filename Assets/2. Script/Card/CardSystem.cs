@@ -247,6 +247,10 @@ namespace GameCore
         public int lastCardDeltaP1, lastCardDeltaP2;         // 카드/혼합 효과로 변한 HP
         public int lastDisasterDeltaP1, lastDisasterDeltaP2; // 자연재해로 변한 HP
 
+        // 클래스 멤버 변수 추가
+        public bool PhaseBonusAppliedP1 { get; private set; }
+        public bool PhaseBonusAppliedP2 { get; private set; }
+
         // ▼▼▼ [이 부분을 추가해주세요] ▼▼▼
         public void ManualInitialize()
         {
@@ -351,6 +355,8 @@ namespace GameCore
         public void ResolveRoundByIndex(int p1Index, int p2Index)
         {
             phaseBonusAppliedThisRound = false;
+            PhaseBonusAppliedP1 = false;        // ★ [추가] 외부 공개용 플래그 초기화
+            PhaseBonusAppliedP2 = false;        // ★ [추가] 외부 공개용 플래그 초기화
             if (playerILost || playerIILost) return;
 
             StormCheckedThisRound = false;
@@ -1179,8 +1185,16 @@ namespace GameCore
             if ((roundCounter - 1) % disasterSpan != 0) return;
             if (phaseBonusAppliedThisRound) return;
 
-            if (playerILife > playerIILife) playerILife += 1;
-            else if (playerIILife > playerILife) playerIILife += 1;
+            if (playerILife > playerIILife) 
+            {
+                playerILife += 1;
+                PhaseBonusAppliedP1 = true; // ★ [추가] P1 보너스 획득 표시
+            }
+            else if (playerIILife > playerILife) 
+            {
+                playerIILife += 1;
+                PhaseBonusAppliedP2 = true; // ★ [추가] P2 보너스 획득 표시
+            }
             // 동점이면 아무도 보너스 없음
 
             phaseBonusAppliedThisRound = true;

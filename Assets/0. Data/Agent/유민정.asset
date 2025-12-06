@@ -13,8 +13,11 @@ MonoBehaviour:
   m_Name: "\uC720\uBBFC\uC815"
   m_EditorClassIdentifier: 
   agentName: 8
+  gender: 1
+  age: 22
+  job: "\uB300\uD559\uC0DD"
   title: Iron Wall
-  icon: {fileID: 591627783, guid: a6281a5e270526b4c97596b97ee94190, type: 3}
+  icon: {fileID: 1304002832, guid: 58fa24bde228d934aa4bd92d69a5dcd0, type: 3}
   description: "\uADF8\uB140\uB294 \uC2A4\uC2A4\uB85C\uB97C \u2018\uC8FC\uC778\uACF5\u2019\uC774\uB77C
     \uC0DD\uAC01\uD558\uC9C0 \uC54A\uB294\uB2E4. \uB298 \uD0C0\uC778\uC758 \uD750\uB984\uC744
     \uC77D\uACE0 \uB530\uB77C\uAC04\uB2E4. \uC218\uBE44\uD615 \uD50C\uB808\uC774\uC5B4\uC9C0\uB9CC,
@@ -39,20 +42,5 @@ MonoBehaviour:
     Growth: 30
     Control: 20
   personality: 3
-  elo: 1442.6229702202504
-  records:
-  - verseAgent: 4
-    matchCount: 129
-    winCount: 75
-    loseCount: 48
-    drawCount: 6
-  - verseAgent: 14
-    matchCount: 13000
-    winCount: 5647
-    loseCount: 7133
-    drawCount: 220
-  - verseAgent: 15
-    matchCount: 10000
-    winCount: 2864
-    loseCount: 6989
-    drawCount: 147
+  elo: 1500
+  records: []

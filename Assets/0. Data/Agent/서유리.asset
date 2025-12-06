@@ -13,8 +13,11 @@ MonoBehaviour:
   m_Name: "\uC11C\uC720\uB9AC"
   m_EditorClassIdentifier: 
   agentName: 13
+  gender: 1
+  age: 27
+  job: "\uD328\uD134 \uC5F0\uAD6C\uAE30"
   title: Pattern Breaker
-  icon: {fileID: -49012438, guid: a6281a5e270526b4c97596b97ee94190, type: 3}
+  icon: {fileID: -2019568353, guid: 58fa24bde228d934aa4bd92d69a5dcd0, type: 3}
   description: "\uADF8\uB140\uC758 \uB208\uC5D4 \uBAA8\uB4E0 \uBC18\uBCF5\uC774 \u2018\uD328\uBC30\u2019\uB85C
     \uBCF4\uC778\uB2E4. \uAC19\uC740 \uD589\uB3D9\uC744 \uB450 \uBC88 \uD558\uC9C0
     \uC54A\uB294\uB2E4. \uC0C1\uB300\uC758 \uD328\uD134\uC744 \uD0D0\uC9C0\uD558\uBA74
@@ -38,125 +41,5 @@ MonoBehaviour:
     Growth: 50
     Control: 92
   personality: 5
-  elo: 1611.754069099151
-  records:
-  - verseAgent: 12
-    matchCount: 56324
-    winCount: 28236
-    loseCount: 26889
-    drawCount: 1199
-  - verseAgent: 7
-    matchCount: 32008
-    winCount: 16991
-    loseCount: 14411
-    drawCount: 606
-  - verseAgent: 11
-    matchCount: 58032
-    winCount: 23842
-    loseCount: 33031
-    drawCount: 1159
-  - verseAgent: 18
-    matchCount: 16004
-    winCount: 9497
-    loseCount: 6189
-    drawCount: 318
-  - verseAgent: 6
-    matchCount: 50020
-    winCount: 23997
-    loseCount: 25003
-    drawCount: 1020
-  - verseAgent: 19
-    matchCount: 40020
-    winCount: 20231
-    loseCount: 19000
-    drawCount: 789
-  - verseAgent: 3
-    matchCount: 46024
-    winCount: 21034
-    loseCount: 24103
-    drawCount: 887
-  - verseAgent: 5
-    matchCount: 49026
-    winCount: 20028
-    loseCount: 28034
-    drawCount: 964
-  - verseAgent: 1
-    matchCount: 40020
-    winCount: 18700
-    loseCount: 20469
-    drawCount: 851
-  - verseAgent: 20
-    matchCount: 10000
-    winCount: 6446
-    loseCount: 3432
-    drawCount: 122
-  - verseAgent: 9
-    matchCount: 22008
-    winCount: 12201
-    loseCount: 9435
-    drawCount: 372
-  - verseAgent: 2
-    matchCount: 16004
-    winCount: 9454
-    loseCount: 6250
-    drawCount: 300
-  - verseAgent: 15
-    matchCount: 43022
-    winCount: 21013
-    loseCount: 21116
-    drawCount: 893
-  - verseAgent: 13
-    matchCount: 1608
-    winCount: 792
-    loseCount: 788
-    drawCount: 28
-  - verseAgent: 4
-    matchCount: 42028
-    winCount: 21452
-    loseCount: 19813
-    drawCount: 763
-  - verseAgent: 16
-    matchCount: 39026
-    winCount: 18727
-    loseCount: 19445
-    drawCount: 854
-  - verseAgent: 24
-    matchCount: 42028
-    winCount: 19419
-    loseCount: 21587
-    drawCount: 1022
-  - verseAgent: 21
-    matchCount: 27018
-    winCount: 14425
-    loseCount: 12147
-    drawCount: 446
-  - verseAgent: 17
-    matchCount: 6004
-    winCount: 3802
-    loseCount: 2114
-    drawCount: 88
-  - verseAgent: 14
-    matchCount: 6004
-    winCount: 3757
-    loseCount: 2149
-    drawCount: 98
-  - verseAgent: 23
-    matchCount: 24016
-    winCount: 12291
-    loseCount: 11216
-    drawCount: 509
-  - verseAgent: 25
-    matchCount: 18012
-    winCount: 9856
-    loseCount: 7808
-    drawCount: 348
-  - verseAgent: 22
-    matchCount: 3002
-    winCount: 1924
-    loseCount: 1021
-    drawCount: 57
-  - verseAgent: 8
-    matchCount: 3002
-    winCount: 1966
-    loseCount: 986
-    drawCount: 50
+  elo: 1500
+  records: []

@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e0feac0b93001254b835ecddcb436fd3, type: 3}
+  m_Name: "\uC624\uAC00\uB2C9 \uD31C"
+  m_EditorClassIdentifier: 
+  stockName: "\uC624\uAC00\uB2C9 \uD31C"
+  symbol: ORGA
+  description: "\"\uB300\uC9C0\uC758 \uACE0\uC9D1.\" \uC5B4\uB5A0\uD55C \uC720\uC804\uC790
+    \uC870\uC791\uC774\uB098 \uAE30\uACC4\uC801 \uACF5\uC815\uB3C4 \uAC70\uBD80\uD558\uACE0,
+    \uD759\uC5D0\uC11C \uC9C1\uC811 \uD0A4\uC6B4 \uB18D\uC791\uBB3C\uB9CC \uACE0\uC9D1\uD569\uB2C8\uB2E4.
+    \uC0DD\uC0B0\uB7C9\uC740 \uC801\uC9C0\uB9CC \uADF8\uB9B0 \uB7A9(\uC778\uACF5
+    \uC2DD\uB7C9)\uC5D0 \uAC70\uBD80\uAC10\uC744 \uB290\uB080 \uC18C\uBE44\uC790\uB4E4\uC758
+    \uC9C0\uC9C0\uB97C \uBC1B\uC2B5\uB2C8\uB2E4. \uAE30\uD6C4 \uBCC0\uD654\uB098
+    \uBCD1\uCDA9\uD574\uC5D0 \uAC00\uC7A5 \uCDE8\uC57D\uD569\uB2C8\uB2E4."
+  icon: {fileID: 0}
+  startPrice: 22000
+  volatility: 0.04
+  sector: 3
+  totalShares: 45000
+  eventPotential: 0.6
+  eventWeight: 1.8
+  dividendPerShare: 60

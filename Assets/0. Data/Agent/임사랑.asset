@@ -13,8 +13,11 @@ MonoBehaviour:
   m_Name: "\uC784\uC0AC\uB791"
   m_EditorClassIdentifier: 
   agentName: 17
+  gender: 1
+  age: 26
+  job: "\uC0AC\uD68C\uBCF5\uC9C0\uC0AC"
   title: The Saint
-  icon: {fileID: -1457779307, guid: a6281a5e270526b4c97596b97ee94190, type: 3}
+  icon: {fileID: -1302292916, guid: 58fa24bde228d934aa4bd92d69a5dcd0, type: 3}
   description: "\"\uC6B0\uB9B0 \uC2F8\uC6B0\uB7EC \uC628 \uAC8C \uC544\uB2C8\uC5D0\uC694.\"
     \uADF8\uB140\uC758 \uC0AC\uC804\uC5D0\uB294 '\uACF5\uACA9'\uC774 \uC5C6\uB2E4.
     \uADF8\uB140\uB294 \uC5B4\uB5A4 \uC0C1\uD669\uC5D0\uC11C\uB3C4 Betrayal\uC774\uB098
