@@ -25,7 +25,7 @@ MonoBehaviour:
   startPrice: 8200
   volatility: 0.11
   sector: 5
-  totalShares: 125000
-  eventPotential: 2.2
-  eventWeight: 6.2
+  totalShares: 20000000
+  eventPotential: 1
+  eventWeight: 3
   dividendPerShare: 0

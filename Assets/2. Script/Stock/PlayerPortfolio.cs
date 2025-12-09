@@ -6,11 +6,23 @@ public class PlayerPortfolio : MonoBehaviour
 {
     [Header("Player Assets")]
     public long money = 100000; 
-    public long currentDebt = 0; // ➕ [신규] 현재 대출금 (빚)
+    public long currentDebt = 0; // 현재 대출금 (빚)
 
     [Header("Loan Settings")]
     [Range(0f, 1.0f)] public float loanLimitRatio = 0.5f; // 자산의 50%까지 대출 가능
-    public float loanInterestRate = 0.005f; // 매 턴이자 0.5% (꽤 쎔)
+
+    // ➕ [신규] 플레이어 마지막 행동 기록
+    public string lastActionLog = "아직 거래 내역이 없습니다.";
+
+    // [변경] 시장 금리를 받아오는 프로퍼티
+    public float loanInterestRate 
+    {
+        get 
+        { 
+            if (market != null) return market.GetCurrentLoanRate(); 
+            return 0.05f; // 기본값
+        }
+    }
 
     // 보유 주식 목록
     private Dictionary<StockData, int> myStocks = new Dictionary<StockData, int>();
@@ -35,6 +47,12 @@ public class PlayerPortfolio : MonoBehaviour
     {
         if (myStocks.ContainsKey(data)) myStocks[data] += amount;
         else myStocks.Add(data, amount);
+    }
+
+    // ➕ [신규] 행동 기록 업데이트 함수 (StockMarketManager에서 호출)
+    public void SetLastAction(string action)
+    {
+        lastActionLog = action;
     }
 
     // 주식 매도 (Long 청산)

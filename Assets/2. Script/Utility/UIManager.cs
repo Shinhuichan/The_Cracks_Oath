@@ -13,6 +13,8 @@ using UnityEngine.Events;
 
 // ➕ [추가] 입력창 (InputField)
 [System.Serializable] public struct InputTool { public string inputName; public TMP_InputField input; }
+// ➕ [추가] 슬라이더 (Slider)
+[System.Serializable] public struct SliderTool { public string sliderName; public Slider slider; }
 
 // ➕ [추가] 통짜 오브젝트 (패널, 부모 객체 등)
 [System.Serializable] public struct ObjectTool { public string objectName; public GameObject obj; }
@@ -26,6 +28,7 @@ public struct UITool
     public List<ButtonTool> button;
     public List<InputTool> input;   // ➕ 추가됨
     public List<ObjectTool> obj;    // ➕ 추가됨
+    public List<SliderTool> slider; // ➕ 추가됨
 }
 #endregion
 
@@ -49,6 +52,7 @@ public class UIManager : SingletonBehaviour<UIManager>
         public readonly Dictionary<string, Button> buttons = new();
         public readonly Dictionary<string, TMP_InputField> inputs = new(); // ➕
         public readonly Dictionary<string, GameObject> objects = new();    // ➕
+        public readonly Dictionary<string, Slider> sliders = new(); // ➕ [추가] 슬라이더 딕셔너리
     }
     private readonly Dictionary<string, GroupMaps> _groups = new();
 
@@ -80,6 +84,10 @@ public class UIManager : SingletonBehaviour<UIManager>
             if (group.obj != null)
                 foreach (var o in group.obj)
                     if (!string.IsNullOrEmpty(o.objectName) && o.obj) maps.objects[o.objectName] = o.obj;
+            // ➕ [추가] Slider 매핑
+            if (group.slider != null)
+                foreach (var s in group.slider)
+                    if (!string.IsNullOrEmpty(s.sliderName) && s.slider) maps.sliders[s.sliderName] = s.slider;
         }
     }
 
@@ -118,6 +126,47 @@ public class UIManager : SingletonBehaviour<UIManager>
         }
         Debug.LogWarning($"[UIManager] Target not found for SetActive: {group}.{name}");
         return false;
+    }
+
+    // ===== ➕ [추가] Slider API =====
+
+    public bool TrySetSliderValue(string group, string name, float value)
+    {
+        if (_groups.TryGetValue(group, out var g) && g.sliders.TryGetValue(name, out var s))
+        {
+            s.value = value;
+            return true;
+        }
+        return false;
+    }
+
+    public bool TrySetSliderMinMax(string group, string name, float min, float max)
+    {
+        if (_groups.TryGetValue(group, out var g) && g.sliders.TryGetValue(name, out var s))
+        {
+            s.minValue = min;
+            s.maxValue = max;
+            return true;
+        }
+        return false;
+    }
+
+    public bool TrySetSliderOnValueChanged(string group, string name, UnityAction<float> action)
+    {
+        if (_groups.TryGetValue(group, out var g) && g.sliders.TryGetValue(name, out var s))
+        {
+            s.onValueChanged.RemoveAllListeners();
+            if (action != null) s.onValueChanged.AddListener(action);
+            return true;
+        }
+        return false;
+    }
+
+    public float GetSliderValue(string group, string name)
+    {
+        if (_groups.TryGetValue(group, out var g) && g.sliders.TryGetValue(name, out var s))
+            return s.value;
+        return 0f;
     }
 
     // ===== Text API =====
@@ -196,6 +245,18 @@ public class UIManager : SingletonBehaviour<UIManager>
         if (_groups.TryGetValue(group, out var g) && g.inputs.TryGetValue(name, out var ipt))
         {
             ipt.text = value;
+            return true;
+        }
+        return false;
+    }
+
+    // ===== ➕ [추가] InputField Event API (슬라이더와 연동 위해 필요) =====
+    public bool TrySetInputOnEndEdit(string group, string name, UnityAction<string> action)
+    {
+        if (_groups.TryGetValue(group, out var g) && g.inputs.TryGetValue(name, out var ipt))
+        {
+            ipt.onEndEdit.RemoveAllListeners();
+            if (action != null) ipt.onEndEdit.AddListener(action);
             return true;
         }
         return false;

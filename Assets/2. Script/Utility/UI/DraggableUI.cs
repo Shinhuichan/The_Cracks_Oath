@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using UnityEngine.Events; // ➕ UnityEvent 사용을 위해 추가
 
 public class DraggableUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
@@ -16,6 +17,9 @@ public class DraggableUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndD
     private RectTransform targetRectTransform;
     private Canvas parentCanvas;
     private Vector3 originalScale; // 초기 크기 저장용
+
+    [Tooltip("드래그가 시작될 때 호출될 이벤트")]
+    public UnityEvent onBeginDrag; // ➕ [신규] 외부에서 기능을 연결할 이벤트
 
     private void Awake()
     {
@@ -86,6 +90,9 @@ public class DraggableUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndD
         {
             targetRectTransform.SetAsLastSibling();
         }
+
+        // ➕ [신규] 드래그 시작 이벤트 호출
+        onBeginDrag?.Invoke();
     }
 
     // 2. 드래그 중 계속 호출 (이동 로직)
