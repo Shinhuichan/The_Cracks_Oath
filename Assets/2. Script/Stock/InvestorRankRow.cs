@@ -14,7 +14,7 @@ public class InvestorRankRow : MonoBehaviour
     {
         txtRank.text = $"{rank}위";
         txtName.text = name;
-        txtAsset.text = $"{totalAsset:N0} 원";
+        txtAsset.text = $"{NumberUtils.ToCurrencyString(totalAsset)} 원";
 
         // 🎨 텍스트 색상 설정
         Color textColor = Color.white;

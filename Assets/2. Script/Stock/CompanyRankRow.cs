@@ -14,7 +14,7 @@ public class CompanyRankRow : MonoBehaviour
     {
         txtRank.text = $"{rank}위";
         txtName.text = $"{name} <size=70%><color=#666666>({symbol})</color></size>";
-        txtMarketCap.text = $"{marketCap:N0} 원";
+        txtMarketCap.text = $"{NumberUtils.ToCurrencyString(marketCap)} 원";
 
         // 1~3위 색상 강조
         if (rank == 1) txtRank.color = new Color(1f, 0.8f, 0f); // 금색

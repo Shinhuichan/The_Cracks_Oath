@@ -2,22 +2,22 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
+using UnityEngine.UI;
 
 public class RankingManager : MonoBehaviour
 {
     [Header("Settings")]
-    public float refreshInterval = 3.0f; // 3초마다 갱신
+    public float refreshInterval = 3.0f; 
 
     [Header("UI References")]
-    public Transform contentParent; // Scroll View의 Content 오브젝트
-    public GameObject rowPrefab;    // InvestorRankRow 프리팹
+    // 🛠️ [수정] 직접 Prefab을 쓰는 대신 ObjectPool 사용
+    public SimpleObjectPool rowPool; 
 
     // 외부 참조
     private PlayerPortfolio player;
     private AIInvestorManager aiManager;
     private StockMarketManager market; 
 
-    // 랭킹용 데이터 구조체
     private class InvestorRankData
     {
         public string name;
@@ -25,13 +25,15 @@ public class RankingManager : MonoBehaviour
         public bool isPlayer; 
     }
 
-    private List<GameObject> spawnedRows = new List<GameObject>();
-
     void Start()
     {
         player = FindAnyObjectByType<PlayerPortfolio>();
         aiManager = FindAnyObjectByType<AIInvestorManager>();
         market = FindAnyObjectByType<StockMarketManager>();
+        
+        // 🛠️ [추가] 풀 컴포넌트 자동 찾기 (없으면 에러 로그)
+        if (rowPool == null) rowPool = GetComponent<SimpleObjectPool>();
+        if (rowPool == null) Debug.LogError("RankingManager에 SimpleObjectPool 컴포넌트가 필요합니다!");
 
         StartCoroutine(RankingUpdateLoop());
     }
@@ -40,7 +42,6 @@ public class RankingManager : MonoBehaviour
     {
         while (true)
         {
-            // 시작하자마자 한번 갱신하고 대기
             UpdateRanking();
             yield return new WaitForSeconds(refreshInterval);
         }
@@ -52,8 +53,7 @@ public class RankingManager : MonoBehaviour
 
         List<InvestorRankData> allInvestors = new List<InvestorRankData>();
 
-        // 1. 플레이어 자산 계산 (부채 포함된 순자산 사용)
-        long playerAsset = player.GetTotalAsset(); // PlayerPortfolio에 이 함수가 있어야 함
+        long playerAsset = player.GetTotalAsset(); 
         
         allInvestors.Add(new InvestorRankData 
         { 
@@ -62,11 +62,10 @@ public class RankingManager : MonoBehaviour
             isPlayer = true 
         });
 
-        // 2. AI 자산 계산
         foreach (var ai in aiManager.aiInvestors)
         {
             long aiStockValue = CalculateStockValue(ai.portfolio);
-            long aiTotal = ai.money + aiStockValue - ai.currentDebt; // AI도 부채 차감
+            long aiTotal = ai.money + aiStockValue - ai.currentDebt; 
 
             allInvestors.Add(new InvestorRankData 
             { 
@@ -76,52 +75,50 @@ public class RankingManager : MonoBehaviour
             });
         }
 
-        // 3. 자산순 정렬 (내림차순)
         var sortedList = allInvestors.OrderByDescending(x => x.totalAsset).ToList();
-
-        // 4. UI 갱신 (스크롤 뷰 방식)
         UpdateScrollUI(sortedList);
     }
 
-    // 주식 평가금 계산 헬퍼
-    long CalculateStockValue(Dictionary<StockData, int> portfolio)
+    long CalculateStockValue(Dictionary<StockData, long> portfolio)
     {
         long total = 0;
         foreach (var item in portfolio)
         {
-            // 시장에서 현재가 조회
             RuntimeStock stock = market.marketStocks.Find(s => s.data == item.Key);
-            // 상장 폐지되었거나 없으면 가치 0
-            if (stock != null)
-            {
-                total += (long)stock.currentPrice * item.Value;
-            }
+            if (stock != null) total += (long)stock.currentPrice * item.Value;
         }
         return total;
     }
 
     void UpdateScrollUI(List<InvestorRankData> rankingData)
     {
-        // 기존 목록 삭제 (풀링을 안 쓰므로 간단히 Destroy)
-        foreach (var row in spawnedRows)
-        {
-            Destroy(row);
-        }
-        spawnedRows.Clear();
+        // 🛠️ [최적화] 기존 오브젝트를 모두 반환 (Destroy 아님)
+        if (rowPool != null) rowPool.ReturnAll();
 
-        // 새 목록 생성
         for (int i = 0; i < rankingData.Count; i++)
         {
             var data = rankingData[i];
-            GameObject newRow = Instantiate(rowPrefab, contentParent);
-            spawnedRows.Add(newRow);
-
+            
+            // 🛠️ [최적화] 풀에서 꺼내오기
+            GameObject newRow = rowPool.Get();
+            
+            // ⭐⭐⭐ [핵심 수정] 이 코드를 추가해주세요! ⭐⭐⭐
+            // 방금 꺼낸 UI를 목록의 맨 아래로 이동시켜서, 위에서부터 차례대로 쌓이게 합니다.
+            newRow.transform.SetAsLastSibling();
+            
             InvestorRankRow rowScript = newRow.GetComponent<InvestorRankRow>();
             if (rowScript != null)
             {
-                // (순위, 이름, 자산, 플레이어여부, 홀수줄여부)
+                // (순위, 이름, 자산, 플레이어여부, 홀수여부)
                 rowScript.SetData(i + 1, data.name, data.totalAsset, data.isPlayer, (i % 2 != 0));
             }
+        }
+
+        // 🔄 [추가] 레이아웃 강제 갱신 (ContentSizeFitter 버그 방지)
+        // rowPool.parentTransform은 SimpleObjectPool에 연결된 Content 오브젝트입니다.
+        if (rowPool.parentTransform != null)
+        {
+            LayoutRebuilder.ForceRebuildLayoutImmediate(rowPool.parentTransform as RectTransform);
         }
     }
 }

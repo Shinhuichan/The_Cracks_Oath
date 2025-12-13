@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e0feac0b93001254b835ecddcb436fd3, type: 3}
+  m_Name: "\uB514\uC624\uB2C8\uC18C\uC2A4"
+  m_EditorClassIdentifier: 
+  stockName: "\uB514\uC624\uB2C8\uC18C\uC2A4"
+  symbol: WINE
+  description: "\"\uD569\uBC95\uC801\uC778 \uCDE8\uAE30.\" \uC219\uCDE8\uAC00 \uC5C6\uACE0
+    \uAC04 \uC190\uC0C1\uC774 \uC5C6\uB294 \uD569\uC131 \uC54C\uCF54\uC62C '\uB124\uC624
+    \uB9AC\uCEE4'\uB97C \uC81C\uC870\uD569\uB2C8\uB2E4. **\uC2A4\uD0C0 \uB354\uC2A4\uD2B8(\uCE74\uD398)**\uAC00
+    \uB0AE\uC744 \uC9C0\uBC30\uD55C\uB2E4\uBA74, \uB514\uC624\uB2C8\uC18C\uC2A4\uB294
+    \uBC24\uC744 \uC9C0\uBC30\uD569\uB2C8\uB2E4. \uC815\uBD80\uC758 \uC8FC\uB958\uC138
+    \uC778\uC0C1 \uB274\uC2A4\uC5D0 \uB9E4\uC6B0 \uBBFC\uAC10\uD569\uB2C8\uB2E4."
+  icon: {fileID: 0}
+  startPrice: 38000
+  volatility: 0.07
+  sector: 3
+  companySize: 1
+  totalShares: 3000000000
+  eventPotential: 1
+  eventWeight: 1
+  dividendPerShare: 2000

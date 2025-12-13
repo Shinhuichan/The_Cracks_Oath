@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e0feac0b93001254b835ecddcb436fd3, type: 3}
+  m_Name: "\uBBA4\uC988 \uB808\uCF54\uB4DC"
+  m_EditorClassIdentifier: 
+  stockName: "\uBBA4\uC988 \uB808\uCF54\uB4DC"
+  symbol: MUSE
+  description: "\"AI\uAC00 \uC791\uACE1\uD558\uB294 \uAC10\uB3D9.\" \uC778\uAC04\uC758
+    \uAC10\uC815\uC744 \uBE45\uB370\uC774\uD130\uB85C \uBD84\uC11D\uD574 \uB9DE\uCDA4\uD615
+    \uC74C\uC545\uC744 \uC791\uACE1\uD558\uB294 AI \uC5D4\uD130 \uAE30\uC5C5\uC785\uB2C8\uB2E4.
+    \uBC84\uC2A4 \uB77C\uC774\uBE0C(\uBA54\uD0C0\uBC84\uC2A4) \uCF58\uC11C\uD2B8\uC758
+    \uC74C\uC6D0\uC744 \uB3C5\uC810 \uACF5\uAE09\uD569\uB2C8\uB2E4. \uC800\uC791\uAD8C\uBC95
+    \uAC1C\uC815\uC5D0 \uB530\uB77C \uC8FC\uAC00\uAC00 \uB110\uB6F0\uAE30\uD569\uB2C8\uB2E4."
+  icon: {fileID: 0}
+  startPrice: 42000
+  volatility: 0.1
+  sector: 5
+  companySize: 1
+  totalShares: 5000000000
+  eventPotential: 1
+  eventWeight: 1
+  dividendPerShare: 1000

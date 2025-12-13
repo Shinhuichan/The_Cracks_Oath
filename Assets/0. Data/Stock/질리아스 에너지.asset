@@ -25,10 +25,11 @@ MonoBehaviour:
     \uCD5C\uADFC \uC6B0\uC8FC \uC790\uC6D0 \uCC44\uAD74(\uBCF4\uC774\uB4DC \uD558\uC6B8
     \uD611\uB825)\uB85C \uB208\uC744 \uB3CC\uB9AC\uACE0 \uC788\uC2B5\uB2C8\uB2E4."
   icon: {fileID: 0}
-  startPrice: 24500
+  startPrice: 450000
   volatility: 0.08
   sector: 4
-  totalShares: 60000000
+  companySize: 0
+  totalShares: 20000000000
   eventPotential: 0.6
   eventWeight: 2.5
-  dividendPerShare: 200
+  dividendPerShare: 22500

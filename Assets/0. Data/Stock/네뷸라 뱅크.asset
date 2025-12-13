@@ -23,10 +23,11 @@ MonoBehaviour:
     \uC788\uC73C\uBA70, \uBCF4\uC218\uC801\uC778 \uD22C\uC790 \uC131\uD5A5\uC744
     \uAC00\uC9D1\uB2C8\uB2E4."
   icon: {fileID: 0}
-  startPrice: 62000
+  startPrice: 450000
   volatility: 0.03
   sector: 0
-  totalShares: 8000000
-  eventPotential: 0.4
+  companySize: 0
+  totalShares: 10000000000
+  eventPotential: 0.5
   eventWeight: 1.5
-  dividendPerShare: 600
+  dividendPerShare: 25000
